@@ -1,0 +1,7 @@
+{
+  "name": "discord-sync-bot",
+  "private": true,
+  "type": "module",
+  "description": "Engineering Study Hub: M-Pesa payment buttons, free-trial expiry and semester renewals for the Discord server.",
+  "engines": { "node": ">=20" }
+}

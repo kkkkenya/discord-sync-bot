@@ -2,6 +2,7 @@
 // Set as the app's Interactions Endpoint URL: https://<project>.vercel.app/api/interactions
 import { api, dm, isValidSignature, isoDay } from '../lib/discord.js';
 import { CHANNELS, GUILD_ID, MPESA, PRICES, ROLES, WHATSAPP } from '../lib/config.js';
+import THREADS from '../lib/threads.json' with { type: 'json' }; // unit code -> posts (regenerate when posts change)
 
 const ADMINISTRATOR = 1n << 3n;
 const MANAGE_ROLES = 1n << 28n;
@@ -36,6 +37,57 @@ const rejection = [
   `Still stuck? Message us on WhatsApp: ${WHATSAPP}`,
 ].join('\n');
 
+// The best post for a unit code in each forum (a unit taught in two years has a post in both).
+// Several posts in one forum: take the merged one, i.e. the post listing the most unit codes.
+async function postsFor(code) {
+  let hits = THREADS[code] || [];
+  if (!hits.length) { // a post created after threads.json was generated
+    const { threads } = await api('GET', `/guilds/${GUILD_ID}/threads/active`);
+    hits = threads.filter((t) => (t.name.split(' — ')[0].match(/[A-Z]{3} \d{3}/g) || []).includes(code))
+      .map((t) => ({ id: t.id, name: t.name, forum: t.parent_id }));
+  }
+  const best = new Map();
+  for (const h of hits) {
+    const n = (h.name.split(' — ')[0].match(/[A-Z]{3} \d{3}/g) || []).length;
+    if (!best.has(h.forum) || n > best.get(h.forum).n) best.set(h.forum, { ...h, n });
+  }
+  return [...best.values()];
+}
+
+const forwardTo = (channelId, messageId, fromChannel) => api('POST', `/channels/${channelId}/messages`, {
+  message_reference: { type: 1, message_id: messageId, channel_id: fromChannel, guild_id: GUILD_ID },
+});
+
+async function handleSort(i, user) {
+  const perms = BigInt(i.member?.permissions || '0');
+  if (!(perms & (ADMINISTRATOR | MANAGE_ROLES))) return ephemeral('Only staff can sort files.');
+  const [, action, fileMsgId] = i.data.custom_id.split(':');
+  const done = (line) => json({ type: 7, data: { content: `${i.message.content}\n\n${line}`, components: [], allowed_mentions: { parse: [] } } });
+
+  if (i.type === 3 && action === 'start') {
+    return json({ type: 9, data: {
+      custom_id: `sort:form:${fileMsgId}`,
+      title: 'Sort into a unit',
+      components: [{ type: 1, components: [{ type: 4, custom_id: 'code', label: 'Unit code (e.g. EMM 305 or ECU107)', style: 1, min_length: 6, max_length: 9, required: true }] }],
+    } });
+  }
+  if (i.type === 3 && action === 'library') {
+    await forwardTo(CHANNELS.library, fileMsgId, i.channel_id);
+    return done(`📚 Sent to #pdf-library by <@${user.id}> on ${isoDay(new Date())}`);
+  }
+  if (i.type === 5 && action === 'form') {
+    const raw = i.data.components[0].components[0].value.toUpperCase();
+    const m = raw.match(/([A-Z]{3})\s*-?\s*(\d{3})/);
+    if (!m) return ephemeral(`"${raw}" doesn't look like a unit code. Use three letters and three numbers, like EMM 305.`);
+    const code = `${m[1]} ${m[2]}`;
+    const posts = await postsFor(code);
+    if (!posts.length) return ephemeral(`There's no post for ${code} yet. Rename the file with its code and drop it in again; the bot creates the post.`);
+    for (const p of posts) await forwardTo(p.id, fileMsgId, i.channel_id);
+    return done(`✅ Sorted into **${posts[0].name}**${posts.length > 1 ? ` (and its other-year post)` : ''} by <@${user.id}> on ${isoDay(new Date())}`);
+  }
+  return ephemeral('Unknown sort action.');
+}
+
 export async function POST(request) {
   const signature = request.headers.get('x-signature-ed25519');
   const timestamp = request.headers.get('x-signature-timestamp');
@@ -48,6 +100,9 @@ export async function POST(request) {
 
   const user = i.member?.user || i.user;
   try {
+    // ── #to-sort: files the upload bot couldn't place ──
+    if (i.data?.custom_id?.startsWith('sort:')) return await handleSort(i, user);
+
     // ── buttons ──
     if (i.type === 3) {
       const [ns, action, uid, plan] = i.data.custom_id.split(':');

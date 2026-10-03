@@ -1,4 +1,6 @@
 {
   "crons": [{ "path": "/api/daily", "schedule": "0 6 * * *" }],
-  "functions": { "api/daily.js": { "maxDuration": 300 } }
+  "functions": { "api/daily.js": { "maxDuration": 300 } },
+  "rewrites": [{ "source": "/auth/:action", "destination": "/api/auth?action=:action" }],
+  "redirects": [{ "source": "/", "destination": "/dashboard/", "permanent": false }]
 }

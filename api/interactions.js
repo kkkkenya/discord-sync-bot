@@ -2,7 +2,7 @@
 // Set as the app's Interactions Endpoint URL: https://<project>.vercel.app/api/interactions
 import { api, dm, isValidSignature, isoDay } from '../lib/discord.js';
 import { CHANNELS, GUILD_ID, MPESA, PRICES, ROLES, WHATSAPP } from '../lib/config.js';
-import THREADS from '../lib/threads.json' with { type: 'json' }; // unit code -> posts (regenerate when posts change)
+import { forwardTo, postsFor } from '../lib/sorting.js';
 
 const ADMINISTRATOR = 1n << 3n;
 const MANAGE_ROLES = 1n << 28n;
@@ -36,27 +36,6 @@ const rejection = [
   `Check that you sent it to **${MPESA.number} (${MPESA.name})** and that the code is right, then press **I've paid** again.`,
   `Still stuck? Message us on WhatsApp: ${WHATSAPP}`,
 ].join('\n');
-
-// The best post for a unit code in each forum (a unit taught in two years has a post in both).
-// Several posts in one forum: take the merged one, i.e. the post listing the most unit codes.
-async function postsFor(code) {
-  let hits = THREADS[code] || [];
-  if (!hits.length) { // a post created after threads.json was generated
-    const { threads } = await api('GET', `/guilds/${GUILD_ID}/threads/active`);
-    hits = threads.filter((t) => (t.name.split(' — ')[0].match(/[A-Z]{3} \d{3}/g) || []).includes(code))
-      .map((t) => ({ id: t.id, name: t.name, forum: t.parent_id }));
-  }
-  const best = new Map();
-  for (const h of hits) {
-    const n = (h.name.split(' — ')[0].match(/[A-Z]{3} \d{3}/g) || []).length;
-    if (!best.has(h.forum) || n > best.get(h.forum).n) best.set(h.forum, { ...h, n });
-  }
-  return [...best.values()];
-}
-
-const forwardTo = (channelId, messageId, fromChannel) => api('POST', `/channels/${channelId}/messages`, {
-  message_reference: { type: 1, message_id: messageId, channel_id: fromChannel, guild_id: GUILD_ID },
-});
 
 async function handleSort(i, user) {
   const perms = BigInt(i.member?.permissions || '0');

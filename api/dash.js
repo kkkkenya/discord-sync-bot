@@ -39,6 +39,7 @@ async function queue() {
     items.push({
       fileMsgId, noteMsgId: note.id, name: a.filename, size: a.size, url: a.url, type: a.content_type || '',
       reason: (note.content.match(/Couldn't place this file\*\*: (.*)/) || [])[1] || '',
+      suggestion: (note.content.match(/💡 Suggestion: ([A-Z]{3} \d{3})/) || [])[1] || '',
       snippet: (note.content.match(/Page 1 starts: "([\s\S]*?)"\n/) || [])[1] || '',
       at: file.timestamp,
     });

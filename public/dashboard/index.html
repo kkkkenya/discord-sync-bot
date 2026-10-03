@@ -164,7 +164,21 @@ h2{font-family:'Instrument Serif',Georgia,serif;font-weight:400;font-size:28px;m
         '<div class="msg"></div><div class="preview" hidden></div>';
       var chosen = (state.chosen[it.fileMsgId] = state.chosen[it.fileMsgId] || []);
       var sendBtn = card.querySelector('[data-act=send]');
-      card.querySelector('.slot').appendChild(picker(chosen, function () { sendBtn.disabled = !chosen.length; }));
+      var pick = picker(chosen, function () { sendBtn.disabled = !chosen.length; });
+      card.querySelector('.slot').appendChild(pick);
+      // a title match on page 1 is offered as a one-tap suggestion (it's right about half the time)
+      var hint = it.suggestion && options().find(function (o) { return o.kind === 'unit' && o.label.indexOf(it.suggestion) === 0; });
+      if (hint) {
+        var use = document.createElement('button'); use.className = 'btn'; use.style.marginTop = '8px';
+        use.textContent = '💡 Use suggestion: ' + hint.label;
+        use.addEventListener('click', function () {
+          if (!chosen.some(function (c) { return c.label === hint.label; })) chosen.push(hint);
+          var input = pick.querySelector('input'); input.dispatchEvent(new Event('input'));
+          pick.querySelector('.chips').innerHTML = chosen.map(function (c, i) { return '<span class="chip">' + esc(c.label) + '<b data-i="' + i + '" title="Remove">×</b></span>'; }).join('');
+          sendBtn.disabled = false; use.remove();
+        });
+        card.querySelector('.slot').appendChild(use);
+      }
       card.querySelector('input[type=checkbox]').addEventListener('change', function () { if (this.checked) state.selected.add(it.fileMsgId); else state.selected.delete(it.fileMsgId); refreshBulk(); });
       card.querySelector('[data-act=preview]').addEventListener('click', function () {
         var p = card.querySelector('.preview');

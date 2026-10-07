@@ -5,7 +5,7 @@
 //   GET  /api/dash?op=stats    members, trials, payments, money this semester
 import { api, isoDay } from '../lib/discord.js';
 import { CHANNELS, EXISTING, GUILD_ID, PRICES, ROLES, SEMESTER_START, TRIAL_DAYS } from '../lib/config.js';
-import { allUnitPosts, forwardTo, normaliseCode, postsFor, SHELVES } from '../lib/sorting.js';
+import { allUnitPosts, forwardTo, normaliseCode, partsOf, postsFor, SHELVES } from '../lib/sorting.js';
 import { currentUser } from '../lib/session.js';
 
 const DAY = 24 * 3600 * 1000;
@@ -69,7 +69,8 @@ async function sort(body, user) {
       plan.push({ label: '#pdf-library', ids: [CHANNELS.library] });
     }
   }
-  for (const p of plan) for (const id of p.ids) await forwardTo(id, fileMsgId, CHANNELS.toSort);
+  const parts = partsOf(note.content, fileMsgId); // every part of a split book
+  for (const p of plan) for (const id of p.ids) for (const part of parts) await forwardTo(id, part, CHANNELS.toSort);
   const labels = plan.map((p) => p.label);
   await api('PATCH', `/channels/${CHANNELS.toSort}/messages/${noteMsgId}`, {
     content: `${note.content}\n\n✅ Sorted into ${labels.join(', ')} by ${user.name} (dashboard) on ${isoDay(new Date())}`,

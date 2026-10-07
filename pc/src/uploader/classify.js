@@ -9,12 +9,15 @@ import { extract } from './extract.js';
 const BOOK_BYTES = Number(process.env.BOOK_MB || 15) * 1024 * 1024;
 const BOOK_PAGES = Number(process.env.BOOK_PAGES || 150);
 
+// Course hints from folder names. A unit prefix only counts on its own ("EEE" folder), not inside a unit code
+// ("EBE 209"): the code itself already says where the unit lives, and shared units belong to several courses.
+const alone = (p) => `\\b${p}\\b(?![\\s_.-]*\\d)`;
 const DEPTS = [
-  ['mech', /mechanical|\bmech\b|aero(space|nautical)?|\bemm\b|\bear\b/i],
-  ['abe', /agric|biosystems|\babe\b|\bebe\b/i],
-  ['civil', /\bcivil\b|\becv\b|structural/i],
-  ['eee', /electrical|electronic|\beee\b|\bebm\b|biomedical/i],
-  ['egp', /\begp\b|\bepl\b|petroleum|energy|geospatial/i],
+  ['mech', new RegExp(`mechanical|\\bmech\\b|aero(space|nautical)?|${alone('emm')}|${alone('ear')}`, 'i')],
+  ['abe', new RegExp(`agric|biosystems|${alone('abe')}|${alone('ebe')}`, 'i')],
+  ['civil', new RegExp(`\\bcivil\\b|${alone('ecv')}|structural`, 'i')],
+  ['eee', new RegExp(`electrical|electronic|${alone('eee')}|${alone('ebm')}|biomedical`, 'i')],
+  ['egp', new RegExp(`${alone('egp')}|${alone('epl')}|petroleum|energy|geospatial`, 'i')],
 ];
 const YEAR = /(?:^|[^\d])([1-5])(?:st|nd|rd|th)?[\s_-]*(?:year|yr)|(?:year|yr|\by)[\s_-]*([1-5])(?!\d)/i;
 const SEM = /([12])(?:st|nd)?[\s_-]*sem|sem(?:ester)?[\s_-]*([12])(?!\d)/i;
@@ -46,6 +49,12 @@ const SHELF_WORDS = {
   'Management, Research & Professional Practice': ['management', 'research', 'ethics', 'professional', 'entrepreneur', 'economics', 'project management', 'law'],
 };
 
+// The kind of a file from its name (and any other text), for files already on the server.
+export function kindOf(text, name = '') {
+  if (/\.pptx?$/i.test(name)) return 'slides';
+  return KINDS.find(([, re]) => re.test(text))?.[0] || 'other';
+}
+
 function bestShelf(text) {
   const t = text.toLowerCase();
   let best = null;
@@ -58,8 +67,9 @@ function bestShelf(text) {
 
 export async function classify(path, root, size, index) {
   const name = basename(path);
-  const rel = relative(root, path);
-  const folders = relative(root, dirname(path)).split(sep).filter((f) => f && f !== '.').reverse(); // nearest first
+  const rel = relative(dirname(root), path); // includes the watched folder's name
+  // the watched folder's own name counts too ("ECU 203; LAPLACE TRANSFORMS"), so measure from its parent
+  const folders = relative(dirname(root), dirname(path)).split(sep).filter((f) => f && f !== '.' && f !== '..').reverse(); // nearest first
   const pathText = [name, ...folders].join(' / ');
 
   const hints = {};

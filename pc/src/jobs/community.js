@@ -71,12 +71,13 @@ export async function runNudges(ctx) {
     const lines = [
       `Hi ${m.displayName}, it's been a little while! Here's what's new on Engineering Study Hub since you last dropped by:`,
       files.length ? `📚 **${plural(files.length, 'new file')}** in the library${inMine ? `, ${inMine} of them in your year's forum` : ''}.` : '📚 The unit libraries are all there when you need them.',
-      `🧠 Today's practice problem is waiting in <#${ctx.setup.channels.dailyChannel.id}>. One tap to start a streak 🔥`,
+      ctx.setup.channels.dailyChannel && `🧠 Today's practice problem is waiting in <#${ctx.setup.channels.dailyChannel.id}>. One tap to start a streak 🔥`,
       '🔎 Looking for something? Type `/find resource` and a unit code.',
+      `👥 Revising with others helps: \`/find group\` shows study groups for your units.`,
       '',
       '_Rather not get these? Type `/nudges off` in the server._',
     ];
-    const ok = await m.send(lines.join('\n')).then(() => true, () => false);
+    const ok = await m.send(lines.filter((l) => l !== false && l !== undefined).join('\n')).then(() => true, () => false);
     state.lastNudged[m.id] = now;
     if (ok) sent++;
     await sleep(1500);
@@ -105,10 +106,10 @@ export async function runExamPush(ctx) {
       forums.length ? `• **Your units**: ${forums.map((f) => `<#${f.id}>`).join(', ')}. Every unit post has its past papers and CATs.` : "• **Your units**: open your year's forum. Every unit post has its past papers and CATs.",
       '• **Past papers fast**: `/find resource EMM 305 kind:paper` (use your unit code).',
       '• **Revise with others**: `/find group`, or start one with `/group create`.',
-      `• **Daily practice**: <#${ctx.setup.channels.dailyChannel.id}>, one exam-style problem a day 🔥`,
+      ctx.setup.channels.dailyChannel && `• **Daily practice**: <#${ctx.setup.channels.dailyChannel.id}>, one exam-style problem a day 🔥`,
       '',
       'You\'ve got this. 💪',
-    ].join('\n');
+    ].filter((l) => l !== false && l !== undefined).join('\n');
     await m.send(msg).catch(() => {});
     done[m.id] = true;
     sent++;

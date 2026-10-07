@@ -3,7 +3,7 @@
 // Set as the app's Interactions Endpoint URL: https://<project>.vercel.app/api/interactions
 import { api, dm, isValidSignature, isoDay } from '../lib/discord.js';
 import { CHANNELS, GUILD_ID, MPESA, PRICES, ROLES, WHATSAPP } from '../lib/config.js';
-import { forwardTo, postsFor } from '../lib/sorting.js';
+import { canSort, forwardTo, partsOf, postsFor } from '../lib/sorting.js';
 import { handleCommand, handleComponent } from '../lib/commands.js';
 
 const ADMINISTRATOR = 1n << 3n;
@@ -52,10 +52,12 @@ const rejection = [
 ].join('\n');
 
 async function handleSort(i, user) {
-  const perms = BigInt(i.member?.permissions || '0');
-  if (!(perms & (ADMINISTRATOR | MANAGE_ROLES))) return ephemeral('Only staff can sort files.');
+  if (!(await canSort(i.member))) return ephemeral('Only reps and admins can sort files.');
   const [, action, fileMsgId] = i.data.custom_id.split(':');
   const done = (line) => json({ type: 7, data: { content: `${i.message.content}\n\n${line}`, components: [], allowed_mentions: { parse: [] } } });
+  // every part of a split book, in order; destinations in parallel so we answer Discord within 3 seconds
+  const parts = partsOf(i.message?.content, fileMsgId);
+  const sendTo = (ids) => Promise.all(ids.map(async (id) => { for (const p of parts) await forwardTo(id, p, i.channel_id); }));
 
   if (i.type === 3 && action === 'start') {
     return json({ type: 9, data: {
@@ -65,7 +67,7 @@ async function handleSort(i, user) {
     } });
   }
   if (i.type === 3 && action === 'library') {
-    await forwardTo(CHANNELS.library, fileMsgId, i.channel_id);
+    await sendTo([CHANNELS.library]);
     return done(`📚 Sent to #pdf-library by <@${user.id}> on ${isoDay(new Date())}`);
   }
   if (i.type === 5 && action === 'form') {
@@ -75,7 +77,7 @@ async function handleSort(i, user) {
     const code = `${m[1]} ${m[2]}`;
     const posts = await postsFor(code);
     if (!posts.length) return ephemeral(`There's no post for ${code} yet. Rename the file with its code and drop it in again; the bot creates the post.`);
-    for (const p of posts) await forwardTo(p.id, fileMsgId, i.channel_id);
+    await sendTo(posts.map((p) => p.id));
     return done(`✅ Sorted into **${posts[0].name}**${posts.length > 1 ? ` (and its other-year post)` : ''} by <@${user.id}> on ${isoDay(new Date())}`);
   }
   return ephemeral('Unknown sort action.');

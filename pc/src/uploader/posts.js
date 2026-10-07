@@ -44,6 +44,18 @@ export class PostIndex {
     return this;
   }
 
+  // Offline (dry run without Discord): the posts saved in lib/threads.json.
+  loadSaved(threads) {
+    for (const posts of Object.values(threads)) {
+      for (const p of posts) {
+        if (!this.forums.has(p.forum)) this.forums.set(p.forum, { name: p.forum });
+        this.add({ id: p.id, name: p.name }, { name: p.forum });
+      }
+    }
+    for (const name of ['ecu-year-1', 'ecu-year-2', 'ecu-upper-years', 'ucu-university-common']) if (!this.forums.has(name)) this.forums.set(name, { name });
+    return this;
+  }
+
   // Unit codes in a piece of text (file name, folder name, page 1), trusted prefixes only.
   codesIn(text) {
     const out = [];

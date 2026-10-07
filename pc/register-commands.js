@@ -4,7 +4,7 @@
 import { config } from 'dotenv';
 config({ path: new URL('./.env', import.meta.url) });
 const { api } = await import('../lib/discord.js');
-const { APP_ID, GUILD_ID } = await import('../lib/config.js');
+const { APP_ID, FEATURES, GUILD_ID } = await import('../lib/config.js');
 
 const SUB = 1, STRING = 3, INTEGER = 4;
 const choices = (...names) => names.map((n) => ({ name: n, value: n }));
@@ -56,7 +56,15 @@ const COMMANDS = [
   { name: 'leaderboard', description: 'Top daily-problem players' },
 ];
 
+// Daily-problem commands only exist while the feature is on; switching it off removes them.
+const DAILY = ['daily', 'streak', 'leaderboard'];
+const existing = await api('GET', `/applications/${APP_ID}/guilds/${GUILD_ID}/commands`);
 for (const c of COMMANDS) {
+  if (!FEATURES.dailyProblems && DAILY.includes(c.name)) {
+    const old = existing.find((e) => e.name === c.name);
+    if (old) { await api('DELETE', `/applications/${APP_ID}/guilds/${GUILD_ID}/commands/${old.id}`); console.log(`- /${c.name} (removed, daily problems are off)`); }
+    continue;
+  }
   await api('POST', `/applications/${APP_ID}/guilds/${GUILD_ID}/commands`, { type: 1, ...c });
   console.log(`✓ /${c.name}`);
 }

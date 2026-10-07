@@ -1,6 +1,6 @@
 // Finds the channels and roles the bot needs (config.NAMES), creating any that are missing.
 import { ChannelType, PermissionFlagsBits } from 'discord.js';
-import { NAMES } from '../../lib/config.js';
+import { CHANNELS, FEATURES, NAMES, SORTER_ROLE_MATCH } from '../../lib/config.js';
 
 const TOPICS = {
   dailyChannel: 'One practice problem a day from real KU past papers. Tap an answer to keep your streak. /daily on for pings, /streak, /leaderboard.',
@@ -14,7 +14,8 @@ export async function ensureSetup(guild, log = console.log) {
   const roles = await guild.roles.fetch();
   const out = { channels: {}, roles: {} };
 
-  for (const key of ['dailyChannel', 'digestChannel', 'groupsChannel', 'botLog']) {
+  const daily = FEATURES.dailyProblems;
+  for (const key of [...(daily ? ['dailyChannel'] : []), 'digestChannel', 'groupsChannel', 'botLog']) {
     let ch = channels.find((c) => c?.name === NAMES[key] && c.type === ChannelType.GuildText);
     if (!ch) {
       ch = await guild.channels.create({
@@ -31,7 +32,7 @@ export async function ensureSetup(guild, log = console.log) {
     out.channels[key] = ch;
   }
 
-  for (const key of ['dailyRole', 'streak7', 'streak30']) {
+  for (const key of daily ? ['dailyRole', 'streak7', 'streak30'] : []) {
     let role = roles.find((r) => r.name === NAMES[key]);
     if (!role) {
       role = await guild.roles.create({ name: NAMES[key], mentionable: key === 'dailyRole', hoist: false, reason: 'Engineering Study Hub bot' });
@@ -39,5 +40,17 @@ export async function ensureSetup(guild, log = console.log) {
     }
     out.roles[key] = role;
   }
+
+  // reps can see and work #to-sort (admins already can)
+  const toSort = await guild.channels.fetch(CHANNELS.toSort).catch(() => null);
+  const reps = roles.filter((r) => !r.managed && SORTER_ROLE_MATCH.test(r.name));
+  if (!reps.size) log(`ℹ️ No rep role found (a role with "rep" in its name), so only admins can sort #to-sort.`);
+  for (const r of reps.values()) {
+    if (toSort && !toSort.permissionsFor(r).has(PermissionFlagsBits.ViewChannel)) {
+      await toSort.permissionOverwrites.edit(r, { ViewChannel: true, SendMessages: true, ReadMessageHistory: true }, { reason: 'Reps sort #to-sort' });
+      log(`Gave ${r.name} access to #${toSort.name}`);
+    }
+  }
+  out.reps = [...reps.values()];
   return out;
 }

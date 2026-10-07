@@ -1,11 +1,11 @@
--- Engineering Study Hub bot: run once in Supabase → SQL Editor.
+-- Engineering Study Hub bot: run once in Supabase → SQL Editor (setup.bat can do it for you). Safe to run again.
 -- Only bot data lives here (file index, daily problems, streaks, groups). No member records beyond that.
 -- RLS is on with no policies, so the website's publishable key can't read or write these tables;
 -- the bot uses the service_role key, which bypasses RLS.
 
 create table if not exists files (
   id          bigserial primary key,
-  hash        text unique not null,      -- sha256 of the file, so nothing is uploaded twice
+  hash        text unique not null,      -- sha256 of the file (or discord:<message>:<attachment> for files already on the server)
   name        text not null,
   kind        text not null,             -- paper | notes | slides | book | other
   unit_code   text,                      -- 'EMM 305', or null for books and general files
@@ -19,6 +19,8 @@ create table if not exists files (
 );
 create index if not exists files_unit_idx on files (unit_code);
 create index if not exists files_created_idx on files (created_at);
+create index if not exists files_size_idx on files (size);  -- duplicate check: same size and file type
+create index if not exists files_message_idx on files (channel_id, message_id);
 
 create table if not exists problems (
   id             bigserial primary key,

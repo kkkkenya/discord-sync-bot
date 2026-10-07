@@ -17,18 +17,23 @@ export function forumsFor(member, index) {
   return out;
 }
 
-export const welcomeGuide = (name, ch) => [
-  `👋 **Welcome to Engineering Study Hub, ${name}!** Here's how to get the most out of it:`,
-  '',
-  `**1. Your free week.** You've got 7 days of full access to the unit libraries. After that it's KES ${PRICES.basic} a semester (Basic) or KES ${PRICES.premium} once for the whole degree (Premium). Pay in #upgrade-to-premium.`,
-  "**2. Find your units.** Each course and year has a forum (like `mech-year-2`) with one post per unit: past papers, CATs and notes. Fastest way: type `/find resource EMM 305` anywhere.",
-  '**3. Books.** Textbooks sit on the topic shelves and in #pdf-library.',
-  `**4. Practise daily.** A new problem from real KU past papers lands in <#${ch.dailyChannel.id}> every morning. Answer to build a streak 🔥 Want a ping? \`/daily on\`.`,
-  `**5. Study with people.** \`/find group\` shows study groups and classmates; \`/group create\` starts one in <#${ch.groupsChannel.id}>.`,
-  `**6. What's new.** Every Sunday <#${ch.digestChannel.id}> lists the files added that week.`,
-  '',
-  `Stuck or missing a unit? Ask in your year's forum, or WhatsApp us: ${WHATSAPP}`,
-].join('\n');
+export function welcomeGuide(name, ch) {
+  const tips = [
+    `**Your free week.** You've got 7 days of full access to the unit libraries. After that it's KES ${PRICES.basic} a semester (Basic) or KES ${PRICES.premium} once for the whole degree (Premium). Pay in #upgrade-to-premium.`,
+    "**Find your units.** Each course and year has a forum (like `mech-year-2`) with one post per unit: past papers, CATs and notes. Fastest way: type `/find resource EMM 305` anywhere.",
+    '**Books.** Textbooks sit on the topic shelves and in #pdf-library.',
+    ch.dailyChannel && `**Practise daily.** A new problem from real KU past papers lands in <#${ch.dailyChannel.id}> every morning. Answer to build a streak 🔥 Want a ping? \`/daily on\`.`,
+    `**Study with people.** \`/find group\` shows study groups and classmates; \`/group create\` starts one in <#${ch.groupsChannel.id}>.`,
+    `**What's new.** Every Sunday <#${ch.digestChannel.id}> lists the files added that week.`,
+  ].filter(Boolean);
+  return [
+    `👋 **Welcome to Engineering Study Hub, ${name}!** Here's how to get the most out of it:`,
+    '',
+    ...tips.map((t, n) => `**${n + 1}.** ${t}`),
+    '',
+    `Stuck or missing a unit? Ask in your year's forum, or WhatsApp us: ${WHATSAPP}`,
+  ].join('\n');
+}
 
 export function wireMembers(client, setup, log) {
   client.on(Events.GuildMemberAdd, async (member) => {

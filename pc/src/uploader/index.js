@@ -1,31 +1,39 @@
-// Watches the folders in WATCH_DIRS (a PC folder and the Google Drive for Desktop folder). Every file that appears,
-// including everything already there on first start, is sorted and uploaded once:
+// Watches the folders in WATCH_DIRS and follows the Drive shortcuts (.lnk) inside them, so a folder of shortcuts
+// to shared course folders works. Every file that appears, including everything already there on first start,
+// is sorted and uploaded once:
 //   unit code found -> that unit's post (created if missing), forwarded to its other-year post too
 //   book, no code   -> the best topic shelf
-//   anything else   -> #to-sort with the Sort buttons (Vercel / dashboard)
-// Files stay where they are; the sha256 of each one is kept in Supabase so nothing is uploaded twice.
+//   anything else   -> #to-sort with the Sort buttons, and reps and admins get a ping
+// Files too big for Discord are compressed or split into parts (shrink.js). Files stay where they are;
+// the sha256 of each one is kept in Supabase so nothing is uploaded twice.
+import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
-import { basename, extname, resolve, sep } from 'node:path';
+import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { readdir, stat } from 'node:fs/promises';
+import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import chokidar from 'chokidar';
-import { CHANNELS } from '../../../lib/config.js';
+import { CHANNELS, SORTER_ROLE_MATCH } from '../../../lib/config.js';
 import { db } from '../../../lib/db.js';
 import { sleep } from '../../../lib/discord.js';
 import { forwardTo } from '../../../lib/sorting.js';
+import { save, state } from '../state.js';
 import { classify } from './classify.js';
+import { fingerprint, onServer } from './existing.js';
+import { mb, PIECES_HELP, shrink } from './shrink.js';
 
 const SKIP_EXT = new Set(['.tmp', '.crdownload', '.part', '.partial', '.ini', '.lnk', '.db', '.ds_store',
-  '.gdoc', '.gsheet', '.gslides', '.gform', '.gdraw', '.gmap', '.gsite', '.gjam']); // .g* are Drive shortcuts, not files
+  '.gdoc', '.gsheet', '.gslides', '.gform', '.gdraw', '.gmap', '.gsite', '.gjam']); // .g* are Drive links, not files
 const ICON = { paper: '📝', notes: '📒', slides: '📊', book: '📚', other: '📄' };
 const LABEL = { paper: 'Past paper', notes: 'Notes', slides: 'Slides', book: 'Book', other: 'File' };
 const LIMIT_BY_TIER = [10, 10, 50, 100]; // MB a bot can upload, by server boost level
+const NONE = { parse: [] };
 
 const skip = (p) => {
   const name = basename(p);
   return name.startsWith('~$') || name.startsWith('.') || SKIP_EXT.has(extname(name).toLowerCase())
     || p.split(sep).some((part) => part === 'node_modules' || part === '.git' || part === '$RECYCLE.BIN');
 };
+const under = (child, parent) => child.toLowerCase().startsWith(parent.toLowerCase() + sep); // Windows paths ignore case
 
 function sha256(path) {
   return new Promise((ok, fail) => {
@@ -34,114 +42,232 @@ function sha256(path) {
   });
 }
 
-const mb = (bytes) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-const quote = (s) => s.replace(/"/g, "'").replace(/\s+/g, ' ').slice(0, 200);
+// Drive for Desktop shows shortcuts to shared folders as .lnk files; Windows knows where they point.
+function shortcutTargets(paths) {
+  if (!paths.length) return Promise.resolve([]);
+  const list = paths.map((p) => `'${p.replace(/'/g, "''")}'`).join(',');
+  const script = `[Console]::OutputEncoding = [Text.Encoding]::UTF8; $s = New-Object -ComObject WScript.Shell; @(${list}) | ForEach-Object { $s.CreateShortcut($_).TargetPath }`;
+  return new Promise((ok) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, maxBuffer: 1 << 20 },
+    (e, out) => ok(e ? [] : String(out).split(/\r?\n/).map((l) => l.trim()).filter(Boolean))));
+}
+const isFolder = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
 
-export function startUploader(ctx) {
-  const roots = (process.env.WATCH_DIRS || '').split(';').map((d) => d.trim()).filter(Boolean).map((d) => resolve(d));
-  if (!roots.length) { ctx.log('⚠️ No WATCH_DIRS set in pc/.env, so the uploader is off.'); return; }
+async function findRoots(dirs) {
+  const found = [...dirs];
+  for (const d of dirs) {
+    const links = (await readdir(d).catch(() => [])).filter((n) => n.toLowerCase().endsWith('.lnk')).map((n) => join(d, n));
+    for (const t of await shortcutTargets(links)) if (isFolder(t)) found.push(resolve(t));
+  }
+  const unique = [...new Map(found.map((r) => [r.toLowerCase(), r])).values()];
+  return unique.filter((r) => !unique.some((o) => o !== r && under(r, o))); // a folder inside another is watched once
+}
 
-  const maxBytes = LIMIT_BY_TIER[ctx.guild.premiumTier] * 1024 * 1024;
+export async function startUploader(ctx) {
+  const dirs = (process.env.WATCH_DIRS || '').split(';').map((d) => d.trim()).filter(Boolean).map((d) => resolve(d));
+  if (!dirs.length) { ctx.log('⚠️ No WATCH_DIRS set in pc/.env, so the uploader is off.'); return; }
+  const missing = dirs.filter((d) => !existsSync(d));
+  if (missing.length) ctx.log(`⚠️ These WATCH_DIRS don't exist: ${missing.join(', ')}`);
+  const roots = await findRoots(dirs.filter((d) => existsSync(d)));
+  console.log(`Watching ${roots.length} folder${roots.length === 1 ? '' : 's'}:\n${roots.map((r) => `  ${r}`).join('\n')}`);
+
+  const maxBytes = LIMIT_BY_TIER[ctx.guild.premiumTier || 0] * 1024 * 1024;
   const seen = new Set();
-  const report = { unit: 0, shelf: 0, toSort: 0, tooBig: [], failed: [], created: [] };
+  const fresh = () => ({ unit: 0, shelf: 0, toSort: 0, dupes: 0, shrunk: [], tooBig: [], failed: [], created: [] });
+  const relOf = (path, root) => relative(dirname(root), path); // "Notes\Year 2\EMM 200\x.pdf"
+  let report = fresh();
+  const dryRows = [];
   let queue = Promise.resolve();
   let pending = 0;
+  let ready = false;
+
+  // Upload one file (in parts if it's too big). Returns every message posted, in order.
+  async function post(target, label, path, size, info) {
+    if (size <= maxBytes) return [await target.send({ content: label || undefined, files: [{ attachment: path, name: info.name }], allowedMentions: NONE })];
+    const out = await shrink(path, maxBytes);
+    const msgs = [];
+    for (const [n, f] of out.files.entries()) {
+      const help = out.how === 'pieces' && n === out.files.length - 1 ? `\n🧩 ${PIECES_HELP}` : '';
+      msgs.push(await target.send({ content: `${label || `📄 **${info.name}**`}${f.label ? ` · ${f.label}` : ''}${help}`, files: [{ attachment: f.data, name: f.name }], allowedMentions: NONE }));
+      await sleep(800);
+    }
+    report.shrunk.push(`${info.name} (${mb(size)}): ${out.how === 'split' ? `${out.files.length} parts` : out.how === 'pieces' ? `${out.files.length} zip pieces` : `${out.how} to ${mb(out.files[0].data.length)}`}`);
+    return msgs;
+  }
 
   async function handle(path) {
-    const root = roots.find((r) => path.toLowerCase().startsWith((r + sep).toLowerCase())) || roots[0]; // Windows paths ignore case
-    const { size, isFile } = await stat(path).then((s) => ({ size: s.size, isFile: s.isFile() }));
-    if (!isFile || !size) return;
-    const hash = await sha256(path);
-    if (seen.has(hash)) return;
-    seen.add(hash);
-    if (!ctx.dry && (await db.select('files', `hash=eq.${hash}&select=id`)).length) return;
+    const root = roots.find((r) => under(path, r)) || roots[0];
+    const s = await stat(path);
+    if (!s.isFile() || !s.size) return;
+    const fp = fingerprint(s.size, basename(path));
+    if (state.unplaceable?.[fp]) return; // couldn't be made small enough last time either
 
-    const info = await classify(path, root, size, ctx.index);
+    // no duplicates, cheapest check first:
+    // 1. already on the server (old uploads, files posted by hand, or uploaded by this bot before)
+    if (ctx.dry ? ctx.existing?.has(fp) : await onServer(s.size, basename(path))) {
+      if (ctx.dry) dryRows.push({ dest: 'skip: already on the server', rel: relOf(path, root), kind: '', size: s.size });
+      return;
+    }
+    // 2. the same file twice in your folders (same content, any name)
+    const key = ctx.dry ? fp : await sha256(path);
+    if (seen.has(key)) {
+      report.dupes++;
+      if (ctx.dry) dryRows.push({ dest: 'skip: duplicate of another file in your folders', rel: relOf(path, root), kind: '', size: s.size });
+      return;
+    }
+    seen.add(key);
+    if (!ctx.dry && (await db.select('files', `hash=eq.${key}&select=id`)).length) return;
+
+    const info = await classify(path, root, s.size, ctx.index);
     let posts = info.code ? ctx.index.pick(info.code, info.hints) : [];
-    const willCreate = info.code && !posts.length ? ctx.index.forumFor(info.code, info.hints) : null;
+    const newForum = info.code && !posts.length ? ctx.index.forumFor(info.code, info.hints) : null;
 
     if (ctx.dry) {
       const dest = posts.length ? posts.map((p) => `${p.forum} › ${p.name}`).join(' + ')
-        : willCreate ? `NEW post ${info.code} in ${willCreate.name}`
-          : info.shelf ? `shelf: ${info.shelf.name}` : '#to-sort';
-      console.log(`[dry] ${info.rel}\n      ${info.kind}${info.code ? ` · ${info.code} (from ${info.from})` : ''} · ${mb(size)} → ${size > maxBytes ? 'TOO BIG for Discord' : dest}`);
+        : newForum ? `NEW post "${info.code}" in ${newForum.name}`
+          : info.shelf ? `📚 shelf: ${info.shelf.name}` : '#to-sort';
+      dryRows.push({ dest, kind: info.kind, code: info.code, from: info.from, rel: info.rel, size: s.size, big: s.size > maxBytes });
       return;
     }
-    if (size > maxBytes) { report.tooBig.push(`${info.rel} (${mb(size)})`); return; }
 
     const label = `${ICON[info.kind]} **${info.name}** · ${LABEL[info.kind]}`;
-    const file = { attachment: path, name: info.name };
     const record = (msg, extra) => db.insert('files', [{
-      hash, name: info.name, kind: info.kind, unit_code: info.code, channel_id: msg.channelId, message_id: msg.id,
-      size, source_path: info.rel, ...extra,
+      hash: key, name: info.name, kind: info.kind, unit_code: info.code, channel_id: msg.channelId, message_id: msg.id,
+      size: s.size, source_path: info.rel, ...extra,
     }], { ignoreDuplicates: true });
 
-    if (info.code && !posts.length && willCreate) {
-      posts = await ctx.index.createPost(info.code, info.hints).catch((e) => { report.failed.push(`${info.rel}: couldn't create a post (${e.message})`); return []; });
-      if (posts.length) report.created.push(`${info.code} in ${posts[0].forum}`);
-    }
-    if (posts.length) {
-      const msg = await posts[0].thread.send({ content: label, files: [file], allowedMentions: { parse: [] } });
-      for (const other of posts.slice(1)) await forwardTo(other.id, msg.id, msg.channelId).catch(() => {});
-      await record(msg, { dest_name: posts[0].name, forum: posts[0].forum });
-      report.unit++;
-      return;
-    }
-    if (info.shelf) {
-      const shelf = await ctx.client.channels.fetch(info.shelf.id);
-      const msg = await shelf.send({ content: `${label}${info.title ? `\n_${info.title.slice(0, 150)}_` : ''}`, files: [file], allowedMentions: { parse: [] } });
-      await record(msg, { dest_name: info.shelf.name });
-      report.shelf++;
-      return;
-    }
+    try {
+      if (info.code && !posts.length && newForum) {
+        posts = await ctx.index.createPost(info.code, info.hints).catch((e) => { report.failed.push(`${info.rel}: couldn't create a post (${e.message})`); return []; });
+        if (posts.length) report.created.push(`${info.code} in ${posts[0].forum}`);
+      }
+      if (posts.length) {
+        const msgs = await post(posts[0].thread, label, path, s.size, info);
+        for (const other of posts.slice(1)) for (const m of msgs) await forwardTo(other.id, m.id, m.channelId).catch(() => {});
+        await record(msgs[0], { dest_name: posts[0].name, forum: posts[0].forum });
+        report.unit++;
+        return;
+      }
+      if (info.shelf) {
+        const shelf = await ctx.client.channels.fetch(info.shelf.id);
+        const msgs = await post(shelf, `${label}${info.title ? `\n_${info.title.slice(0, 150)}_` : ''}`, path, s.size, info);
+        await record(msgs[0], { dest_name: info.shelf.name });
+        report.shelf++;
+        return;
+      }
 
-    // couldn't place it: #to-sort, in the format the Sort buttons and the dashboard read
-    const toSort = await ctx.client.channels.fetch(CHANNELS.toSort);
-    const fileMsg = await toSort.send({ files: [file], allowedMentions: { parse: [] } });
-    const reason = info.code ? `${info.code} has no forum to put a new post in`
-      : info.kind === 'book' ? 'a book that matches no shelf' : 'no unit code in the name, folders or page 1';
-    const suggestion = [info.hints.dept && `${info.hints.dept}`, info.hints.year && `year ${info.hints.year}`, info.hints.sem && `sem ${info.hints.sem}`].filter(Boolean).join(', ');
-    await toSort.send({
-      content: [
-        `⚠️ **Couldn't place this file**: ${reason}`,
-        info.code ? `💡 Suggestion: ${info.code}` : '',
-        info.snippet ? `Page 1 starts: "${quote(info.snippet)}"` : '',
-        `📁 From: \`${info.rel.slice(0, 300)}\`${suggestion ? ` (${suggestion})` : ''}`,
-      ].filter(Boolean).join('\n'),
-      components: [{ type: 1, components: [
-        { type: 2, style: 1, label: 'Sort into a unit', custom_id: `sort:start:${fileMsg.id}` },
-        { type: 2, style: 2, label: 'Not a unit: #pdf-library', custom_id: `sort:library:${fileMsg.id}` },
-      ] }],
-      allowedMentions: { parse: [] },
-    });
-    await record(fileMsg, { dest_name: 'to-sort' });
-    report.toSort++;
+      // couldn't place it: #to-sort, in the format the Sort buttons and the dashboard read
+      const toSort = await ctx.client.channels.fetch(CHANNELS.toSort);
+      const msgs = await post(toSort, '', path, s.size, info);
+      const reason = info.code ? `${info.code} has no forum to put a new post in`
+        : info.kind === 'book' ? 'a book that matches no shelf' : 'no unit code in the name, folders or page 1';
+      const hints = [info.hints.dept, info.hints.year && `year ${info.hints.year}`, info.hints.sem && `sem ${info.hints.sem}`].filter(Boolean).join(', ');
+      await toSort.send({
+        content: [
+          `⚠️ **Couldn't place this file**: ${reason}`,
+          info.code ? `💡 Suggestion: ${info.code}` : '',
+          info.snippet ? `Page 1 starts: "${info.snippet.replace(/"/g, "'").replace(/\s+/g, ' ').slice(0, 200)}"` : '',
+          `📁 From: \`${info.rel.slice(0, 300)}\`${hints ? ` (${hints})` : ''}`,
+          msgs.length > 1 ? `🧩 Parts: ${msgs.map((m) => m.id).join(' ')}` : '',
+        ].filter(Boolean).join('\n'),
+        components: [{ type: 1, components: [
+          { type: 2, style: 1, label: 'Sort into a unit', custom_id: `sort:start:${msgs[0].id}` },
+          { type: 2, style: 2, label: 'Not a unit: #pdf-library', custom_id: `sort:library:${msgs[0].id}` },
+        ] }],
+        allowedMentions: NONE,
+      });
+      await record(msgs[0], { dest_name: 'to-sort' });
+      report.toSort++;
+    } catch (e) {
+      if (!/limit/.test(e.message)) throw e;
+      report.tooBig.push(`${info.rel} (${mb(s.size)}): ${e.message}`);
+      (state.unplaceable ||= {})[fp] = info.rel; // don't retry on every start
+      save();
+    }
   }
 
-  function summarise() {
-    const placed = report.unit + report.shelf + report.toSort;
-    if (!placed && !report.tooBig.length && !report.failed.length) return;
-    const lines = [`📥 **Uploaded ${placed} file${placed === 1 ? '' : 's'}**: ${report.unit} to unit posts, ${report.shelf} to shelves, ${report.toSort} to <#${CHANNELS.toSort}>.`];
-    if (report.created.length) lines.push(`🆕 New unit posts: ${report.created.join(', ')}`);
-    if (report.tooBig.length) lines.push(`🐘 Too big for Discord (limit ${LIMIT_BY_TIER[ctx.guild.premiumTier]} MB, boost the server to raise it):`, ...report.tooBig.slice(0, 15).map((f) => `• ${f}`));
-    if (report.failed.length) lines.push('❌ Failed:', ...report.failed.slice(0, 10).map((f) => `• ${f}`));
+  // reps and admins: roles named like "Rep"/"Class Reps", plus admin roles
+  const sorterRoles = () => [...ctx.guild.roles.cache.values()].filter((r) => !r.managed && r.id !== ctx.guild.id
+    && (SORTER_ROLE_MATCH.test(r.name) || r.permissions.has('Administrator')));
+
+  async function summarise() {
+    const r = report;
+    report = fresh();
+    const placed = r.unit + r.shelf + r.toSort;
+    if (!placed && !r.tooBig.length && !r.failed.length) return;
+    const lines = [`📥 **Uploaded ${placed} file${placed === 1 ? '' : 's'}**: ${r.unit} to unit posts, ${r.shelf} to shelves, ${r.toSort} to <#${CHANNELS.toSort}>.`];
+    if (r.dupes) lines.push(`♻️ Skipped ${r.dupes} duplicate${r.dupes === 1 ? '' : 's'} (the same file in more than one folder).`);
+    if (r.created.length) lines.push(`🆕 New unit posts: ${r.created.join(', ')}`);
+    if (r.shrunk.length) lines.push('🗜️ Too big for one upload, so compressed or split:', ...r.shrunk.slice(0, 15).map((f) => `• ${f}`));
+    if (r.tooBig.length) lines.push("🐘 Couldn't make these small enough:", ...r.tooBig.slice(0, 15).map((f) => `• ${f}`));
+    if (r.failed.length) lines.push('❌ Failed:', ...r.failed.slice(0, 10).map((f) => `• ${f}`));
     ctx.log(lines.join('\n'));
-    Object.assign(report, { unit: 0, shelf: 0, toSort: 0, tooBig: [], failed: [], created: [] });
+    if (r.toSort) {
+      const roles = sorterRoles();
+      const toSort = await ctx.client.channels.fetch(CHANNELS.toSort);
+      await toSort.send({
+        content: `${roles.map((x) => `<@&${x.id}>`).join(' ')} 📥 **${r.toSort} new file${r.toSort === 1 ? '' : 's'} need${r.toSort === 1 ? 's' : ''} sorting.** Tap **Sort into a unit** under each one, or use the dashboard.`.trim(),
+        allowedMentions: { roles: roles.map((x) => x.id) },
+      }).catch(() => {});
+    }
   }
 
+  function finishDryRun() {
+    const out = new URL('../../data/', import.meta.url);
+    mkdirSync(out, { recursive: true });
+    const byDest = new Map();
+    for (const row of dryRows) byDest.set(row.dest, [...(byDest.get(row.dest) || []), row]);
+    const lines = [];
+    for (const [dest, rows] of [...byDest].sort((a, b) => b[1].length - a[1].length)) {
+      lines.push(`\n## ${dest}  (${rows.length})`);
+      for (const r of rows) lines.push(`  ${r.kind.padEnd(6)} ${r.code ? `${r.code} from ${r.from}` : ''}${r.big ? `  [${mb(r.size)}: will be compressed/split]` : ''}\n      ${r.rel}`);
+    }
+    const file = new URL('dry-run.txt', out);
+    writeFileSync(file, `Dry run ${new Date().toISOString()}: where each file would go\n${lines.join('\n')}\n`);
+    const count = (f) => dryRows.filter(f).length;
+    const created = new Set(dryRows.filter((r) => r.dest.startsWith('NEW')).map((r) => r.dest));
+    const special = (d) => d.startsWith('NEW') || d.startsWith('📚') || d.startsWith('skip') || d === '#to-sort';
+    console.log([
+      '',
+      `Dry run: ${dryRows.length} files`,
+      `  to existing unit posts: ${count((r) => !special(r.dest))}`,
+      `  to new unit posts:      ${count((r) => r.dest.startsWith('NEW'))} (${created.size} new posts)`,
+      `  to book shelves:        ${count((r) => r.dest.startsWith('📚'))}`,
+      `  to #to-sort:            ${count((r) => r.dest === '#to-sort')}`,
+      `  skipped, already on the server: ${count((r) => r.dest === 'skip: already on the server')}`,
+      `  skipped, duplicates in your folders: ${count((r) => r.dest.startsWith('skip: duplicate'))}`,
+      `  over ${maxBytes / 1024 / 1024} MB (will be split into parts): ${count((r) => r.big)}`,
+      `Full list: ${file.pathname.replace(/^\//, '').replace(/\//g, '\\')}`,
+    ].join('\n'));
+    ctx.onDryRunDone?.();
+  }
+
+  const done = () => { if (ctx.dry) finishDryRun(); else summarise().catch((e) => console.error(e)); };
   const enqueue = (path) => {
-    if (skip(path)) return;
     pending++;
     queue = queue.then(() => handle(path))
-      .catch((e) => { report.failed.push(`${path}: ${e.message}`); if (ctx.dry) console.error(`[dry] ${path}: ${e.message}`); })
+      .catch((e) => { report.failed.push(`${path}: ${e.message}`); if (ctx.dry) console.error(`  ! ${path}: ${e.message}`); })
       .then(() => sleep(ctx.dry ? 0 : 1200)) // stay well under Discord's upload rate limits
-      .finally(() => { if (--pending === 0 && !ctx.dry) summarise(); });
+      .finally(() => { if (--pending === 0 && ready) done(); });
   };
 
-  chokidar.watch(roots, {
+  const watcher = chokidar.watch(roots, {
     ignored: (p) => skip(p),
     awaitWriteFinish: { stabilityThreshold: 5000, pollInterval: 500 }, // wait until a copy or Drive sync finishes
     ignorePermissionErrors: true,
-  }).on('add', enqueue).on('error', (e) => ctx.log(`⚠️ Watcher: ${e.message}`))
-    .on('ready', () => console.log(`Watching ${roots.join(' and ')}`));
+  });
+  watcher.on('add', enqueue).on('error', (e) => ctx.log(`⚠️ Watcher: ${e.message}`))
+    .on('ready', () => { ready = true; if (pending === 0) done(); });
+
+  // a shortcut added later to a WATCH_DIRS folder starts being watched too
+  if (!ctx.dry) {
+    chokidar.watch(dirs, { depth: 0, ignoreInitial: true }).on('add', async (p) => {
+      if (!p.toLowerCase().endsWith('.lnk')) return;
+      const [target] = await shortcutTargets([p]);
+      if (target && isFolder(target) && !roots.some((r) => r.toLowerCase() === target.toLowerCase() || under(target, r))) {
+        roots.push(resolve(target));
+        watcher.add(target);
+        ctx.log(`📂 Now also watching ${basename(target)} (new shortcut in ${basename(dirname(p))}).`);
+      }
+    });
+  }
 }

@@ -58,11 +58,15 @@ export function kindOf(text, name = '') {
   return KINDS.find(([, re]) => re.test(text))?.[0] || 'other';
 }
 
-function bestShelf(text) {
-  const t = text.toLowerCase();
+// The title, file name and folders count three times as much as page text: a physics book's first pages talk
+// about vectors and calculus, but its title says physics.
+function bestShelf(title, pageText) {
+  const t = title.toLowerCase();
+  const p = pageText.toLowerCase();
   let best = null;
   for (const shelf of SHELVES) {
-    const score = (SHELF_WORDS[shelf.name] || []).filter((w) => t.includes(w)).length;
+    const words = SHELF_WORDS[shelf.name] || [];
+    const score = 3 * words.filter((w) => t.includes(w)).length + words.filter((w) => p.includes(w)).length;
     if (score && (!best || score > best.score)) best = { ...shelf, score };
   }
   return best;
@@ -122,7 +126,7 @@ export async function classify(path, root, size, index) {
   if (kind !== 'paper' && (isBigFile || doc.pages >= BOOK_PAGES)) kind = 'book';
   kind ||= 'other';
 
-  const shelf = !code && kind === 'book' ? bestShelf(`${doc.title} ${name} ${folders.join(' ')} ${doc.text.slice(0, 1500)}`) : null;
+  const shelf = !code && kind === 'book' ? bestShelf(`${doc.title} ${name} ${folders.join(' ')}`, doc.text.slice(0, 1500)) : null;
   return {
     name, rel, code, from, kind, hints, shelf,
     title: doc.title, pages: doc.pages,

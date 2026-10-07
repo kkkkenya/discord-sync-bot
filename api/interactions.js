@@ -1,8 +1,10 @@
-// Discord Interactions endpoint: the "I've paid" button, the payment form, and staff Approve/Reject.
+// Discord Interactions endpoint: the "I've paid" button, the payment form, staff Approve/Reject, the #to-sort
+// Sort buttons, and every slash command (/find, /group, /streak... see lib/commands.js).
 // Set as the app's Interactions Endpoint URL: https://<project>.vercel.app/api/interactions
 import { api, dm, isValidSignature, isoDay } from '../lib/discord.js';
 import { CHANNELS, GUILD_ID, MPESA, PRICES, ROLES, WHATSAPP } from '../lib/config.js';
 import { forwardTo, postsFor } from '../lib/sorting.js';
+import { handleCommand, handleComponent } from '../lib/commands.js';
 
 const ADMINISTRATOR = 1n << 3n;
 const MANAGE_ROLES = 1n << 28n;
@@ -93,6 +95,10 @@ export async function POST(request) {
   try {
     // ── #to-sort: files the upload bot couldn't place ──
     if (i.data?.custom_id?.startsWith('sort:')) return await handleSort(i, user);
+
+    // ── community: slash commands, daily-problem and group buttons (lib/commands.js) ──
+    if (i.type === 2) return await handleCommand(i, user);
+    if (/^(dp|grp):/.test(i.data?.custom_id || '')) return await handleComponent(i, user);
 
     // ── buttons ──
     if (i.type === 3) {

@@ -1,0 +1,22 @@
+{
+  "name": "esh-pc-bot",
+  "private": true,
+  "type": "module",
+  "description": "Engineering Study Hub, always-on half: file uploader (PC + Google Drive folders), welcome guide, daily problems, digest, nudges.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/index.js",
+    "register": "node register-commands.js",
+    "dry-run": "node src/index.js --dry-run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "chokidar": "^4.0.3",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.8.0",
+    "node-cron": "^3.0.3",
+    "pdfjs-dist": "^4.10.38"
+  }
+}

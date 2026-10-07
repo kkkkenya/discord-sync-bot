@@ -21,7 +21,7 @@ Data for the file index, groups and streaks lives in Supabase (`supabase/schema.
 2. `npm run register` in `pc/` adds the slash commands to the server.
 3. `npm run dry-run` shows where every file would go against the live server, posting nothing.
    (`npm run preview` does the same offline, no token needed.) The full list goes to `pc/data/dry-run.txt`.
-4. Double-click **`pc/start-bot.bat`** to run the bot. To start it with Windows: Win+R → `shell:startup` →
+4. Double-click **`pc/start-bot.bat`** to run the bot. To start it with Windows (already set up on the main PC): Win+R → `shell:startup` →
    put a shortcut to `start-bot.bat` there.
 
 In the Discord Developer Portal → your app → **Bot**, turn on **Server Members Intent**. The bot needs

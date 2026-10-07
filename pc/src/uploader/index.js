@@ -84,8 +84,10 @@ async function findRoots(dirs) {
 export async function startUploader(ctx) {
   const dirs = (process.env.WATCH_DIRS || '').split(';').map((d) => d.trim()).filter(Boolean).map((d) => resolve(d));
   if (!dirs.length) { ctx.log('⚠️ No WATCH_DIRS set in pc/.env, so the uploader is off.'); return; }
-  const missing = dirs.filter((d) => !existsSync(d));
-  if (missing.length) ctx.log(`⚠️ These WATCH_DIRS don't exist: ${missing.join(', ')}`);
+  // Right after Windows starts, Google Drive may not have mounted G: yet: missing folders are checked every
+  // minute and picked up when they appear (a warning only if they're still missing after 30 minutes).
+  let missing = dirs.filter((d) => !existsSync(d));
+  if (missing.length) console.log(`Waiting for ${missing.join(', ')} (Google Drive may still be starting)`);
   const roots = await findRoots(dirs.filter((d) => existsSync(d)));
   console.log(`Watching ${roots.length} folder${roots.length === 1 ? '' : 's'}:\n${roots.map((r) => `  ${r}`).join('\n')}`);
 
@@ -302,6 +304,25 @@ export async function startUploader(ctx) {
   });
   watcher.on('add', enqueue).on('error', (e) => ctx.log(`⚠️ Watcher: ${e.message}`))
     .on('ready', () => { ready = true; if (pending === 0) done(); });
+
+  if (missing.length && !ctx.dry) {
+    const since = Date.now();
+    const timer = setInterval(async () => {
+      const appeared = missing.filter((d) => existsSync(d));
+      if (appeared.length) {
+        missing = missing.filter((d) => !appeared.includes(d));
+        const fresh = (await findRoots(appeared)).filter((r) => !roots.some((o) => o.toLowerCase() === r.toLowerCase() || under(r, o)));
+        roots.push(...fresh);
+        watcher.add(fresh);
+        console.log(`Now watching ${fresh.length} more folder${fresh.length === 1 ? '' : 's'}: ${fresh.join(', ')}`);
+      }
+      if (!missing.length) clearInterval(timer);
+      else if (Date.now() - since > 30 * 60 * 1000) {
+        ctx.log(`⚠️ These WATCH_DIRS still don't exist after 30 minutes: ${missing.join(', ')}. Is Google Drive running?`);
+        clearInterval(timer);
+      }
+    }, 60 * 1000);
+  }
 
   // a shortcut added later to a WATCH_DIRS folder starts being watched too
   if (!ctx.dry) {

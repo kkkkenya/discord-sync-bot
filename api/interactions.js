@@ -23,11 +23,23 @@ const paymentForm = {
   },
 };
 
+const premiumGuide = [
+  '',
+  '**How to find things in Premium:**',
+  '• **Unit forums:** open the forum for your course and year (e.g. `mech-year-3`, `civil-year-2`, `ecu-year-1`). Each unit has its own post with its notes, past papers and slides. Search the unit code (e.g. EMM 305) to jump to it.',
+  '• **Common units:** first-year ECU and university-wide UCU units are in `ecu-year-1`, `ecu-year-2`, `ecu-upper-years` and `ucu-university-common`.',
+  '• **Book shelves:** textbooks are grouped by topic (Thermodynamics, Fluid Mechanics, Engineering Mathematics and more). Browse a shelf when you want a book, not a single unit.',
+  '• **#pdf-library:** general files that don\'t belong to one unit.',
+  `Can't find a unit? Message us on WhatsApp and we'll add it: ${WHATSAPP}`,
+  '',
+];
+
 const receipt = (plan) => [
   `✅ **Payment confirmed: ${planName(plan)}** (KES ${PRICES[plan]})`,
   plan === 'premium'
     ? 'You now have Premium for life, plus all the unit libraries.'
     : 'You now have full access to the unit libraries for this semester.',
+  ...(plan === 'premium' ? premiumGuide : []),
   'Thanks for supporting Engineering Study Hub. Good luck with your CATs!',
 ].join('\n');
 

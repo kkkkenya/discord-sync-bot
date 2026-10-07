@@ -9,6 +9,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { lookup } from 'node:dns/promises';
 import { open, readdir, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import chokidar from 'chokidar';
@@ -106,8 +107,12 @@ export async function startUploader(ctx) {
   const transient = (e) => e?.name === 'AbortError' || ['ECONNRESET', 'ETIMEDOUT', 'UND_ERR_SOCKET', 'EPIPE'].includes(e?.code) || e?.status >= 500;
   async function landed(target, bytes, since) {
     await sleep(4000);
-    const recent = await target.messages.fetch({ limit: 20 }).catch(() => null);
-    return recent?.find((m) => m.author.id === ctx.client.user.id && m.createdTimestamp >= since - 60000 && m.attachments.some((a) => a.size === bytes)) || null;
+    try {
+      const recent = await target.messages.fetch({ limit: 20 });
+      return recent.find((m) => m.author.id === ctx.client.user.id && m.createdTimestamp >= since - 60000 && m.attachments.some((a) => a.size === bytes)) || null;
+    } catch {
+      return null; // can't look (offline): treat as not landed; the outage pause retries it later
+    }
   }
   async function send(target, payload, bytes) {
     for (let attempt = 1; ; attempt++) {
@@ -137,7 +142,13 @@ export async function startUploader(ctx) {
     return msgs;
   }
 
+  // A file that fails is forgotten again, so a retry (after a dropped connection) isn't mistaken for a duplicate.
   async function handle(path) {
+    const mark = {};
+    try { await handleFile(path, mark); } catch (e) { if (mark.key) seen.delete(mark.key); throw e; }
+  }
+
+  async function handleFile(path, mark) {
     const root = roots.find((r) => under(path, r)) || roots[0];
     const s = await stat(path);
     if (!s.isFile() || !s.size) return;
@@ -158,6 +169,7 @@ export async function startUploader(ctx) {
       return;
     }
     seen.add(key);
+    mark.key = key;
     if (!ctx.dry && (await db.select('files', `hash=eq.${key}&select=id`)).length) return;
 
     const info = await classify(path, root, s.size, ctx.index);
@@ -289,20 +301,81 @@ export async function startUploader(ctx) {
   }
 
   const done = () => { if (ctx.dry) finishDryRun(); else summarise().catch((e) => console.error(e)); };
+
+  // ── the internet or Google Drive dropped: pause the queue, wait for both, retry ──
+  const offline = (e) => /fetch failed|getaddrinfo|ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ENETUNREACH|EHOSTUNREACH|socket hang up|other side closed/i
+    .test(`${e?.code || ''} ${e?.message || ''} ${e?.cause?.code || ''} ${e?.cause?.message || ''}`);
+  const driveGone = (path, e) => e?.code === 'ENOENT' && !existsSync(roots.find((r) => under(path, r)) || roots[0]);
+  let down = 0; // when it dropped (0 = all fine)
+  async function untilBack() {
+    for (;;) {
+      const net = await lookup('discord.com').then(() => true, () => false);
+      if (net && roots.every((r) => existsSync(r))) return;
+      await sleep(30000);
+    }
+  }
+  const tries = new Map();
+  const queued = new Set();    // waiting in the queue
+  const finished = new Set();  // uploaded, skipped, or failed for good this run
   const enqueue = (path) => {
+    if (queued.has(path) || finished.has(path)) return; // the watcher can report a file twice after Drive comes back
+    queued.add(path);
     pending++;
-    queue = queue.then(() => handle(path))
-      .catch((e) => { report.failed.push(`${path}: ${e.message}`); console.error(`upload failed: ${path}:`, e); })
+    queue = queue
+      .then(async () => {
+        if (down) {
+          await untilBack();
+          ctx.log(`🔌 The internet and Google Drive are back (down about ${Math.max(1, Math.round((Date.now() - down) / 60000))} min). Carrying on with the uploads.`);
+          down = 0;
+          sweepSoon(); // folders may have changed while Drive was away
+        }
+        await handle(path);
+        finished.add(path);
+      })
+      .catch((e) => {
+        const n = (tries.get(path) || 0) + 1;
+        tries.set(path, n);
+        if ((offline(e) || driveGone(path, e)) && n <= 5) {
+          if (!down) { down = Date.now(); console.error(`internet or Google Drive dropped (${e.message}): uploads paused until both are back`); }
+          queued.delete(path);
+          enqueue(path); // again, once they're back
+          return;
+        }
+        finished.add(path);
+        report.failed.push(`${path}: ${e.message}`);
+        console.error(`upload failed: ${path}:`, e);
+      })
       .then(() => sleep(ctx.dry ? 0 : 1200)) // stay well under Discord's upload rate limits
-      .finally(() => { if (--pending === 0 && ready) done(); });
+      .finally(() => { queued.delete(path); if (--pending === 0 && ready) done(); });
   };
+
+  // Every 30 minutes (and soon after an outage) walk the folders for files the watcher missed: when Google Drive
+  // disconnects, Windows stops telling the watcher about changes.
+  async function walk(dir, out) {
+    for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+      const p = join(dir, entry.name);
+      if (skip(p)) continue;
+      if (entry.isDirectory()) await walk(p, out);
+      else if (entry.isFile()) out.push(p);
+    }
+    return out;
+  }
+  async function sweep() {
+    if (down || !ready) return;
+    let added = 0;
+    for (const r of [...roots]) for (const p of await walk(r, [])) if (!queued.has(p) && !finished.has(p)) { enqueue(p); added++; }
+    if (added) console.log(`sweep: queued ${added} file${added === 1 ? '' : 's'} the watcher missed`);
+  }
+  let sweepTimer;
+  const sweepSoon = () => { clearTimeout(sweepTimer); sweepTimer = setTimeout(() => sweep().catch((e) => console.error('sweep:', e.message)), 2 * 60 * 1000); };
+  if (!ctx.dry) setInterval(() => sweep().catch((e) => console.error('sweep:', e.message)), 30 * 60 * 1000);
 
   const watcher = chokidar.watch(roots, {
     ignored: (p) => skip(p),
     awaitWriteFinish: { stabilityThreshold: 5000, pollInterval: 500 }, // wait until a copy or Drive sync finishes
     ignorePermissionErrors: true,
   });
-  watcher.on('add', enqueue).on('error', (e) => ctx.log(`⚠️ Watcher: ${e.message}`))
+  watcher.on('add', enqueue).on('error', (e) => console.error(`watcher: ${e.message}`)) // Drive disconnects show up here; the sweep covers them
     .on('ready', () => { ready = true; if (pending === 0) done(); });
 
   if (missing.length && !ctx.dry) {

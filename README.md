@@ -38,10 +38,15 @@ followed, so one folder of shortcuts to shared course folders is enough; add a s
 **Sorting a file**, working backwards from the file:
 1. A unit code (like `EMM 305`) in the **file name**, then in **each folder above it, nearest first**, so
    `Mechanical/2nd Year/1st Sem/Notes/EMM 200 Thermodynamics/lecture 3.pdf` goes to EMM 200.
-2. If that isn't enough, the **title and first page** (PDF, Word, PowerPoint, text).
-3. The path also gives course, year, semester and kind (`past papers`, `CATs`, `notes`, `slides`, `books`).
-4. **Books** (15 MB+, or PDFs with 150+ pages) go to the best topic shelf.
-5. Destination: the unit's post (created in the right forum if missing; forwarded to the other-year post when a
+2. A file or folder **named by the unit's title**: `Notes/2.2/Fluid Mechanics 2/` → EMM 205 Fluid Mechanics II,
+   `DEs` → ECU 202, `SSM 3` → EMM 403. Titles come from `lib/units.json` (the website's unit pages plus the
+   server's post titles; rebuild with `npm run units` after adding unit pages) and from live post names. It's
+   strict: the year must match the folder's year (`2.2`, `Y3 S2`, `3rd year`), part numbers must agree, and
+   there must be one clear winner, otherwise the file goes to `#to-sort`.
+3. If that isn't enough, the **title and first page** (PDF, Word, PowerPoint, text).
+4. The path also gives course, year, semester and kind (`past papers`, `CATs`, `notes`, `slides`, `books`).
+5. **Books** (15 MB+, or PDFs with 150+ pages) go to the best topic shelf.
+6. Destination: the unit's post (created in the right forum if missing; forwarded to the other-year post when a
    unit is taught in two years), a shelf, or **`#to-sort`**, where reps and admins get a ping and sort it with the
    buttons. Reps are roles with "rep" in the name (`SORTER_ROLE_MATCH` in `lib/config.js`).
 
@@ -71,7 +76,8 @@ split book from `#to-sort` moves every part. To shrink one file by hand: `npm ru
 - `lib/commands.js`: slash commands and buttons (Vercel). `lib/db.js`: Supabase client. `lib/sorting.js`: Sort helpers.
 - `pc/setup-keys.js` (`setup.bat`): asks for keys and saves `pc/.env`. `pc/register-commands.js`: slash commands.
 - `pc/src/uploader/`: `index.js` (watching and posting), `classify.js` (what is this file?), `extract.js` (title,
-  first page), `posts.js` (forums and unit posts), `existing.js` (files already on the server), `shrink.js`.
+  first page), `titles.js` (folder titles → unit codes), `posts.js` (forums and unit posts), `existing.js` (files
+  already on the server), `shrink.js`. `pc/make-units.js` rebuilds `lib/units.json`.
 - `pc/src/jobs/`: `community.js` (digest, nudges, revision packs, streaks, leaderboard), `daily-problem.js`.
 
 ## Discord setup

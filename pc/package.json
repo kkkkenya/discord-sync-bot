@@ -10,7 +10,8 @@
     "register": "node register-commands.js",
     "preview": "node src/preview.js",
     "dry-run": "node src/index.js --dry-run",
-    "shrink": "node shrink.js"
+    "shrink": "node shrink.js",
+    "units": "node make-units.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

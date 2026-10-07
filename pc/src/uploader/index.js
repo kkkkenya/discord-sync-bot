@@ -9,7 +9,7 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
+import { open, readdir, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import chokidar from 'chokidar';
 import { CHANNELS, SORTER_ROLE_MATCH } from '../../../lib/config.js';
@@ -28,12 +28,31 @@ const LABEL = { paper: 'Past paper', notes: 'Notes', slides: 'Slides', book: 'Bo
 const LIMIT_BY_TIER = [10, 10, 50, 100]; // MB a bot can upload, by server boost level
 const NONE = { parse: [] };
 
+// SKIP_FOLDERS in pc/.env: folder names (separated by ;) to leave out wherever they appear.
+const skipFolders = () => new Set((process.env.SKIP_FOLDERS || '').split(';').map((s) => s.trim().toLowerCase()).filter(Boolean));
 const skip = (p) => {
   const name = basename(p);
+  const folders = skipFolders();
   return name.startsWith('~$') || name.startsWith('.') || SKIP_EXT.has(extname(name).toLowerCase())
-    || p.split(sep).some((part) => part === 'node_modules' || part === '.git' || part === '$RECYCLE.BIN');
+    || p.split(sep).some((part) => part === 'node_modules' || part === '.git' || part === '$RECYCLE.BIN' || folders.has(part.toLowerCase()));
 };
 const under = (child, parent) => child.toLowerCase().startsWith(parent.toLowerCase() + sep); // Windows paths ignore case
+
+// Files with no extension ("Photo from Amos (4)", a phone export) get one from their first bytes, so Discord
+// shows them properly.
+async function withExtension(path, name) {
+  if (extname(name)) return name;
+  const fh = await open(path, 'r');
+  try {
+    const { buffer } = await fh.read(Buffer.alloc(8), 0, 8, 0);
+    const sig = buffer.toString('hex');
+    const ext = sig.startsWith('ffd8ff') ? '.jpg' : sig.startsWith('89504e47') ? '.png' : sig.startsWith('25504446') ? '.pdf'
+      : sig.startsWith('47494638') ? '.gif' : sig.startsWith('504b0304') ? '.zip' : sig.startsWith('d0cf11e0') ? '.doc' : '';
+    return name + ext;
+  } finally {
+    await fh.close();
+  }
+}
 
 function sha256(path) {
   return new Promise((ok, fail) => {
@@ -58,7 +77,7 @@ async function findRoots(dirs) {
     const links = (await readdir(d).catch(() => [])).filter((n) => n.toLowerCase().endsWith('.lnk')).map((n) => join(d, n));
     for (const t of await shortcutTargets(links)) if (isFolder(t)) found.push(resolve(t));
   }
-  const unique = [...new Map(found.map((r) => [r.toLowerCase(), r])).values()];
+  const unique = [...new Map(found.map((r) => [r.toLowerCase(), r])).values()].filter((r) => !skip(r)); // SKIP_FOLDERS
   return unique.filter((r) => !unique.some((o) => o !== r && under(r, o))); // a folder inside another is watched once
 }
 
@@ -118,6 +137,7 @@ export async function startUploader(ctx) {
     if (!ctx.dry && (await db.select('files', `hash=eq.${key}&select=id`)).length) return;
 
     const info = await classify(path, root, s.size, ctx.index);
+    info.name = await withExtension(path, info.name);
     let posts = info.code ? ctx.index.pick(info.code, info.hints) : [];
     const newForum = info.code && !posts.length ? ctx.index.forumFor(info.code, info.hints) : null;
 

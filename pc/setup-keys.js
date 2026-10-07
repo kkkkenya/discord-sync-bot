@@ -182,6 +182,8 @@ function save(env) {
     '',
     '# Folders of notes, past papers and books, separated by ;  Drive shortcuts (.lnk) inside them are followed.',
     `WATCH_DIRS=${env.WATCH_DIRS || ''}`,
+    '# Folder names to leave out wherever they appear, separated by ;',
+    `SKIP_FOLDERS=${env.SKIP_FOLDERS || ''}`,
     `BOOK_MB=${env.BOOK_MB || 15}`,
     `BOOK_PAGES=${env.BOOK_PAGES || 150}`,
     '',

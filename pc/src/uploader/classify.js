@@ -1,10 +1,12 @@
 // Decides what a file is and where it goes. Works backwards from the file:
-//   1. the file name, 2. each folder above it, nearest first (so Mechanical/Year 2/Sem 1/Notes/EMM 200/x.pdf
-//   finds EMM 200 in its own folder before anything else), 3. the document title, 4. the first page's text.
+//   1. a unit code in the file name, 2. in each folder above it, nearest first (so Mechanical/Year 2/Sem 1/Notes/
+//   EMM 200/x.pdf finds EMM 200 in its own folder), 3. a file or folder named by the unit's title ("Fluid
+//   Mechanics 2" in a "2.2" folder), 4. a code in the document title or first page, 5. the document title.
 // The folder path also gives hints (course, year, semester, kind) used to pick between posts and forums.
 import { basename, dirname, extname, relative, sep } from 'node:path';
 import SHELVES from '../../../lib/shelves.json' with { type: 'json' };
 import { extract } from './extract.js';
+import { fromPosts, unitFromTitle } from './titles.js';
 
 const BOOK_BYTES = Number(process.env.BOOK_MB || 15) * 1024 * 1024;
 const BOOK_PAGES = Number(process.env.BOOK_PAGES || 150);
@@ -20,7 +22,8 @@ const DEPTS = [
   ['egp', new RegExp(`${alone('egp')}|${alone('epl')}|petroleum|energy|geospatial`, 'i')],
 ];
 const YEAR = /(?:^|[^\d])([1-5])(?:st|nd|rd|th)?[\s_-]*(?:year|yr)|(?:year|yr|\by)[\s_-]*([1-5])(?!\d)/i;
-const SEM = /([12])(?:st|nd)?[\s_-]*sem|sem(?:ester)?[\s_-]*([12])(?!\d)/i;
+const SEM = /([12])(?:st|nd)?[\s_-]*sem|sem(?:ester)?[\s_-]*([12])(?!\d)|\bs([12])\b/i; // "1st sem", "Semester 2", "Y3 S2"
+const YEAR_SEM = /^\s*([1-5])\.([12])\s*$/; // a folder named "2.2" or "3.1"
 
 const KINDS = [
   ['paper', /past[\s_-]*papers?|\bexams?\b|examination|\bcats?\b|\bcat[\s_-]*\d|\bsupp|special[\s_-]*exam|marking[\s_-]*scheme|question[\s_-]*paper/i],
@@ -75,25 +78,40 @@ export async function classify(path, root, size, index) {
   const hints = {};
   for (const part of [name, ...folders]) { // nearest wins
     if (!hints.dept) hints.dept = DEPTS.find(([, re]) => re.test(part))?.[0];
+    const ys = part.match(YEAR_SEM); // "2.2" = year 2, semester 2
+    if (ys) { hints.year ||= Number(ys[1]); hints.sem ||= Number(ys[2]); }
     if (!hints.year) { const m = part.match(YEAR); if (m) hints.year = Number(m[1] || m[2]); }
-    if (!hints.sem) { const m = part.match(SEM); if (m) hints.sem = Number(m[1] || m[2]); }
+    if (!hints.sem) { const m = part.match(SEM); if (m) hints.sem = Number(m[1] || m[2] || m[3]); }
     if (!hints.kind) hints.kind = KINDS.find(([, re]) => re.test(part))?.[0];
   }
+  const parts = [name.replace(extname(name), ''), ...folders]; // the file name, then each folder working outwards
 
-  // 1-2: the file name, then each folder working outwards
+  // 1-2: a unit code in the file name, then in each folder
   let code = null; let from = '';
-  for (const [n, part] of [name.replace(extname(name), ''), ...folders].entries()) {
+  for (const [n, part] of parts.entries()) {
     const found = index.codesIn(part);
     if (found.length) { code = found[0]; from = n === 0 ? 'name' : `folder "${part}"`; break; }
   }
+  // 3: a file or folder named by the unit's title ("Fluid Mechanics 2" in a "2.2" folder = EMM 205)
+  const byTitle = (text) => unitFromTitle(text, { year: hints.year }, (index.titleUnits ||= fromPosts(index.byCode)));
+  if (!code) {
+    for (const [n, part] of parts.entries()) {
+      const hit = byTitle(part);
+      if (hit) { code = hit.code; from = `${n === 0 ? 'name' : 'folder'} "${part}" = ${hit.title}`; break; }
+    }
+  }
 
-  // 3-4: open the file only when the name and folders weren't enough, or to tell a book from notes
+  // 4-5: open the file only when the name and folders weren't enough, or to tell a book from notes
   const isBigFile = size >= BOOK_BYTES;
   let doc = { title: '', pages: 0, text: '' };
   if (!code || isBigFile || !hints.kind) doc = await extract(path);
   if (!code) {
     const found = index.codesIn(`${doc.title} ${doc.text.slice(0, 1500)}`);
     if (found.length) { code = found[0]; from = doc.title && index.codesIn(doc.title).length ? 'title' : 'page 1'; }
+  }
+  if (!code && doc.title) {
+    const hit = byTitle(doc.title);
+    if (hit) { code = hit.code; from = `title "${doc.title.slice(0, 60)}" = ${hit.title}`; }
   }
 
   const ext = extname(name).toLowerCase();

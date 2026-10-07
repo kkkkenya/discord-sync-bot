@@ -1,0 +1,700 @@
+[
+ {
+  "codes": [
+   "EAR 200"
+  ],
+  "title": "Engineering Mechanics I"
+ },
+ {
+  "codes": [
+   "EAR 201"
+  ],
+  "title": "Aerospace Engineering Drawing and Design CAD"
+ },
+ {
+  "codes": [
+   "EAR 202"
+  ],
+  "title": "Fluid Mechanics I"
+ },
+ {
+  "codes": [
+   "EAR 206"
+  ],
+  "title": "Solid And Structural Mechanics"
+ },
+ {
+  "codes": [
+   "EAR 300"
+  ],
+  "title": "Aircraft Structures I"
+ },
+ {
+  "codes": [
+   "EAR 303"
+  ],
+  "title": "Measurement And Instrumentation Systems"
+ },
+ {
+  "codes": [
+   "EAR 305"
+  ],
+  "title": "Aerodynamics I"
+ },
+ {
+  "codes": [
+   "EAR 307"
+  ],
+  "title": "Mechanics of Machines"
+ },
+ {
+  "codes": [
+   "EAR 309"
+  ],
+  "title": "Aerodynamics II"
+ },
+ {
+  "codes": [
+   "EAR 310"
+  ],
+  "title": "Flight Mechanics"
+ },
+ {
+  "codes": [
+   "EAR 312"
+  ],
+  "title": "Aerospace Structures II"
+ },
+ {
+  "codes": [
+   "EAR 313"
+  ],
+  "title": "Digital Electronics"
+ },
+ {
+  "codes": [
+   "EAR 400"
+  ],
+  "title": "Propulsion"
+ },
+ {
+  "codes": [
+   "EAR 401"
+  ],
+  "title": "Orbit and Space Mechanics"
+ },
+ {
+  "codes": [
+   "EAR 402"
+  ],
+  "title": "Control Systems II"
+ },
+ {
+  "codes": [
+   "EAR 403"
+  ],
+  "title": "Avionics"
+ },
+ {
+  "codes": [
+   "EAR 404"
+  ],
+  "title": "Aircraft Structure and Design I"
+ },
+ {
+  "codes": [
+   "EAR 405"
+  ],
+  "title": "Telecommunications"
+ },
+ {
+  "codes": [
+   "EAR 406"
+  ],
+  "title": "Modeling and Simulation"
+ },
+ {
+  "codes": [
+   "EAR 407"
+  ],
+  "title": "Gas Dynamics and Propulsion"
+ },
+ {
+  "codes": [
+   "EAR 408"
+  ],
+  "title": "Computational Fluid Dynamics"
+ },
+ {
+  "codes": [
+   "EAR 409"
+  ],
+  "title": "Aircraft Structure and Design II"
+ },
+ {
+  "codes": [
+   "EAR 410"
+  ],
+  "title": "Aerospace Vibration and Control"
+ },
+ {
+  "codes": [
+   "EAR 411"
+  ],
+  "title": "Vehicle System Design"
+ },
+ {
+  "codes": [
+   "EAR 412"
+  ],
+  "title": "Guidance and Navigation Systems"
+ },
+ {
+  "codes": [
+   "EAR 413"
+  ],
+  "title": "Aerospace Engineering Project I"
+ },
+ {
+  "codes": [
+   "EAR 501"
+  ],
+  "title": "Aircraft And Spacecraft Flight Dynamics"
+ },
+ {
+  "codes": [
+   "EAR 502"
+  ],
+  "title": "Cad And Cam"
+ },
+ {
+  "codes": [
+   "EAR 504"
+  ],
+  "title": "Radar And Satellite Systems"
+ },
+ {
+  "codes": [
+   "EAR 505"
+  ],
+  "title": "Rotary Wing Aircraft Aeromechanics"
+ },
+ {
+  "codes": [
+   "EAR 506"
+  ],
+  "title": "Aircraft Vibration And Aero Elasticity"
+ },
+ {
+  "codes": [
+   "EAR 507"
+  ],
+  "title": "Spacecraft Design"
+ },
+ {
+  "codes": [
+   "EAR 508"
+  ],
+  "title": "Aerospace Engineering Project II"
+ },
+ {
+  "codes": [
+   "EAR 509"
+  ],
+  "title": "Aerospace Materials And Manufacturing"
+ },
+ {
+  "codes": [
+   "EAR 510"
+  ],
+  "title": "Aircraft System Design"
+ },
+ {
+  "codes": [
+   "EAR 512"
+  ],
+  "title": "Aircraft Manufacturing Technology"
+ },
+ {
+  "codes": [
+   "EAR 513"
+  ],
+  "title": "Aerospace Law Safety And Management"
+ },
+ {
+  "codes": [
+   "EAR 514"
+  ],
+  "title": "Aircraft And Space Maintenance"
+ },
+ {
+  "codes": [
+   "ECU 100"
+  ],
+  "title": "Chemistry I"
+ },
+ {
+  "codes": [
+   "ECU 101"
+  ],
+  "title": "Physics I"
+ },
+ {
+  "codes": [
+   "ECU 102"
+  ],
+  "title": "Chemistry II"
+ },
+ {
+  "codes": [
+   "ECU 103"
+  ],
+  "title": "Physics II"
+ },
+ {
+  "codes": [
+   "ECU 104"
+  ],
+  "title": "Analytical Geometry"
+ },
+ {
+  "codes": [
+   "ECU 105"
+  ],
+  "title": "Algebra"
+ },
+ {
+  "codes": [
+   "ECU 106"
+  ],
+  "title": "Vectors"
+ },
+ {
+  "codes": [
+   "ECU 107"
+  ],
+  "title": "Calculus I"
+ },
+ {
+  "codes": [
+   "ECU 200"
+  ],
+  "title": "Calculus II"
+ },
+ {
+  "codes": [
+   "ECU 201"
+  ],
+  "title": "Statistics And Probability"
+ },
+ {
+  "codes": [
+   "ECU 202"
+  ],
+  "title": "Engineering Maths VII (ODE)"
+ },
+ {
+  "codes": [
+   "ECU 203"
+  ],
+  "title": "Engineering Maths VIII (Transforms)"
+ },
+ {
+  "codes": [
+   "ECU 300"
+  ],
+  "title": "Engineering Maths IX"
+ },
+ {
+  "codes": [
+   "ECU 301"
+  ],
+  "title": "Mathematics X"
+ },
+ {
+  "codes": [
+   "ECU 302"
+  ],
+  "title": "Entrepreneurship"
+ },
+ {
+  "codes": [
+   "ECU 400"
+  ],
+  "title": "Research Methodology"
+ },
+ {
+  "codes": [
+   "ECU 401"
+  ],
+  "title": "Project Management"
+ },
+ {
+  "codes": [
+   "ECU 500"
+  ],
+  "title": "Engineering Practice And Ethics"
+ },
+ {
+  "codes": [
+   "ECV 300"
+  ],
+  "title": "Engineering Geology"
+ },
+ {
+  "codes": [
+   "ECV 301"
+  ],
+  "title": "Soil Mechanics I"
+ },
+ {
+  "codes": [
+   "ECV 302"
+  ],
+  "title": "Hydraulics I"
+ },
+ {
+  "codes": [
+   "ECV 303"
+  ],
+  "title": "Public Health Engineering I"
+ },
+ {
+  "codes": [
+   "ECV 304"
+  ],
+  "title": "Surveying III"
+ },
+ {
+  "codes": [
+   "ECV 305"
+  ],
+  "title": "Theory of Structures III"
+ },
+ {
+  "codes": [
+   "ECV 306"
+  ],
+  "title": "Transportation Planning And Development"
+ },
+ {
+  "codes": [
+   "EMM 100",
+   "EAR 100",
+   "EBE 100"
+  ],
+  "title": "Drawing I"
+ },
+ {
+  "codes": [
+   "EMM 101",
+   "EAR 104",
+   "EBE 102"
+  ],
+  "title": "Drawing II"
+ },
+ {
+  "codes": [
+   "EMM 102",
+   "EAR 101"
+  ],
+  "title": "Intro to Material Science"
+ },
+ {
+  "codes": [
+   "EMM 107",
+   "EAR 103"
+  ],
+  "title": "Engineering Materials"
+ },
+ {
+  "codes": [
+   "EMM 108",
+   "EAR 102"
+  ],
+  "title": "Workshop Practice I"
+ },
+ {
+  "codes": [
+   "EMM 109",
+   "EAR 105"
+  ],
+  "title": "Computer Programming I"
+ },
+ {
+  "codes": [
+   "EMM 201"
+  ],
+  "title": "Computer Aided Drawing"
+ },
+ {
+  "codes": [
+   "EMM 203",
+   "EAR 203"
+  ],
+  "title": "Thermodynamics I"
+ },
+ {
+  "codes": [
+   "EMM 204"
+  ],
+  "title": "Fluid Mechanics"
+ },
+ {
+  "codes": [
+   "EMM 205",
+   "EAR 301"
+  ],
+  "title": "Fluid Mechanics II"
+ },
+ {
+  "codes": [
+   "EMM 209",
+   "EAR 204"
+  ],
+  "title": "Electrical Engineering I"
+ },
+ {
+  "codes": [
+   "EMM 210"
+  ],
+  "title": "Engineering Mechanics"
+ },
+ {
+  "codes": [
+   "EMM 211",
+   "EAR 210"
+  ],
+  "title": "Mechanics II (Kinetics)"
+ },
+ {
+  "codes": [
+   "EMM 212",
+   "EAR 205"
+  ],
+  "title": "Workshop Processes And Practices"
+ },
+ {
+  "codes": [
+   "EMM 214",
+   "EAR 211",
+   "EBE 209"
+  ],
+  "title": "Electrical Engineering II"
+ },
+ {
+  "codes": [
+   "EMM 216",
+   "EAR 208"
+  ],
+  "title": "Workshop III"
+ },
+ {
+  "codes": [
+   "EMM 217",
+   "EAR 207"
+  ],
+  "title": "Principles of Engineering Design"
+ },
+ {
+  "codes": [
+   "EMM 218"
+  ],
+  "title": "Engineering Materials I"
+ },
+ {
+  "codes": [
+   "EMM 219",
+   "EAR 209"
+  ],
+  "title": "Thermodynamics II"
+ },
+ {
+  "codes": [
+   "EMM 300"
+  ],
+  "title": "Engineering Electronics"
+ },
+ {
+  "codes": [
+   "EMM 301"
+  ],
+  "title": "Kinematic Pairs Chains And Mechanisms"
+ },
+ {
+  "codes": [
+   "EMM 302"
+  ],
+  "title": "Strength of Materials"
+ },
+ {
+  "codes": [
+   "EMM 305"
+  ],
+  "title": "Metrology"
+ },
+ {
+  "codes": [
+   "EMM 308",
+   "EAR 302"
+  ],
+  "title": "Computer Programming II"
+ },
+ {
+  "codes": [
+   "EMM 312"
+  ],
+  "title": "Fluid Mechanics III"
+ },
+ {
+  "codes": [
+   "EMM 313",
+   "EAR 303"
+  ],
+  "title": "Measurement And Instrumentation"
+ },
+ {
+  "codes": [
+   "EMM 314"
+  ],
+  "title": "Manufacturing Work Study"
+ },
+ {
+  "codes": [
+   "EMM 318",
+   "EAR 306"
+  ],
+  "title": "Machine Design"
+ },
+ {
+  "codes": [
+   "EMM 400",
+   "EAR 311"
+  ],
+  "title": "Fluid Mechanics IV"
+ },
+ {
+  "codes": [
+   "EMM 402"
+  ],
+  "title": "Mechanics of Machines III"
+ },
+ {
+  "codes": [
+   "EMM 403"
+  ],
+  "title": "Solid And Structural Mechanics III"
+ },
+ {
+  "codes": [
+   "EMM 404"
+  ],
+  "title": "Engineering Thermodynamics III"
+ },
+ {
+  "codes": [
+   "EMM 407"
+  ],
+  "title": "Heat Transfer"
+ },
+ {
+  "codes": [
+   "EMM 408",
+   "EAR 503"
+  ],
+  "title": "Refrigeration And Air Conditioning"
+ },
+ {
+  "codes": [
+   "EMM 409",
+   "EAR 511"
+  ],
+  "title": "Manufacturing Processes I"
+ },
+ {
+  "codes": [
+   "EMM 410"
+  ],
+  "title": "Manufacturing Processes II"
+ },
+ {
+  "codes": [
+   "EMM 413"
+  ],
+  "title": "Operations Research"
+ },
+ {
+  "codes": [
+   "EMM 414"
+  ],
+  "title": "Industrial Ergonomics"
+ },
+ {
+  "codes": [
+   "EMM 416",
+   "EAR 308"
+  ],
+  "title": "Control Engineering I"
+ },
+ {
+  "codes": [
+   "EMM 419"
+  ],
+  "title": "Mechanical Vibrations"
+ },
+ {
+  "codes": [
+   "EMM 500"
+  ],
+  "title": "Systems And Reliability Engineering"
+ },
+ {
+  "codes": [
+   "EMM 502"
+  ],
+  "title": "Quality Management"
+ },
+ {
+  "codes": [
+   "EMM 504"
+  ],
+  "title": "Metal Forming Processes"
+ },
+ {
+  "codes": [
+   "EMM 506"
+  ],
+  "title": "Manufacturing Management"
+ },
+ {
+  "codes": [
+   "EMM 507"
+  ],
+  "title": "Plant & Facilities Design"
+ },
+ {
+  "codes": [
+   "SMA 330"
+  ],
+  "title": "Numerical Analysis I"
+ },
+ {
+  "codes": [
+   "UCU 100",
+   "UCU 110"
+  ],
+  "title": "Communication Skills"
+ },
+ {
+  "codes": [
+   "UCU 111"
+  ],
+  "title": "Critical Thinking & Problem Solving"
+ },
+ {
+  "codes": [
+   "UCU 112"
+  ],
+  "title": "Creativity And Innovation"
+ }
+]

@@ -102,10 +102,18 @@ async function checkDiscord(token) {
   return { ok: true, msg: lines.join('\n') };
 }
 
+// Accepts the API URL, the project ref, or a dashboard link, and returns https://<ref>.supabase.co
+function supabaseUrl(input) {
+  const s = String(input || '').trim();
+  const ref = s.match(/supabase\.com\/dashboard\/project\/([a-z0-9]{20})/i)?.[1] || s.match(/^https?:\/\/([a-z0-9]{20})\.supabase\.co/i)?.[1] || s.match(/^([a-z0-9]{20})$/i)?.[1];
+  return ref ? `https://${ref.toLowerCase()}.supabase.co` : s.replace(/\/+$/, '');
+}
+
 async function checkSupabase(url, key) {
   if (key.startsWith('sb_publishable_')) return { ok: false, msg: red('✗ That is the publishable key. The bot needs the secret key (starts with sb_secret_).') };
+  if (!/^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(url)) return { ok: false, msg: red(`✗ "${url}" isn't a Supabase project URL. It looks like https://abcdefghijklmnopqrst.supabase.co`) };
   const r = await call(`${url}/rest/v1/files?select=id&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-  if (r.ok) return { ok: true, tables: true, msg: green("✓ Supabase key works and the bot's tables exist.") };
+  if (r.ok && Array.isArray(r.body)) return { ok: true, tables: true, msg: green("✓ Supabase key works and the bot's tables exist.") };
   const code = r.body?.code || '';
   if (r.status === 404 || code === 'PGRST205' || code === '42P01') return { ok: true, tables: false, msg: green('✓ Supabase key works') + red(", but the bot's tables don't exist yet.") };
   if (r.status === 401 || r.status === 403) return { ok: false, msg: red("✗ Supabase didn't accept that key. Copy the secret key again.") };
@@ -199,7 +207,8 @@ const oldToken = env.DISCORD_TOKEN;
 env.DISCORD_TOKEN = await askChecked('Discord bot token', { secret: true, current: env.DISCORD_TOKEN }, checkDiscord);
 
 console.log(dim('\n2. Supabase: Project Settings → API Keys.'));
-env.SUPABASE_URL = (await ask('Supabase Project URL', { current: env.SUPABASE_URL })).replace(/\/+$/, '');
+env.SUPABASE_URL = supabaseUrl(await ask('Supabase Project URL (or the dashboard link)', { current: env.SUPABASE_URL }));
+console.log(dim(`Using ${env.SUPABASE_URL}`));
 env.SUPABASE_SERVICE_KEY = await askChecked('Supabase secret key (starts with sb_secret_)', { secret: true, current: env.SUPABASE_SERVICE_KEY },
   (key) => checkSupabase(env.SUPABASE_URL, key));
 if (env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY && (await checkSupabase(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY)).tables === false) {

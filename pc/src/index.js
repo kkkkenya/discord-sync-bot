@@ -5,6 +5,7 @@
 //   npm run dry-run      show where every file in WATCH_DIRS would go, without uploading or changing anything
 //   npm run preview      the same, offline, no token needed (src/preview.js)
 import './env.js';
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import cron from 'node-cron';
 import { FEATURES, GUILD_ID } from '../../lib/config.js';
@@ -29,7 +30,24 @@ const client = new Client({
     GatewayIntentBits.GuildVoiceStates,
   ],
   partials: [Partials.Message, Partials.Reaction, Partials.User],
+  // Big books on a slow line take minutes: the 15-second default gave up mid-upload, then discord.js re-sent the
+  // whole file up to 3 times (that's how files got posted 2-4 times). Long timeout, and no blind retries: the
+  // uploader retries itself, after checking whether the file already landed.
+  rest: { timeout: 10 * 60 * 1000, retries: 0 },
 });
+
+// One copy at a time: two would race through the same files and post them twice.
+if (!DRY) {
+  const LOCK = new URL('../data/bot.lock', import.meta.url);
+  const other = (() => { try { return Number(readFileSync(LOCK, 'utf8')); } catch { return 0; } })();
+  if (other && other !== process.pid) {
+    let running = true;
+    try { process.kill(other, 0); } catch (e) { running = e.code === 'EPERM'; }
+    if (running) { console.error(`The bot is already running (process ${other}). Close its window first, or wait for it.`); process.exit(1); }
+  }
+  writeFileSync(LOCK, String(process.pid));
+  process.on('exit', () => { try { if (readFileSync(LOCK, 'utf8') === String(process.pid)) unlinkSync(LOCK); } catch { /* gone already */ } });
+}
 
 client.once(Events.ClientReady, async () => {
   console.log(`Signed in as ${client.user.tag}${DRY ? ' (dry run: nothing will be posted)' : ''}`);
@@ -49,7 +67,7 @@ client.once(Events.ClientReady, async () => {
   const botLog = setup.channels.botLog;
   const log = (text) => {
     console.log(text);
-    botLog.send({ content: text.slice(0, 1900), allowedMentions: { parse: [] } }).catch(() => {});
+    botLog.send({ content: text.slice(0, 1900), allowedMentions: { parse: [] } }).catch((e) => console.error(`couldn't post to #bot-log: ${e.message}`));
   };
   const ctx = { client, guild, index, setup, log, dry: false };
 
@@ -60,6 +78,7 @@ client.once(Events.ClientReady, async () => {
   const before = Date.now();
   const scan = await scanExisting(ctx);
   if (scan.added) log(`📚 Indexed ${scan.added} file${scan.added === 1 ? '' : 's'} already on the server (${Math.round((Date.now() - before) / 1000)}s). /find can search them, and the uploader skips them.`);
+  if (scan.failed.length) log(`⚠️ Couldn't read ${scan.failed.length} post${scan.failed.length === 1 ? '' : 's'} or channel${scan.failed.length === 1 ? '' : 's'} (${scan.failed.slice(0, 10).join(', ')}): files already there may be uploaded again. They're retried on the next start.`);
   client.on(Events.MessageCreate, (msg) => recordLive(ctx, msg).catch((e) => console.error('index:', e.message)));
   await startUploader(ctx);
 

@@ -99,14 +99,36 @@ export async function startUploader(ctx) {
   let pending = 0;
   let ready = false;
 
+  // On a slow line Discord can take a file and still have the reply time out. Before trying again, look for
+  // it in the channel, so an upload that "failed" is never posted a second time.
+  const transient = (e) => e?.name === 'AbortError' || ['ECONNRESET', 'ETIMEDOUT', 'UND_ERR_SOCKET', 'EPIPE'].includes(e?.code) || e?.status >= 500;
+  async function landed(target, bytes, since) {
+    await sleep(4000);
+    const recent = await target.messages.fetch({ limit: 20 }).catch(() => null);
+    return recent?.find((m) => m.author.id === ctx.client.user.id && m.createdTimestamp >= since - 60000 && m.attachments.some((a) => a.size === bytes)) || null;
+  }
+  async function send(target, payload, bytes) {
+    for (let attempt = 1; ; attempt++) {
+      const started = Date.now();
+      try {
+        return await target.send(payload);
+      } catch (e) {
+        if (bytes) { const msg = await landed(target, bytes, started); if (msg) return msg; }
+        if (attempt >= 3 || !transient(e)) throw e;
+        console.error(`send to ${target.name} timed out or dropped (try ${attempt} of 3), retrying: ${e.message}`);
+        await sleep(10000 * attempt);
+      }
+    }
+  }
+
   // Upload one file (in parts if it's too big). Returns every message posted, in order.
   async function post(target, label, path, size, info) {
-    if (size <= maxBytes) return [await target.send({ content: label || undefined, files: [{ attachment: path, name: info.name }], allowedMentions: NONE })];
+    if (size <= maxBytes) return [await send(target, { content: label || undefined, files: [{ attachment: path, name: info.name }], allowedMentions: NONE }, size)];
     const out = await shrink(path, maxBytes);
     const msgs = [];
     for (const [n, f] of out.files.entries()) {
       const help = out.how === 'pieces' && n === out.files.length - 1 ? `\n🧩 ${PIECES_HELP}` : '';
-      msgs.push(await target.send({ content: `${label || `📄 **${info.name}**`}${f.label ? ` · ${f.label}` : ''}${help}`, files: [{ attachment: f.data, name: f.name }], allowedMentions: NONE }));
+      msgs.push(await send(target, { content: `${label || `📄 **${info.name}**`}${f.label ? ` · ${f.label}` : ''}${help}`, files: [{ attachment: f.data, name: f.name }], allowedMentions: NONE }, f.data.length));
       await sleep(800);
     }
     report.shrunk.push(`${info.name} (${mb(size)}): ${out.how === 'split' ? `${out.files.length} parts` : out.how === 'pieces' ? `${out.files.length} zip pieces` : `${out.how} to ${mb(out.files[0].data.length)}`}`);
@@ -162,8 +184,9 @@ export async function startUploader(ctx) {
       }
       if (posts.length) {
         const msgs = await post(posts[0].thread, label, path, s.size, info);
+        await record(msgs[0], { dest_name: posts[0].name, forum: posts[0].forum }); // straight away, so a crash can't mean a second copy
         for (const other of posts.slice(1)) for (const m of msgs) await forwardTo(other.id, m.id, m.channelId).catch(() => {});
-        await record(msgs[0], { dest_name: posts[0].name, forum: posts[0].forum });
+        console.log(`↑ ${info.rel} -> ${posts[0].forum} › ${posts[0].name}`);
         report.unit++;
         return;
       }
@@ -171,6 +194,7 @@ export async function startUploader(ctx) {
         const shelf = await ctx.client.channels.fetch(info.shelf.id);
         const msgs = await post(shelf, `${label}${info.title ? `\n_${info.title.slice(0, 150)}_` : ''}`, path, s.size, info);
         await record(msgs[0], { dest_name: info.shelf.name });
+        console.log(`↑ ${info.rel} -> shelf ${info.shelf.name}`);
         report.shelf++;
         return;
       }
@@ -178,10 +202,12 @@ export async function startUploader(ctx) {
       // couldn't place it: #to-sort, in the format the Sort buttons and the dashboard read
       const toSort = await ctx.client.channels.fetch(CHANNELS.toSort);
       const msgs = await post(toSort, '', path, s.size, info);
+      await record(msgs[0], { dest_name: 'to-sort' }); // recorded first: a failed note never means a second copy
+      console.log(`↑ ${info.rel} -> #to-sort`);
       const reason = info.code ? `${info.code} has no forum to put a new post in`
         : info.kind === 'book' ? 'a book that matches no shelf' : 'no unit code in the name, folders or page 1';
       const hints = [info.hints.dept, info.hints.year && `year ${info.hints.year}`, info.hints.sem && `sem ${info.hints.sem}`].filter(Boolean).join(', ');
-      await toSort.send({
+      await send(toSort, {
         content: [
           `⚠️ **Couldn't place this file**: ${reason}`,
           info.code ? `💡 Suggestion: ${info.code}` : '',
@@ -195,7 +221,6 @@ export async function startUploader(ctx) {
         ] }],
         allowedMentions: NONE,
       });
-      await record(msgs[0], { dest_name: 'to-sort' });
       report.toSort++;
     } catch (e) {
       if (!/limit/.test(e.message)) throw e;
@@ -265,7 +290,7 @@ export async function startUploader(ctx) {
   const enqueue = (path) => {
     pending++;
     queue = queue.then(() => handle(path))
-      .catch((e) => { report.failed.push(`${path}: ${e.message}`); if (ctx.dry) console.error(`  ! ${path}: ${e.message}`); })
+      .catch((e) => { report.failed.push(`${path}: ${e.message}`); console.error(`upload failed: ${path}:`, e); })
       .then(() => sleep(ctx.dry ? 0 : 1200)) // stay well under Discord's upload rate limits
       .finally(() => { if (--pending === 0 && ready) done(); });
   };

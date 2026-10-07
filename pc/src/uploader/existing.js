@@ -109,23 +109,29 @@ export async function scanExisting(ctx, { write = true } = {}) {
   const found = new Set();
   state.scanned ||= {};
   let files = 0; let added = 0;
+  const failed = [];
   const list = await places(ctx);
   for (const place of list) {
-    try {
-      const msgs = await messagesSince(place.channel, write ? state.scanned[place.channel.id] : undefined);
-      const rows = rowsFor(place, msgs);
-      for (const r of rows) found.add(fingerprint(r.size, r.name));
-      files += rows.length;
-      if (write) {
-        added += await store(rows);
-        if (msgs.length) state.scanned[place.channel.id] = newest(msgs);
+    for (let attempt = 1; attempt <= 3; attempt++) { // a missed post means its files could be uploaded again
+      try {
+        const msgs = await messagesSince(place.channel, write ? state.scanned[place.channel.id] : undefined);
+        const rows = rowsFor(place, msgs);
+        for (const r of rows) found.add(fingerprint(r.size, r.name));
+        files += rows.length;
+        if (write) {
+          added += await store(rows);
+          if (msgs.length) state.scanned[place.channel.id] = newest(msgs);
+          save();
+        }
+        break;
+      } catch (e) {
+        console.error(`couldn't read ${place.channel.name} (try ${attempt} of 3): ${e.message}`);
+        if (attempt === 3) failed.push(place.channel.name);
+        else await new Promise((r) => setTimeout(r, 5000 * attempt));
       }
-    } catch (e) {
-      console.error(`  couldn't read ${place.channel.name}: ${e.message}`);
     }
   }
-  if (write) save();
-  return { found, places: list.length, files, added };
+  return { found, places: list.length, files, added, failed };
 }
 
 // A file a member posts in a unit post, shelf or library channel joins the index straight away.

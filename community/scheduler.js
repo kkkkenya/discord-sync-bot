@@ -10,9 +10,8 @@ const { SCHEDULE } = await import('./src/config.js');
 const { JOBS } = await import('./src/posts.js');
 const { load, nairobiDay, nairobiMinutes, store } = await import('./src/rest.js');
 
-for (const k of ['COMMUNITY_DISCORD_TOKEN', 'GEMINI_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY']) {
-  if (!process.env[k]) { console.error(`Missing ${k}`); process.exit(1); }
-}
+const missingKeys = ['COMMUNITY_DISCORD_TOKEN', 'GEMINI_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'].filter((k) => !process.env[k]);
+if (missingKeys.length) { console.log(`Not set up yet (missing ${missingKeys.join(', ')}): nothing posted. Run community/setup.bat.`); process.exit(0); }
 const now = process.argv.includes('--now');
 const day = nairobiDay();
 const minutes = nairobiMinutes();

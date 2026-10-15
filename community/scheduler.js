@@ -20,6 +20,7 @@ let failed = false;
 for (const { job, at } of SCHEDULE) {
   const [h, m] = at.split(':').map(Number);
   if (done[job] === day || (!now && minutes < h * 60 + m)) continue;
+  if (now && job === 'reveal' && minutes < h * 60 + m) continue; // a test run never gives the trivia answer away early
   try {
     await JOBS[job]();
     done[job] = day;

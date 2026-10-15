@@ -1,3 +1,4 @@
 # The PC bot and the database schema are not part of the Vercel deployment.
 pc/
 supabase/
+community/

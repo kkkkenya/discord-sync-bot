@@ -84,3 +84,18 @@ split book from `#to-sort` moves every part. To shrink one file by hand: `npm ru
 
 Developer Portal → your app → General Information → **Interactions Endpoint URL** =
 `https://<your-vercel-domain>/api/interactions`
+
+## Community bot (`community/`)
+
+A second Discord app that keeps `#general-chat` lively, powered by Gemini (`gemini-3.8-flash`):
+
+- **10:00** an engineering trivia question from a KU unit, with A-D buttons; the answer and working at **16:00**.
+- **14:00** a new video from Practical Engineering, Real Engineering, The Efficient Engineer, Branch Education,
+  Veritasium, 3Blue1Brown or First Principles Engineering. **19:00** an open-access article (arXiv, Phys.org).
+- Every post opens a discussion thread, and the bot takes part in it.
+- It answers when @mentioned or replied to anywhere, including photos of problems (free-body diagrams, past-paper
+  questions), and now and then joins a busy conversation by itself (at most 6 times a day).
+
+Setup: create a new app in the Developer Portal, turn on **Message Content Intent**, then double-click
+`community/setup.bat` (asks for the bot token and a Gemini key from aistudio.google.com/apikey and gives the invite
+link). Run with `community/start-bot.bat`. Channels, times, YouTube channels and limits are in `community/src/config.js`.

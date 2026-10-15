@@ -1,0 +1,17 @@
+{
+  "name": "esh-community-bot",
+  "private": true,
+  "type": "module",
+  "description": "Engineering Study Hub community bot: daily trivia, YouTube videos and articles in #general-chat, each opened for discussion; chats with members using Gemini.",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "setup": "node setup-keys.js",
+    "start": "node src/index.js",
+    "try": "node src/index.js --post-now"
+  },
+  "dependencies": {
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.7",
+    "node-cron": "^3.0.3"
+  }
+}

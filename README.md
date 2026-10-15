@@ -87,15 +87,23 @@ Developer Portal → your app → General Information → **Interactions Endpoin
 
 ## Community bot (`community/`)
 
-A second Discord app that keeps `#general-chat` lively, powered by Gemini (`gemini-3.8-flash`):
+A second Discord app ("hub buddy") that keeps `#general-chat` lively, powered by Gemini (`gemini-3.8-flash`).
 
-- **10:00** an engineering trivia question from a KU unit, with A-D buttons. The answer and working at **16:00**.
-- **14:00** a new video from Practical Engineering, Real Engineering, The Efficient Engineer, Branch Education,
-  Veritasium, 3Blue1Brown or First Principles Engineering. **19:00** an open-access article (arXiv, Phys.org).
-- Every post opens a discussion thread, and the bot takes part in it.
-- It answers when @mentioned or replied to anywhere, including photos of problems (free-body diagrams, past-paper
-  questions), and now and then joins a busy conversation by itself (at most 6 times a day).
+Daily posts, Nairobi time. A GitHub Actions schedule (`.github/workflows/community-posts.yml`) sends them, so they go
+out with the PC off:
 
-Setup: create a new app in the Developer Portal, turn on **Message Content Intent**, then double-click
-`community/setup.bat` (asks for the bot token and a Gemini key from aistudio.google.com/apikey and gives the invite
-link). Run with `community/start-bot.bat`. Channels, times, YouTube channels and limits are in `community/src/config.js`.
+| Time | Post |
+|---|---|
+| 10:00 | Engineering trivia from a KU unit. Members answer with 🇦 🇧 🇨 🇩 reactions |
+| 14:00 | A new video from Practical Engineering, Real Engineering, The Efficient Engineer, Branch Education, Veritasium, 3Blue1Brown or First Principles Engineering |
+| 16:00 | The trivia answer and working, with a shout-out to everyone who got it |
+| 17:00 | A research paper (arXiv) for the department of the day, pinging its role. Eight departments take turns |
+| 19:00 | An engineering news story (TechXplore, Phys.org) |
+
+Every post opens a discussion thread. The PC half (`npm start`, starts with Windows) does the talking: it answers
+when @mentioned or replied to, including photos of problems such as free-body diagrams, joins its own threads, and
+now and then joins a busy conversation (at most 6 times a day).
+
+Setup: double-click `community/setup.bat`. It asks for the bot token and a Gemini key, creates the Supabase table it
+needs, and stores the keys as GitHub Actions secrets. Times, departments, channels and limits are in
+`community/src/config.js`.

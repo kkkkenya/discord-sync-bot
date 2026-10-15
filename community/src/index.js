@@ -1,11 +1,11 @@
-// Engineering Study Hub community bot (a separate Discord app from the uploader).
-//   npm start          run it          npm run try     post today's trivia, video and article now, then keep running
+// Engineering Study Hub community bot, the conversation half (runs on the PC; starts with Windows).
+// The daily posts are sent by GitHub Actions (scheduler.js), so they go out even when this isn't running.
+//   npm start      chat          npm run try     also send any of today's posts not sent yet, right now
 import { config } from 'dotenv';
 import { appendFileSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
-import cron from 'node-cron';
-import { CHANNEL, SCHEDULE } from './config.js';
-import { postArticle, postTrivia, postVideo, recordVote, revealTrivia } from './posts.js';
+import { CHANNEL } from './config.js';
 import { onMessage } from './talk.js';
 
 config({ path: new URL('../.env', import.meta.url), quiet: true });
@@ -28,26 +28,18 @@ writeFileSync(LOCK, String(process.pid));
 process.on('exit', () => { try { unlinkSync(LOCK); } catch { /* gone */ } });
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent], // MessageContent: turn on in the Developer Portal
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent], // MessageContent: on in the Developer Portal
 });
 
 client.once(Events.ClientReady, async () => {
-  console.log(`Signed in as ${client.user.tag}`);
   const channel = await client.channels.fetch(CHANNEL);
-  const job = (name, fn) => async () => { try { await fn(channel); console.log(`${name}: posted`); } catch (e) { console.error(`${name} failed:`, e.message); } };
-  const at = (expr, name, fn) => cron.schedule(expr, job(name, fn), { timezone: 'Africa/Nairobi' });
-  at(SCHEDULE.trivia, 'trivia', postTrivia);
-  at(SCHEDULE.triviaReveal, 'trivia answer', revealTrivia);
-  at(SCHEDULE.video, 'video', postVideo);
-  at(SCHEDULE.article, 'article', postArticle);
-  if (process.argv.includes('--post-now')) for (const [n, f] of [['trivia', postTrivia], ['video', postVideo], ['article', postArticle]]) await job(n, f)();
-  console.log(`Ready: posting in #${channel.name}, chatting when mentioned and in its threads.`);
+  console.log(`Signed in as ${client.user.tag}: chatting in #${channel.name}, its threads, and wherever it's mentioned.`);
+  if (process.argv.includes('--post-now')) {
+    execFile(process.execPath, ['scheduler.js', '--now'], { cwd: new URL('..', import.meta.url) }, (e, out, err) => console.log(`posts now: ${out}${err}`.trim()));
+  }
 });
 
 client.on(Events.MessageCreate, (msg) => onMessage(msg, client).catch((e) => console.error('message:', e.message)));
-client.on(Events.InteractionCreate, (i) => {
-  if (i.isButton() && i.customId.startsWith('trivia:')) recordVote(i).catch((e) => console.error('vote:', e.message));
-});
 client.on(Events.Error, (e) => console.error('Discord error:', e.message));
 process.on('unhandledRejection', (e) => console.error('Unhandled:', e));
 client.login(process.env.COMMUNITY_DISCORD_TOKEN);

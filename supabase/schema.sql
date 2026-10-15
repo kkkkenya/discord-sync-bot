@@ -96,3 +96,11 @@ alter table groups        enable row level security;
 alter table group_members enable row level security;
 alter table findable      enable row level security;
 alter table prefs         enable row level security;
+
+-- Community bot memory (what's been posted, today's trivia), written by community/scheduler.js.
+create table if not exists community_state (
+  key        text primary key,
+  value      jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table community_state enable row level security;

@@ -4,6 +4,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { GUILD_ID } from '../lib/config.js';
 import { MODEL } from './src/config.js';
 
+const PC_ENV = new URL('../pc/.env', import.meta.url);
+const REPO = 'kkkkenya/discord-sync-bot';
+
 const ENV = new URL('./.env', import.meta.url);
 const read = () => (existsSync(ENV) ? Object.fromEntries(readFileSync(ENV, 'utf8').split(/\r?\n/).map((l) => l.match(/^([A-Z_]+)=(.*)$/)).filter(Boolean).map((m) => [m[1], m[2].trim()])) : {});
 const env = read();
@@ -67,6 +70,44 @@ env.COMMUNITY_DISCORD_TOKEN = await askChecked('Community bot token', env.COMMUN
 console.log(dim('\n2. aistudio.google.com/apikey → Create API key → Copy.'));
 env.GEMINI_API_KEY = await askChecked('Gemini API key', env.GEMINI_API_KEY, checkGemini);
 writeFileSync(ENV, `# Community bot keys. Made by setup-keys.js; never commit or share this file.\nCOMMUNITY_DISCORD_TOKEN=${env.COMMUNITY_DISCORD_TOKEN || ''}\nGEMINI_API_KEY=${env.GEMINI_API_KEY || ''}\n`);
+
+// 3. Supabase: the community_state table that remembers what's been posted (the uploader's keys are reused)
+const pc = existsSync(PC_ENV) ? Object.fromEntries(readFileSync(PC_ENV, 'utf8').split(/\r?\n/).map((l) => l.match(/^([A-Z_]+)=(.*)$/)).filter(Boolean).map((m) => [m[1], m[2].trim()])) : {};
+const sbHead = { apikey: pc.SUPABASE_SERVICE_KEY, Authorization: `Bearer ${pc.SUPABASE_SERVICE_KEY}` };
+const hasTable = async () => (await get(`${pc.SUPABASE_URL}/rest/v1/community_state?select=key&limit=1`, sbHead)).ok;
+if (!pc.SUPABASE_URL || !pc.SUPABASE_SERVICE_KEY) console.log(red('\n✗ pc/.env has no Supabase keys yet: run pc/setup.bat first, then this again.'));
+else if (await hasTable()) console.log(green('\n✓ Supabase: the community_state table exists.'));
+else {
+  console.log(dim('\n3. The community_state table is missing. It can be made for you with a Supabase access token (used once, not\n   saved): supabase.com/dashboard/account/tokens → Generate new token. Or press Enter and paste the end of\n   supabase/schema.sql (from "Community bot memory") into the SQL Editor yourself.'));
+  const token = await ask('Supabase access token (starts with sbp_)');
+  if (token) {
+    const ref = new URL(pc.SUPABASE_URL).hostname.split('.')[0];
+    const sql = readFileSync(new URL('../supabase/schema.sql', import.meta.url), 'utf8').split('-- Community bot memory')[1];
+    const r = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query: `--${sql}` }) });
+    console.log(r.ok && await hasTable() ? green('✓ Created the community_state table.') : red(`✗ Couldn't create it (${r.status}). Paste the end of supabase/schema.sql into the SQL Editor.`));
+  }
+}
+
+// 4. GitHub: the keys the daily posts need, stored as Actions secrets so posts go out with the PC off
+console.log(dim(`\n4. So posts go out when your PC is off, the keys are stored as secrets in the GitHub repo ${REPO}.\n   github.com/settings/personal-access-tokens/new → Repository access: Only select repositories → discord-sync-bot\n   → Permissions: Secrets "Read and write" and Actions "Read and write" → Generate. Used once, not saved.\n   Press Enter to skip.`));
+const gh = await ask('GitHub token (starts with github_pat_)');
+if (gh && env.COMMUNITY_DISCORD_TOKEN && env.GEMINI_API_KEY && pc.SUPABASE_SERVICE_KEY) {
+  const sodium = (await import('libsodium-wrappers')).default;
+  await sodium.ready;
+  const h = { Authorization: `Bearer ${gh}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  const key = await get(`https://api.github.com/repos/${REPO}/actions/secrets/public-key`, h);
+  if (!key.ok) console.log(red(`✗ GitHub didn't accept that token (${key.status}). It needs Secrets: Read and write on ${REPO}.`));
+  else {
+    const secrets = { COMMUNITY_DISCORD_TOKEN: env.COMMUNITY_DISCORD_TOKEN, GEMINI_API_KEY: env.GEMINI_API_KEY, SUPABASE_URL: pc.SUPABASE_URL, SUPABASE_SERVICE_KEY: pc.SUPABASE_SERVICE_KEY };
+    for (const [name, value] of Object.entries(secrets)) {
+      const sealed = sodium.crypto_box_seal(sodium.from_string(value), sodium.from_base64(key.body.key, sodium.base64_variants.ORIGINAL));
+      const r = await fetch(`https://api.github.com/repos/${REPO}/actions/secrets/${name}`, { method: 'PUT', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ encrypted_value: sodium.to_base64(sealed, sodium.base64_variants.ORIGINAL), key_id: key.body.key_id }) });
+      console.log(r.ok ? green(`✓ GitHub secret ${name} saved`) : red(`✗ GitHub secret ${name} (${r.status})`));
+    }
+    const run = await fetch(`https://api.github.com/repos/${REPO}/actions/workflows/community-posts.yml/dispatches`, { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: 'main' }) });
+    console.log(run.ok ? green("✓ Started a first run: anything due today gets posted in a minute or two.") : dim(`(Couldn't start a run now (${run.status}); the schedule takes over at the next post time.)`));
+  }
+}
 const missing = KEYS.filter((k) => !env[k]);
 console.log(missing.length ? red(`\nStill missing: ${missing.join(', ')}. Run setup again when you have them.`) : green("\n✓ Saved. Tell Claude you're done, or double-click start-bot.bat."));
 process.exit(0);

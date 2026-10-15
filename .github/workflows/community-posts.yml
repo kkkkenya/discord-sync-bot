@@ -1,0 +1,34 @@
+# Daily community posts in #general-chat (trivia, video, trivia answer, research paper, news), sent from GitHub's
+# servers so they go out with the PC off. Times are UTC: 07:00 = 10:00 in Nairobi. GitHub can start a few minutes
+# late; every run sends whatever is due and not yet sent, so late runs catch up.
+# Secrets (repo → Settings → Secrets and variables → Actions): COMMUNITY_DISCORD_TOKEN, GEMINI_API_KEY,
+# SUPABASE_URL, SUPABASE_SERVICE_KEY. community/setup.bat can add them for you.
+name: Community posts
+on:
+  schedule:
+    - cron: '5 7 * * *'    # 10:05 trivia
+    - cron: '5 11 * * *'   # 14:05 video
+    - cron: '5 13 * * *'   # 16:05 trivia answer
+    - cron: '5 14 * * *'   # 17:05 research paper
+    - cron: '5 16 * * *'   # 19:05 news
+    - cron: '30 18 * * *'  # 21:30 catch-up
+  workflow_dispatch: {}
+concurrency: community-posts
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev
+        working-directory: community
+      - run: node scheduler.js
+        working-directory: community
+        env:
+          COMMUNITY_DISCORD_TOKEN: ${{ secrets.COMMUNITY_DISCORD_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

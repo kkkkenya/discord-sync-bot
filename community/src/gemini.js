@@ -12,13 +12,22 @@ How you talk:
 - If you're not sure of a fact, say so. Never make up references, past-paper questions or exam dates.
 - No @everyone or @here, ever.`;
 
+const FALLBACK = 'gemini-3.5-flash-lite'; // used when the main model is overloaded
+const BUSY = [429, 500, 502, 503, 504];
+
 async function call(body) {
-  const r = await fetch(`${URL_BASE}/${MODEL}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
-    body: JSON.stringify(body),
-  });
-  const data = await r.json().catch(() => ({}));
+  let r; let data;
+  // Busy servers are common and short-lived: retry twice, then once more on the lighter model.
+  for (const [n, model] of [MODEL, MODEL, MODEL, FALLBACK].entries()) {
+    if (n) await new Promise((ok) => setTimeout(ok, 5000 * n));
+    r = await fetch(`${URL_BASE}/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+      body: JSON.stringify(body),
+    });
+    data = await r.json().catch(() => ({}));
+    if (!BUSY.includes(r.status)) break;
+  }
   if (!r.ok) throw new Error(`Gemini ${r.status}: ${data.error?.message || 'request failed'}`);
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
   if (!text) throw new Error(`Gemini gave no answer (${data.candidates?.[0]?.finishReason || data.promptFeedback?.blockReason || 'empty'})`);

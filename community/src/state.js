@@ -1,5 +1,4 @@
-// What the bot remembers between runs (community/data/state.json): posted videos and articles, today's trivia,
-// and daily counters.
+// Daily reply counters for the PC bot (community/data/state.json). What's been posted lives in Supabase.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 
 const DIR = new URL('../data/', import.meta.url);
@@ -7,12 +6,11 @@ const FILE = new URL('state.json', DIR);
 mkdirSync(DIR, { recursive: true });
 
 export const state = (() => {
-  const empty = { videos: [], articles: [], units: [], trivia: null, threads: [], day: '', replies: 0, jumpIns: 0, lastSpoke: 0 };
+  const empty = { day: '', replies: 0, jumpIns: 0, lastSpoke: 0 };
   try { return { ...empty, ...JSON.parse(readFileSync(FILE, 'utf8')) }; } catch { return empty; }
 })();
 
 export function save() {
-  for (const k of ['videos', 'articles', 'units', 'threads']) state[k] = state[k].slice(-300);
   writeFileSync(new URL('state.json.tmp', DIR), JSON.stringify(state));
   renameSync(new URL('state.json.tmp', DIR), FILE);
 }

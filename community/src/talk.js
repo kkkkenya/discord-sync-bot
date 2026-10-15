@@ -63,7 +63,7 @@ export async function onMessage(msg, client) {
   const ch = msg.channel;
   const me = client.user.id;
   const inGeneral = ch.id === CHANNEL;
-  const inMyThread = ch.isThread?.() && state.threads.includes(ch.id);
+  const inMyThread = ch.isThread?.() && ch.ownerId === me; // discussion threads it opened under its posts
   if (inGeneral) humanTimes.push(Date.now());
 
   const mentioned = msg.mentions.users.has(me);

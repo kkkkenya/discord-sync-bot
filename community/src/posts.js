@@ -1,107 +1,113 @@
-// The three daily posts in #general-chat. Each one opens a thread with a discussion question, and the bot
-// answers people in those threads.
+// The daily posts in #general-chat, sent over Discord's REST API so they work from GitHub Actions with the PC off.
+// Each opens a thread with a discussion question; the PC bot (when running) joins in.
 import UNITS from '../../lib/units.json' with { type: 'json' };
-import { latestArticles, latestVideos } from './feeds.js';
+import { CHANNEL, DEPARTMENTS } from './config.js';
+import { latestNews, latestPapers, latestVideos } from './feeds.js';
 import { askJson } from './gemini.js';
-import { save, state } from './state.js';
+import { discord, load, nairobiDay, store } from './rest.js';
 
-const LETTERS = 'ABCD';
+const LETTERS = ['🇦', '🇧', '🇨', '🇩'];
 const NONE = { parse: [] };
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
-async function openThread(msg, name, question) {
-  const thread = await msg.startThread({ name: name.slice(0, 95), autoArchiveDuration: 1440 });
-  await thread.send({ content: question, allowedMentions: NONE });
-  state.threads.push(thread.id);
-  save();
-  return thread;
+async function post(content, threadName, question, allowed = NONE) {
+  const msg = await discord('POST', `/channels/${CHANNEL}/messages`, { content: content.slice(0, 2000), allowed_mentions: allowed });
+  const thread = await discord('POST', `/channels/${CHANNEL}/messages/${msg.id}/threads`, { name: threadName.slice(0, 95), auto_archive_duration: 1440 });
+  await discord('POST', `/channels/${thread.id}/messages`, { content: `💬 ${question}`, allowed_mentions: NONE });
+  return { msg, thread };
 }
 
-// ── trivia: a 4-choice question from one of the KU units ──
-export async function postTrivia(channel) {
-  const fresh = UNITS.filter((u) => !state.units.includes(u.codes[0]));
+// Everything already posted lives in one state row, so nothing repeats.
+const posted = () => load('posted', { videos: [], links: [], units: [] });
+async function remember(kind, value) {
+  const p = await posted();
+  p[kind] = [...(p[kind] || []), value].slice(-300);
+  await store('posted', p);
+}
+
+// The department of the day (the paper rotates through them).
+export const departmentToday = () => DEPARTMENTS[Math.floor(Date.parse(nairobiDay()) / 864e5) % DEPARTMENTS.length];
+
+export async function trivia() {
+  const done = (await posted()).units;
+  const fresh = UNITS.filter((u) => !done.includes(u.codes[0]));
   const unit = pick(fresh.length ? fresh : UNITS);
   const q = await askJson(
     `Write one fun engineering trivia question for KU students, on the unit ${unit.codes.join(' / ')} "${unit.title}". It can be a quick concept check, a real-world "why does this happen" question, or a short calculation (under 2 minutes). Exactly 4 choices, with tempting wrong ones. explanation: 2 to 4 sentences on why the answer is right, with the working if there is any. discussion: one open question that gets people talking about it.`,
-    {
-      type: 'OBJECT',
-      properties: {
-        question: { type: 'STRING' }, choices: { type: 'ARRAY', items: { type: 'STRING' } },
-        answer: { type: 'INTEGER' }, explanation: { type: 'STRING' }, discussion: { type: 'STRING' },
-      },
-      required: ['question', 'choices', 'answer', 'explanation', 'discussion'],
-    },
+    { type: 'OBJECT', properties: { question: { type: 'STRING' }, choices: { type: 'ARRAY', items: { type: 'STRING' } }, answer: { type: 'INTEGER' }, explanation: { type: 'STRING' }, discussion: { type: 'STRING' } }, required: ['question', 'choices', 'answer', 'explanation', 'discussion'] },
   );
   if (!Array.isArray(q.choices) || q.choices.length !== 4 || !(q.answer >= 0 && q.answer <= 3)) throw new Error('Gemini gave a malformed question');
-  const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5); // so the answer isn't always B
+  const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5); // so the answer isn't always the same letter
   const choices = order.map((n) => q.choices[n]);
-  const answer = order.indexOf(q.answer);
+  const { msg, thread } = await post(
+    [`🧠 **Engineering trivia · ${unit.codes[0]} ${unit.title}**`, '', q.question.slice(0, 900), '',
+      ...choices.map((c, n) => `${LETTERS[n]} ${c.slice(0, 150)}`), '', '_React with your answer (one letter only). Answer and working at 4 pm._'].join('\n'),
+    `Trivia: ${unit.title}`, q.discussion,
+  );
+  for (const e of LETTERS) await discord('PUT', `/channels/${CHANNEL}/messages/${msg.id}/reactions/${encodeURIComponent(e)}/@me`);
+  await store('trivia', { messageId: msg.id, threadId: thread.id, answer: order.indexOf(q.answer), choices, explanation: q.explanation, day: nairobiDay() });
+  await remember('units', unit.codes[0]);
+}
 
-  const msg = await channel.send({
-    content: [`🧠 **Engineering trivia · ${unit.codes[0]} ${unit.title}**`, '', q.question.slice(0, 900), '',
-      ...choices.map((c, n) => `**${LETTERS[n]})** ${c.slice(0, 150)}`), '', '_Tap your answer. The answer and the working come out at 4 pm._'].join('\n'),
-    components: [{ type: 1, components: choices.map((_, n) => ({ type: 2, style: 1, label: LETTERS[n], custom_id: `trivia:${n}` })) }],
-    allowedMentions: NONE,
+export async function reveal() {
+  const t = await load('trivia', null);
+  if (!t || t.revealed || t.day !== nairobiDay()) return;
+  const me = (await discord('GET', '/users/@me')).id;
+  const voters = new Map(); // user -> letters they reacted with
+  for (const [n, e] of LETTERS.entries()) {
+    const users = await discord('GET', `/channels/${CHANNEL}/messages/${t.messageId}/reactions/${encodeURIComponent(e)}?limit=100`).catch(() => []);
+    for (const u of users) if (u.id !== me && !u.bot) voters.set(u.id, [...(voters.get(u.id) || []), n]);
+  }
+  const right = [...voters].filter(([, v]) => v.length === 1 && v[0] === t.answer).map(([id]) => id); // one letter only
+  await discord('POST', `/channels/${t.threadId}/messages`, {
+    content: [`✅ **Answer: ${LETTERS[t.answer]} ${t.choices[t.answer]}**`, t.explanation, '',
+      voters.size ? `${right.length} of ${voters.size} got it.${right.length ? ` 🎉 ${right.slice(0, 15).map((id) => `<@${id}>`).join(' ')}` : ''}` : 'Nobody answered this one. Tomorrow!'].join('\n').slice(0, 2000),
+    allowed_mentions: { users: right.slice(0, 15) },
   });
-  const thread = await openThread(msg, `Trivia: ${unit.title}`, `💬 ${q.discussion}`);
-  state.trivia = { messageId: msg.id, threadId: thread.id, answer, choices, explanation: q.explanation, votes: {}, revealed: false };
-  state.units.push(unit.codes[0]);
-  save();
+  await store('trivia', { ...t, revealed: true });
 }
 
-export async function recordVote(interaction) {
-  const t = state.trivia;
-  if (!t || t.revealed || interaction.message.id !== t.messageId) return interaction.reply({ content: "This one's closed. Watch for tomorrow's question!", ephemeral: true });
-  if (t.votes[interaction.user.id] !== undefined) return interaction.reply({ content: `You already locked in **${LETTERS[t.votes[interaction.user.id]]}**. Answer at 4 pm.`, ephemeral: true });
-  t.votes[interaction.user.id] = Number(interaction.customId.split(':')[1]);
-  save();
-  return interaction.reply({ content: `Locked in **${LETTERS[t.votes[interaction.user.id]]}**. The answer comes out at 4 pm in the thread.`, ephemeral: true });
-}
-
-export async function revealTrivia(channel) {
-  const t = state.trivia;
-  if (!t || t.revealed) return;
-  const voters = Object.entries(t.votes);
-  const right = voters.filter(([, v]) => v === t.answer).map(([id]) => id);
-  const thread = await channel.client.channels.fetch(t.threadId).catch(() => null);
-  const text = [
-    `✅ **Answer: ${LETTERS[t.answer]}) ${t.choices[t.answer]}**`, t.explanation, '',
-    voters.length ? `${right.length} of ${voters.length} got it.${right.length ? ` 🎉 ${right.slice(0, 15).map((id) => `<@${id}>`).join(' ')}` : ''}` : 'Nobody answered this one. Tomorrow!',
-  ].join('\n').slice(0, 2000);
-  await (thread || channel).send({ content: text, allowedMentions: { users: right.slice(0, 15) } });
-  const msg = await channel.messages.fetch(t.messageId).catch(() => null);
-  if (msg) await msg.edit({ components: [] }).catch(() => {});
-  t.revealed = true;
-  save();
-}
-
-// ── a new video from one of the engineering channels ──
-export async function postVideo(channel) {
+export async function video() {
+  const seen = (await posted()).videos;
   const monthAgo = new Date(Date.now() - 30 * 864e5).toISOString();
-  const videos = (await latestVideos()).filter((v) => !state.videos.includes(v.id) && v.published >= monthAgo);
-  if (!videos.length) return;
-  const v = videos[0];
+  const v = (await latestVideos()).find((x) => !seen.includes(x.id) && x.published >= monthAgo);
+  if (!v) return;
   const p = await askJson(
     `Engineering students will see this YouTube video in the server chat.\nChannel: ${v.channel}\nTitle: ${v.title}\nDescription: ${v.description}\n\nhook: one or two sentences on why it's worth watching, linking it to what KU engineering students study (name the unit topic if one fits). discussion: one question that gets people debating or explaining it. Don't repeat the title.`,
     { type: 'OBJECT', properties: { hook: { type: 'STRING' }, discussion: { type: 'STRING' } }, required: ['hook', 'discussion'] },
   );
-  const msg = await channel.send({ content: `🎬 **${v.channel}: ${v.title}**\n${p.hook}\nhttps://youtu.be/${v.id}`, allowedMentions: NONE });
-  await openThread(msg, `Video: ${v.title}`, `💬 ${p.discussion}`);
-  state.videos.push(v.id);
-  save();
+  await post(`🎬 **${v.channel}: ${v.title}**\n${p.hook}\nhttps://youtu.be/${v.id}`, `Video: ${v.title}`, p.discussion);
+  await remember('videos', v.id);
 }
 
-// ── an article: Gemini picks the one most relevant to undergrads out of the newest ──
-export async function postArticle(channel) {
-  const fresh = (await latestArticles()).filter((a) => !state.articles.includes(a.link)).slice(0, 30);
-  if (!fresh.length) return;
-  const p = await askJson(
-    `Here are new engineering articles and papers. Pick the ONE most interesting and understandable for KU engineering undergraduates (practical, surprising, or tied to what they study), then write about it.\n\n${fresh.map((a, n) => `[${n}] (${a.source}) ${a.title}\n${a.summary}`).join('\n\n')}\n\nindex: the number you picked. summary: 2 or 3 plain sentences on what they found and why it matters, no jargon left unexplained. discussion: one question to start a debate.`,
+// Gemini picks the most relevant item for undergraduates from a list, and writes about it.
+async function choose(items, brief) {
+  return askJson(
+    `${brief}\n\n${items.map((a, n) => `[${n}] (${a.source}) ${a.title}\n${a.summary}`).join('\n\n')}\n\nindex: the number you picked. summary: 2 or 3 plain sentences on what they found and why it matters, with any jargon explained. discussion: one question to start a debate.`,
     { type: 'OBJECT', properties: { index: { type: 'INTEGER' }, summary: { type: 'STRING' }, discussion: { type: 'STRING' } }, required: ['index', 'summary', 'discussion'] },
   );
-  const a = fresh[p.index] || fresh[0];
-  const msg = await channel.send({ content: `📰 **${a.title}** (${a.source})\n${p.summary}\n${a.link}`, allowedMentions: NONE });
-  await openThread(msg, `Article: ${a.title}`, `💬 ${p.discussion}`);
-  state.articles.push(a.link);
-  save();
 }
+
+export async function paper() {
+  const dept = departmentToday();
+  const seen = (await posted()).links;
+  const papers = (await latestPapers(dept.arxiv)).filter((p) => !seen.includes(p.link)).slice(0, 25);
+  if (!papers.length) return;
+  const p = await choose(papers, `These are new research papers. Pick the ONE that ${dept.name} Engineering undergraduates at KU would find most interesting and could follow (practical results, a clever method, or something tied to their units), then write about it for them.`);
+  const a = papers[p.index] || papers[0];
+  await post(`📄 <@&${dept.role}> **Research paper of the day for ${dept.name}**\n**${a.title}**\n${p.summary}\n${a.link}`,
+    `Paper: ${a.title}`, p.discussion, { roles: [dept.role] });
+  await remember('links', a.link);
+}
+
+export async function news() {
+  const seen = (await posted()).links;
+  const items = (await latestNews()).filter((a) => !seen.includes(a.link)).slice(0, 30);
+  if (!items.length) return;
+  const p = await choose(items, 'These are new engineering news stories. Pick the ONE most interesting for KU engineering undergraduates (practical, surprising, or tied to what they study), then write about it.');
+  const a = items[p.index] || items[0];
+  await post(`📰 **${a.title}** (${a.source})\n${p.summary}\n${a.link}`, `News: ${a.title}`, p.discussion);
+  await remember('links', a.link);
+}
+
+export const JOBS = { trivia, video, reveal, paper, news };

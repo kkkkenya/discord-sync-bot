@@ -5,6 +5,7 @@ import { api, dm, isValidSignature, isoDay } from '../lib/discord.js';
 import { CHANNELS, GUILD_ID, MPESA, PRICES, ROLES, WHATSAPP } from '../lib/config.js';
 import { canSort, forwardTo, partsOf, postsFor } from '../lib/sorting.js';
 import { handleCommand, handleComponent } from '../lib/commands.js';
+import { handleLogAutocomplete } from '../lib/logbook.js';
 
 const ADMINISTRATOR = 1n << 3n;
 const MANAGE_ROLES = 1n << 28n;
@@ -99,6 +100,7 @@ export async function POST(request) {
     if (i.data?.custom_id?.startsWith('sort:')) return await handleSort(i, user);
 
     // ── community: slash commands, daily-problem and group buttons (lib/commands.js) ──
+    if (i.type === 4) return await handleLogAutocomplete(i, user); // only /milestone uses autocomplete
     if (i.type === 2) return await handleCommand(i, user);
     if (/^(dp|grp):/.test(i.data?.custom_id || '')) return await handleComponent(i, user);
 

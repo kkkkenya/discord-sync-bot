@@ -64,7 +64,7 @@ split book from `#to-sort` moves every part. To shrink one file by hand: `npm ru
 
 | When | What |
 |---|---|
-| Daily 09:00 | (Vercel) trials and semester renewals |
+| Daily 09:00 | (Vercel) trials and semester renewals; on Sundays also the Study Hub Milestones recap in `#daily-logs` |
 | Daily 10:00 | Revision-pack DMs, from 14 days before exams (`CALENDAR` in `lib/config.js`) |
 | Daily 17:30 | Check-in DMs to members quiet for 14+ days (at most 40 a day, `/nudges off` to opt out) |
 | Sundays 18:00 | `#new-this-week` digest |
@@ -74,6 +74,9 @@ split book from `#to-sort` moves every part. To shrink one file by hand: `npm ru
 
 - `lib/config.js`: everything about the server you might change (IDs, prices and M-Pesa details, trial and semester length, the KU calendar, channel and role names, feature switches).
 - `lib/commands.js`: slash commands and buttons (Vercel). `lib/db.js`: Supabase client. `lib/sorting.js`: Sort helpers.
+- Study Hub Milestones (12-month cycle from 19 Oct 2026): `lib/logbook.js` answers `/log`, `/unlog`, `/goal`,
+  `/progress`, `/board` and `/milestone`; `lib/milestones.js` holds the tracks, milestones and cycle dates;
+  `api/board.js` + `public/board/` are the public board at `/board/`. Tables: `log_members`, `log_entries`, `log_milestones`.
 - `pc/setup-keys.js` (`setup.bat`): asks for keys and saves `pc/.env`. `pc/register-commands.js`: slash commands.
 - `pc/src/uploader/`: `index.js` (watching and posting), `classify.js` (what is this file?), `extract.js` (title,
   first page), `titles.js` (folder titles → unit codes), `posts.js` (forums and unit posts), `existing.js` (files

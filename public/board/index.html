@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Study Hub Milestones</title>
+<meta name="description" content="Engineering Study Hub's 12-month build-in-public cycle. Members log their day with /log on Discord.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an engineering logbook on graph paper. Header with the cycle gauge, then the server board (left) and the live feed (right). */
+:root{
+  --paper:#F3F6FA; --panel:#FFFFFF; --ink:#12203A; --ink-2:#4A5873; --line:#D5DDE8; --grid:rgba(47,91,234,.07);
+  --accent:#2F5BEA; --soft:#EAF0FD; --crit:#C2410C;
+  --t-ai:#2F5BEA; --t-sw:#7C3AED; --t-eng:#0E7490; --t-iot:#15803D; --t-biz:#B45309; --t-cn:#C8102E; --t-other:#64748B;
+  --h0:#E3E9F1; --h1:#C7D5F7; --h2:#8EA9F0; --h3:#4F76E6; --h4:#2443B8;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0B1322; --panel:#111C30; --ink:#E6ECF5; --ink-2:#9AA8C0; --line:#24334E; --grid:rgba(120,150,255,.07);
+  --accent:#7E9BFF; --soft:#1A2947; --crit:#FF8A5B;
+  --t-ai:#7E9BFF; --t-sw:#B794F6; --t-eng:#4FC3D9; --t-iot:#5BD18B; --t-biz:#F0A54A; --t-cn:#FF6B6B; --t-other:#94A3B8;
+  --h0:#18243B; --h1:#233B6E; --h2:#2F55A8; --h3:#4B74E0; --h4:#8FA9FF; color-scheme:dark}}
+html.lenis,html.lenis body{height:auto}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font:15px/1.5 var(--f-body);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.top{border-bottom:1px solid var(--line);background:var(--panel)}
+.top-in{display:flex;flex-wrap:wrap;gap:24px 40px;justify-content:space-between;align-items:flex-end;padding-block:28px 24px}
+.brand{flex:1 1 360px;min-width:0;display:grid;gap:6px}
+.brand h1{font-size:clamp(30px,5vw,44px);line-height:1.05}
+.brand p{margin:0;color:var(--ink-2);max-width:58ch}
+.cycle{flex:1 1 320px;max-width:460px;display:grid;gap:8px}
+.cycle-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.cycle-num{font-family:var(--f-display);font-size:40px;font-weight:700;line-height:1}
+.muted{color:var(--ink-2)}.small{font-size:13px}
+.bar{position:relative;height:10px;border-radius:5px;background:var(--h0)}
+.bar-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:5px;background:var(--accent)}
+.bar-mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);left:49.6%}
+.bar-legend{display:flex;justify-content:space-between;gap:8px;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2)}
+.grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;padding-block:20px 40px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:grid;gap:20px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:16px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.panel h2{font-size:22px}
+.empty{padding:16px;border:1px dashed var(--line);border-radius:8px;color:var(--ink-2);font-size:14px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:520px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{border-top:2px solid var(--ink);padding-top:8px;display:grid;gap:2px}
+.stat b{font-family:var(--f-display);font-size:28px;line-height:1.1}
+.stat span{font-size:12px;color:var(--ink-2);font-family:var(--f-mono);letter-spacing:.04em;text-transform:uppercase}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-family:var(--f-mono);font-size:11.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+tbody tr{cursor:pointer}tbody tr:hover td,tr.sel td{background:var(--soft)}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who img,.who .ph{width:24px;height:24px;border-radius:50%;background:var(--h0);flex:none}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.dots{display:flex;gap:3px}.dots i{width:8px;height:8px;border-radius:50%;background:var(--c);display:block}
+.flame{color:var(--crit);font-weight:600}
+.heat-wrap{overflow-x:auto;padding-bottom:4px}
+.heat{display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px;width:max-content}
+.heat i{display:block;width:11px;height:11px;border-radius:2px;background:var(--h0)}
+.heat i[data-l="1"]{background:var(--h1)}.heat i[data-l="2"]{background:var(--h2)}.heat i[data-l="3"]{background:var(--h3)}.heat i[data-l="4"]{background:var(--h4)}
+.heat i.today{outline:1.5px solid var(--ink);outline-offset:1px}.heat i.future{opacity:.45}
+.legend{display:flex;gap:4px;align-items:center;font-size:11.5px;color:var(--ink-2);font-family:var(--f-mono)}
+.legend i{width:11px;height:11px;border-radius:2px;display:inline-block}
+.detail-head{display:flex;gap:12px;align-items:center}
+.detail-head img,.detail-head .ph{width:44px;height:44px;border-radius:50%;background:var(--h0)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:11.5px;font-family:var(--f-mono);padding:2px 8px;border-radius:999px;border:1px solid var(--c);background:color-mix(in srgb,var(--c) 12%,transparent)}
+.tag.ms{border-style:dashed}
+.list{display:grid;max-height:640px;overflow:auto}
+.item{display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.av{width:32px;height:32px;border-radius:50%;background:var(--h0);object-fit:cover}
+.item-head{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.when{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2)}
+.item p{margin:4px 0 6px;overflow-wrap:anywhere}
+.link-out{font-size:13px;overflow-wrap:anywhere}
+.ms-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line);font-size:14px}
+.ms-row:last-child{border-bottom:0}
+.ms-row.done span:first-child{text-decoration:line-through;color:var(--ink-2)}
+.ms-row .when{white-space:nowrap}
+code{font-family:var(--f-mono);font-size:13px;background:var(--soft);padding:1px 6px;border-radius:4px}
+.how{display:grid;gap:8px;margin:0;padding-left:20px}
+footer{padding-block:0 32px;font-size:13px;color:var(--ink-2)}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <span class="eyebrow">Engineering Study Hub · 2026–27 cycle</span>
+      <h1>Study Hub Milestones</h1>
+      <p>Members log what they did each day with <code>/log</code> on Discord and tick off milestones with <code>/milestone</code>. This board shows everyone's year.</p>
+    </div>
+    <div class="cycle">
+      <div class="cycle-row"><span class="cycle-num num" id="dayNum">Day 0</span><span class="muted small" id="dayLbl">Starts Monday 19 Oct 2026</span></div>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="365" id="bar"><div class="bar-fill" id="barFill"></div><span class="bar-mark" title="6-month checkpoint"></span></div>
+      <div class="bar-legend"><span>19 Oct</span><span>6-month check · 19 Apr</span><span>18 Oct 2027</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap grid">
+  <section class="col">
+    <article class="panel">
+      <div class="panel-head"><h2>Server board</h2><span class="eyebrow" id="updated">Loading…</span></div>
+      <div class="stats">
+        <div class="stat"><b class="num" id="gMembers">0</b><span>Members</span></div>
+        <div class="stat"><b class="num" id="gToday">0</b><span>Logged today</span></div>
+        <div class="stat"><b class="num" id="gWeek">0</b><span>Hours, 7 days</span></div>
+        <div class="stat"><b class="num" id="gMs">0</b><span>Milestones</span></div>
+      </div>
+      <div class="table-wrap" id="board"><div class="empty">Loading the board…</div></div>
+      <p class="muted small" style="margin:0">Select a member to see their year.</p>
+    </article>
+    <article class="panel" id="detail">
+      <div class="empty">Select a member on the board to see their 365 days, goal and milestones.</div>
+    </article>
+  </section>
+  <section class="col">
+    <article class="panel">
+      <div class="panel-head"><h2>Live feed</h2><span class="eyebrow">Logs and milestones</span></div>
+      <div class="list" id="feed"><div class="empty">No logs yet. The first <code>/log</code> starts the feed.</div></div>
+    </article>
+    <article class="panel">
+      <div class="panel-head"><h2>Join in</h2><span class="eyebrow">On Discord</span></div>
+      <ol class="how">
+        <li><code>/log</code> what you did, pick a track (or type your own course or interest), add minutes and a proof link if you have one.</li>
+        <li><code>/milestone done</code> when you hit one. Start typing and pick it from the list.</li>
+        <li><code>/progress</code> shows your streak and last 4 weeks. <code>/goal</code> sets your goal for the year.</li>
+        <li>Forgot yesterday? <code>/log day: yesterday</code>. Made a mistake? <code>/unlog</code>.</li>
+      </ol>
+      <p class="muted small" style="margin:0">Tracks: AI coding · Software · MATLAB & CAD · IoT · Clients & business · Chinese 中文 · My field, plus any course or interest you add yourself. Ideas for new tracks: <code>/suggest</code>.</p>
+    </article>
+  </section>
+</main>
+<footer class="wrap">Everything here is what members posted with <code>/log</code> in the Engineering Study Hub Discord. It updates about once a minute.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://unpkg.com/lenis@1.3.26/dist/lenis.min.js"></script>
+<script>
+(function () {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAY = 864e5;
+const parse = (s) => Date.parse(s + 'T12:00:00Z');
+const addDays = (s, n) => new Date(parse(s) + n * DAY).toISOString().slice(0, 10);
+const diff = (a, b) => Math.round((parse(b) - parse(a)) / DAY);
+const fmtDay = (s) => { const d = new Date(parse(s)); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}`; };
+const fmtTime = (iso) => { const d = new Date(iso); return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Nairobi' }); };
+const PRESET = ['ai', 'sw', 'eng', 'iot', 'biz', 'cn', 'other'];
+const tcol = (t) => `var(--t-${PRESET.includes(t) ? t : 'other'})`;
+let D = null, selected = null, first = true;
+
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') n.className = v; else if (k === 'style') n.setAttribute('style', v);
+    else if (k === 'text') n.textContent = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return n;
+}
+const avatar = (url, cls) => url ? el('img', { src: url, alt: '', class: cls || '', loading: 'lazy' }) : el('span', { class: 'ph ' + (cls || '') });
+const trackName = (t, named) => named || (D.tracks.find((x) => x.id === t) || { name: t.replace(/^own:/, '') }).name;
+const dayLabel = (s) => { const n = diff(D.cycle.start, s) + 1; return n < 1 ? 'Warm-up' : n > D.cycle.days ? 'After the cycle' : `Day ${n}`; };
+
+function renderCycle() {
+  const n = diff(D.cycle.start, D.today) + 1, shown = Math.max(0, Math.min(D.cycle.days, n));
+  $('dayNum').textContent = `Day ${shown}`;
+  $('dayLbl').textContent = n < 1 ? `Starts Monday 19 Oct 2026 · ${1 - n} day${1 - n === 1 ? '' : 's'} to go` : n > D.cycle.days ? 'Cycle complete' : `of ${D.cycle.days} · ${D.cycle.days - shown} days left`;
+  $('bar').setAttribute('aria-valuenow', shown);
+  const pct = shown / D.cycle.days * 100;
+  if (first && window.gsap && !matchMedia('(prefers-reduced-motion: reduce)').matches) gsap.fromTo('#barFill', { width: '0%' }, { width: pct + '%', duration: 1.2, ease: 'power3.out' });
+  else $('barFill').style.width = pct + '%';
+}
+
+function renderBoard() {
+  const ms = D.members;
+  const week = (m) => Object.entries(m.byDay).reduce((s, [d, v]) => { const g = diff(d, D.today); return g >= 0 && g < 7 ? s + v : s; }, 0);
+  $('gMembers').textContent = ms.length;
+  $('gToday').textContent = ms.filter((m) => m.byDay[D.today] != null).length;
+  const h = ms.reduce((s, m) => s + week(m), 0) / 60;
+  $('gWeek').textContent = h >= 100 ? Math.round(h) : Math.round(h * 10) / 10;
+  $('gMs').textContent = ms.reduce((s, m) => s + m.milestones.length, 0);
+  if (!ms.length) { $('board').replaceChildren(el('div', { class: 'empty', text: 'Nobody has logged yet. Use /log in the Discord server to be first.' })); return; }
+  const rows = [...ms].sort((a, b) => b.streak - a.streak || b.last30 - a.last30 || b.hours - a.hours);
+  $('board').replaceChildren(el('table', {},
+    el('thead', {}, el('tr', {}, ['#', 'Member', 'Tracks', 'Streak', 'Last 30', 'Hours', 'Miles.'].map((t, k) => el('th', { class: k === 0 || k > 2 ? 'n' : '', text: t })))),
+    el('tbody', {}, rows.map((m, k) => el('tr', { class: m.id === selected ? 'sel' : '', tabindex: '0', onclick: () => select(m.id), onkeydown: (e) => { if (e.key === 'Enter') select(m.id); } },
+      el('td', { class: 'n', text: k + 1 }),
+      el('td', {}, el('div', { class: 'who' }, avatar(m.avatar), el('span', { text: m.name }))),
+      el('td', {}, el('div', { class: 'dots' }, Object.keys(m.byTrack).map((t) => el('i', { style: `--c:${tcol(t)}`, title: trackName(t, m.trackNames[t]) })))),
+      el('td', { class: 'n' + (m.streak >= 7 ? ' flame' : ''), text: m.streak }),
+      el('td', { class: 'n', text: m.last30 }), el('td', { class: 'n', text: m.hours }), el('td', { class: 'n', text: m.milestones.length }))))));
+}
+
+function select(id) { selected = id; renderBoard(); renderDetail(); if (window.lenisInstance) window.lenisInstance.scrollTo('#detail', { offset: -16 }); }
+
+function renderDetail() {
+  const m = D.members.find((x) => x.id === selected);
+  if (!m) return;
+  const cells = [];
+  for (let k = 0; k < D.cycle.days; k++) {
+    const d = addDays(D.cycle.start, k), v = m.byDay[d];
+    const l = v == null ? 0 : v >= 120 ? 4 : v >= 60 ? 3 : v >= 30 ? 2 : 1;
+    cells.push(el('i', { 'data-l': l, class: (d === D.today ? 'today ' : '') + (d > D.today ? 'future' : ''), title: `${fmtDay(d)} · ${dayLabel(d)}${v != null ? ` · ${v} min` : ''}` }));
+  }
+  const done = new Map(m.milestones.map((x) => [x.id, x]));
+  const tracks = Object.keys(m.byTrack).filter((t) => D.milestones[t]);
+  $('detail').replaceChildren(
+    el('div', { class: 'detail-head' }, avatar(m.avatar), el('div', {}, el('h2', { text: m.name }), el('div', { class: 'muted small', text: m.goal ? `Goal: ${m.goal}` : `Joined ${fmtDay(m.joined)}` }))),
+    el('div', { class: 'stats' },
+      [['Day streak', m.streak], ['Days logged', m.daysLogged], ['Hours', m.hours], ['Milestones', m.milestones.length]].map(([l, v]) => el('div', { class: 'stat' }, el('b', { class: 'num', text: v }), el('span', { text: l })))),
+    el('div', { class: 'panel-head' }, el('span', { class: 'eyebrow', text: '365 days' }), el('span', { class: 'legend' }, 'less ', ['--h0', '--h1', '--h2', '--h3', '--h4'].map((v) => el('i', { style: `background:var(${v})` })), ' 2h+')),
+    el('div', { class: 'heat-wrap', 'data-lenis-prevent': '' }, el('div', { class: 'heat', 'aria-label': `${m.name}'s daily activity` }, cells)),
+    el('div', { class: 'tags' }, Object.entries(m.byTrack).sort((a, b) => b[1] - a[1]).map(([t, mins]) => el('span', { class: 'tag', style: `--c:${tcol(t)}`, text: `${trackName(t, m.trackNames[t])} · ${Math.round(mins / 6) / 10} h` }))),
+    ...tracks.map((t) => el('div', {}, el('h3', { style: 'font-size:16px;margin-bottom:4px', text: trackName(t) }),
+      D.milestones[t].map(([id, title, by]) => el('div', { class: 'ms-row' + (done.has(id) ? ' done' : '') }, el('span', { text: title }), el('span', { class: 'when', text: done.has(id) ? `done ${fmtDay(done.get(id).day)}` : `target ${by}` }))))),
+    m.milestones.some((x) => x.id.startsWith('own:')) ? el('div', {}, el('h3', { style: 'font-size:16px;margin-bottom:4px', text: 'Own milestones' }),
+      m.milestones.filter((x) => x.id.startsWith('own:')).map((x) => el('div', { class: 'ms-row done' }, el('span', { text: x.title }), el('span', { class: 'when', text: `done ${fmtDay(x.day)}` })))) : null,
+  );
+}
+
+function renderFeed() {
+  const items = [
+    ...D.feed.map((f) => ({ ...f, kind: 'log', at: f.created_at })),
+    ...D.milestoneFeed.map((x) => ({ ...x, kind: 'ms', at: x.day + 'T23:59:00+03:00' })),
+  ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 60);
+  const av = new Map(D.members.map((m) => [m.id, m.avatar]));
+  $('feed').replaceChildren(...(items.length ? items.map((it) => el('div', { class: 'item' }, avatar(av.get(it.user_id), 'av'),
+    el('div', {},
+      el('div', { class: 'item-head' }, el('b', { text: it.name }), el('span', { class: 'when', text: it.kind === 'ms' ? `Milestone · ${dayLabel(it.day)} · ${fmtDay(it.day)}` : `${dayLabel(it.day)} · ${fmtTime(it.at)}` }), it.minutes ? el('span', { class: 'when', text: `${it.minutes} min` }) : null),
+      el('p', { text: it.kind === 'ms' ? `Hit: ${it.title}` : it.what }),
+      el('div', { class: 'tags' }, el('span', { class: 'tag' + (it.kind === 'ms' ? ' ms' : ''), style: `--c:${tcol(it.track)}`, text: trackName(it.track, it.track_name) })),
+      it.link ? el('a', { class: 'link-out', href: it.link, target: '_blank', rel: 'noopener nofollow', text: it.link }) : null)))
+    : [el('div', { class: 'empty', text: 'No logs yet. The first /log starts the feed.' })]));
+}
+
+async function load() {
+  try {
+    const r = await fetch('/api/board', { cache: 'no-store' });
+    if (!r.ok) throw new Error(r.status);
+    D = await r.json();
+    renderCycle(); renderBoard(); renderFeed(); renderDetail();
+    $('updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+    if (first && window.gsap && !matchMedia('(prefers-reduced-motion: reduce)').matches) gsap.from('.panel', { y: 14, duration: .6, ease: 'power2.out', stagger: .06 });
+    first = false;
+  } catch (e) {
+    $('updated').textContent = "Couldn't load the board. It retries every 2 minutes.";
+  }
+}
+
+if (window.gsap && window.Lenis && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  const lenis = new Lenis({ autoRaf: false, allowNestedScroll: true });
+  window.lenisInstance = lenis;
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+}
+load();
+setInterval(load, 120000);
+})();
+</script>
+</body>
+</html>

@@ -6,8 +6,11 @@ config({ path: new URL('./.env', import.meta.url) });
 const { api } = await import('../lib/discord.js');
 const { APP_ID, FEATURES, GUILD_ID } = await import('../lib/config.js');
 
-const SUB = 1, STRING = 3, INTEGER = 4;
+const { TRACKS } = await import('../lib/milestones.js');
+
+const SUB = 1, STRING = 3, INTEGER = 4, BOOLEAN = 5, USER = 6;
 const choices = (...names) => names.map((n) => ({ name: n, value: n }));
+const TRACK_CHOICES = TRACKS.map((t) => ({ name: t.name, value: t.id }));
 
 const COMMANDS = [
   {
@@ -54,6 +57,60 @@ const COMMANDS = [
   ] },
   { name: 'streak', description: 'Your daily-problem streak and points' },
   { name: 'leaderboard', description: 'Top daily-problem players' },
+
+  // Study Hub Milestones (lib/logbook.js)
+  {
+    name: 'log', description: 'Log what you worked on today (Study Hub Milestones)',
+    options: [
+      { type: STRING, name: 'what', description: 'What you did, e.g. "Finished MATLAB Onramp module 4"', required: true, max_length: 280 },
+      { type: STRING, name: 'track', description: 'Pick a track, or type your own interest to add it', required: true, autocomplete: true, max_length: 60 },
+      { type: INTEGER, name: 'minutes', description: 'How long you spent', min_value: 0, max_value: 720 },
+      { type: STRING, name: 'link', description: 'Proof: a certificate, repo or video link', max_length: 300 },
+      { type: STRING, name: 'day', description: 'Forgot yesterday? Log it now (default: today)', choices: choices('today', 'yesterday') },
+    ],
+  },
+  { name: 'unlog', description: 'Delete your most recent log' },
+  { name: 'goal', description: 'Set your goal for the year (shows on the board)', options: [
+    { type: STRING, name: 'text', description: 'e.g. "Land 3 paying clients and pass HSK 2"', required: true, max_length: 140 },
+  ] },
+  { name: 'progress', description: 'Your streak, hours, milestones and last 4 weeks', options: [
+    { type: USER, name: 'member', description: 'See someone else\'s progress instead' },
+    { type: BOOLEAN, name: 'share', description: 'Post it in the channel instead of just showing you' },
+  ] },
+  { name: 'board', description: 'Top streaks this month and the link to everyone\'s year' },
+  {
+    name: 'milestone', description: 'Tick off a Study Hub milestone',
+    options: [
+      { type: SUB, name: 'done', description: 'Tick a preset milestone (announced in the channel)', options: [
+        { type: STRING, name: 'milestone', description: 'Start typing, e.g. "CS50" or "HSK"', required: true, autocomplete: true },
+      ] },
+      { type: SUB, name: 'own', description: 'Tick a milestone of your own', options: [
+        { type: STRING, name: 'title', description: 'e.g. "Passed Thermodynamics II"', required: true, max_length: 100 },
+        { type: STRING, name: 'track', description: 'Which track (default: My field)', choices: TRACK_CHOICES },
+      ] },
+      { type: SUB, name: 'undo', description: 'Untick a milestone', options: [
+        { type: STRING, name: 'milestone', description: 'Start typing its name', required: true, autocomplete: true },
+      ] },
+      { type: SUB, name: 'list', description: 'Milestones and which ones you have done', options: [
+        { type: STRING, name: 'track', description: 'Only this track', choices: TRACK_CHOICES },
+      ] },
+    ],
+  },
+  {
+    name: 'interest', description: 'Your own tracks for /log (courses, skills, hobbies)',
+    options: [
+      { type: SUB, name: 'add', description: 'Add a course or interest of your own', options: [
+        { type: STRING, name: 'name', description: 'e.g. "Robotics", "Thermodynamics", "Guitar"', required: true, max_length: 40 },
+      ] },
+      { type: SUB, name: 'remove', description: 'Remove one of your interests', options: [
+        { type: STRING, name: 'name', description: 'Start typing its name', required: true, autocomplete: true },
+      ] },
+      { type: SUB, name: 'list', description: 'Your own interests' },
+    ],
+  },
+  { name: 'suggest', description: 'Suggest a course, track or milestone for everyone', options: [
+    { type: STRING, name: 'text', description: 'e.g. "Add an AutoCAD track" or "Milestone: first internship"', required: true, max_length: 300 },
+  ] },
 ];
 
 // Daily-problem commands only exist while the feature is on; switching it off removes them.

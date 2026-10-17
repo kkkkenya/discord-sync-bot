@@ -104,3 +104,46 @@ create table if not exists community_state (
   updated_at timestamptz not null default now()
 );
 alter table community_state enable row level security;
+
+-- Study Hub Milestones (/log, /milestone, the public /board page). One row per log; members are whoever has logged.
+create table if not exists log_members (
+  user_id    text primary key,           -- Discord user id
+  name       text not null,              -- server nickname or display name at their last /log
+  avatar     text,                       -- Discord avatar hash, for the board page
+  goal       text,                       -- /goal
+  joined     date not null,
+  updated_at timestamptz not null default now()
+);
+create table if not exists log_entries (
+  id         bigserial primary key,
+  user_id    text not null references log_members(user_id) on delete cascade,
+  day        date not null,              -- Nairobi date the work was done
+  track      text not null,              -- ai | sw | eng | iot | biz | cn | other (lib/milestones.js)
+  what       text not null,
+  minutes    int not null default 0,
+  link       text,
+  created_at timestamptz not null default now()
+);
+create index if not exists log_entries_user_day_idx on log_entries (user_id, day);
+create index if not exists log_entries_day_idx on log_entries (day);
+create table if not exists log_milestones (
+  user_id      text not null references log_members(user_id) on delete cascade,
+  milestone_id text not null,            -- 'ai1'... from lib/milestones.js, or 'own:<slug>' for /milestone own
+  title        text not null,
+  track        text not null,
+  day          date not null,
+  primary key (user_id, milestone_id)
+);
+alter table log_members    enable row level security;
+alter table log_entries    enable row level security;
+alter table log_milestones enable row level security;
+
+-- Members' own interests for /log (anything outside the preset tracks), and the track name each log was made under.
+create table if not exists log_tracks (
+  user_id text not null references log_members(user_id) on delete cascade,
+  id      text not null,                 -- 'own:<slug>'
+  name    text not null,
+  primary key (user_id, id)
+);
+alter table log_tracks enable row level security;
+alter table log_entries add column if not exists track_name text;

@@ -2,6 +2,7 @@
 //   GET /api/board  → cycle dates, tracks, milestones, every member's year and the latest logs
 import { db } from '../lib/db.js';
 import { selectAll } from '../lib/logbook.js';
+import { planData } from '../lib/plan.js';
 import { CYCLE, MILESTONES, TRACKS, addDays, daysWithin, hours, streakOf, summarise, today } from '../lib/milestones.js';
 
 export async function GET() {
@@ -43,6 +44,7 @@ export async function GET() {
     cycle: CYCLE,
     tracks: TRACKS,
     milestones: MILESTONES,
+    plan: planData(),
     members: out,
     feed: recent.map((r) => ({ ...r, name: names.get(r.user_id) || 'Someone' })),
     milestoneFeed: ms.slice(0, 30).map((x) => ({ ...x, name: names.get(x.user_id) || 'Someone' })),

@@ -70,6 +70,10 @@ const COMMANDS = [
     ],
   },
   { name: 'unlog', description: 'Delete your most recent log' },
+  { name: 'today', description: "Today's tasks from the year plan, for the tracks you work on" },
+  { name: 'plan', description: "A track's 12-month plan and milestones", options: [
+    { type: STRING, name: 'track', description: 'Which track', required: true, choices: TRACK_CHOICES.filter((c) => c.value !== 'other') },
+  ] },
   { name: 'goal', description: 'Set your goal for the year (shows on the board)', options: [
     { type: STRING, name: 'text', description: 'e.g. "Land 3 paying clients and pass HSK 2"', required: true, max_length: 140 },
   ] },

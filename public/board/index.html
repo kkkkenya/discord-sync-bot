@@ -97,6 +97,24 @@ tbody tr{cursor:pointer}tbody tr:hover td,tr.sel td{background:var(--soft)}
 code{font-family:var(--f-mono);font-size:13px;background:var(--soft);padding:1px 6px;border-radius:4px}
 .how{display:grid;gap:8px;margin:0;padding-left:20px}
 footer{padding-block:0 32px;font-size:13px;color:var(--ink-2)}
+.plan-wrap{padding-block:0 40px}
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tabs button{font:inherit;font-size:13.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.tabs button .dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.tabs button[aria-selected="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,var(--panel))}
+.week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+@media (max-width:700px){.week{grid-template-columns:minmax(0,1fr)}}
+.wd{border:1px solid var(--line);border-radius:8px;padding:10px;font-size:13px;display:grid;gap:4px;align-content:start}
+.wd b{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);font-weight:500}
+.months{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.month{border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:6px;align-content:start;font-size:14px}
+.month.now{border:2px solid var(--c)}
+.month .mh{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.month .mh b{font-family:var(--f-display);font-size:17px}
+.month .when{white-space:nowrap}
+.month p{margin:0}
+.month ul{margin:0;padding-left:18px;font-size:13px}
+.month .ms-line{font-size:12.5px;color:var(--ink-2)}
 </style>
 </head>
 <body>
@@ -105,7 +123,7 @@ footer{padding-block:0 32px;font-size:13px;color:var(--ink-2)}
     <div class="brand">
       <span class="eyebrow">Engineering Study Hub · 2026–27 cycle</span>
       <h1>Study Hub Milestones</h1>
-      <p>Members log what they did each day with <code>/log</code> on Discord and tick off milestones with <code>/milestone</code>. This board shows everyone's year.</p>
+      <p>Every morning the bot posts today's tasks in #daily-logs. Members do theirs, then post it with <code>/log</code> and tick off milestones with <code>/milestone</code>. The plan for the whole year is below the board.</p>
     </div>
     <div class="cycle">
       <div class="cycle-row"><span class="cycle-num num" id="dayNum">Day 0</span><span class="muted small" id="dayLbl">Starts Monday 19 Oct 2026</span></div>
@@ -140,7 +158,8 @@ footer{padding-block:0 32px;font-size:13px;color:var(--ink-2)}
     <article class="panel">
       <div class="panel-head"><h2>Join in</h2><span class="eyebrow">On Discord</span></div>
       <ol class="how">
-        <li><code>/log</code> what you did, pick a track (or type your own course or interest), add minutes and a proof link if you have one.</li>
+        <li>Each morning, read today's tasks in #daily-logs, or type <code>/today</code> to see just yours.</li>
+        <li>Do the task, then <code>/log</code> what you did. Pick a track (or type your own course or interest), add minutes and a proof link if you have one.</li>
         <li><code>/milestone done</code> when you hit one. Start typing and pick it from the list.</li>
         <li><code>/progress</code> shows your streak and last 4 weeks. <code>/goal</code> sets your goal for the year.</li>
         <li>Forgot yesterday? <code>/log day: yesterday</code>. Made a mistake? <code>/unlog</code>.</li>
@@ -149,6 +168,16 @@ footer{padding-block:0 32px;font-size:13px;color:var(--ink-2)}
     </article>
   </section>
 </main>
+<section class="wrap plan-wrap" id="plan">
+  <article class="panel">
+    <div class="panel-head"><h2>The year plan</h2><span class="eyebrow" id="planNow"></span></div>
+    <p class="muted" style="margin:0">Twelve months per track. On weekdays you do the month's daily task, Saturday is catch-up or project day, Sunday is review day. Every link is free.</p>
+    <div class="tabs" id="planTabs" role="tablist"></div>
+    <div class="week" id="planWeek"></div>
+    <div class="months" id="planMonths"><div class="empty">Loading the plan…</div></div>
+  </article>
+</section>
+
 <footer class="wrap">Everything here is what members posted with <code>/log</code> in the Engineering Study Hub Discord. It updates about once a minute.</footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
@@ -254,12 +283,34 @@ function renderFeed() {
     : [el('div', { class: 'empty', text: 'No logs yet. The first /log starts the feed.' })]));
 }
 
+let planTrack = 'ai';
+function renderPlan() {
+  if (!D.plan) return;
+  const n = diff(D.cycle.start, D.today) + 1, perMonth = D.cycle.days / 12;
+  const now = n < 1 ? 0 : Math.min(12, Math.floor((n - 1) / perMonth) + 1);
+  $('planNow').textContent = now ? `Now: month ${now} of 12` : 'Month 1 starts Monday 19 Oct';
+  const ids = Object.keys(D.plan);
+  $('planTabs').replaceChildren(...ids.map((t) => el('button', { type: 'button', role: 'tab', 'aria-selected': String(t === planTrack), style: `--c:${tcol(t)}`, onclick: () => { planTrack = t; renderPlan(); } }, el('span', { class: 'dot' }), trackName(t))));
+  const units = D.plan[planTrack], cur = units[Math.max(1, now) - 1];
+  $('planWeek').replaceChildren(...['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, k) => el('div', { class: 'wd' }, el('b', { text: d }),
+    k < 5 ? cur.daily : k === 5 ? 'Catch-up or project day: finish what you skipped, or build something with it.' : 'Review day: redo one exercise, tick milestones, plan next week.')));
+  const msTitle = (id) => { for (const list of Object.values(D.milestones)) for (const [mid, title] of list) if (mid === id) return title; return id; };
+  $('planMonths').replaceChildren(...units.map((u, k) => {
+    const start = addDays(D.cycle.start, Math.round(k * perMonth)), end = addDays(D.cycle.start, Math.round((k + 1) * perMonth) - 1);
+    return el('div', { class: 'month' + (k + 1 === now ? ' now' : ''), style: `--c:${tcol(planTrack)}` },
+      el('div', { class: 'mh' }, el('b', { text: `${k + 1}. ${u.title}` }), el('span', { class: 'when', text: `${fmtDay(start)} to ${fmtDay(end)}` })),
+      el('p', { text: u.daily }),
+      u.links.length ? el('ul', {}, u.links.map(([name, url]) => el('li', {}, el('a', { href: url, target: '_blank', rel: 'noopener', text: name })))) : null,
+      u.milestone ? el('div', { class: 'ms-line', text: `Milestone: ${msTitle(u.milestone)}` }) : null);
+  }));
+}
+
 async function load() {
   try {
     const r = await fetch('/api/board', { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
     D = await r.json();
-    renderCycle(); renderBoard(); renderFeed(); renderDetail();
+    renderCycle(); renderBoard(); renderFeed(); renderDetail(); renderPlan();
     $('updated').textContent = `Updated ${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
     if (first && window.gsap && !matchMedia('(prefers-reduced-motion: reduce)').matches) gsap.from('.panel', { y: 14, duration: .6, ease: 'power2.out', stagger: .06 });
     first = false;

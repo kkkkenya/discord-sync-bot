@@ -11,7 +11,10 @@ mkdirSync(DIR, { recursive: true });
 // cards: [{ id, unit, q, a, due, interval, ease, reps, lapses }]
 // reviews: [{ card, unit, grade, at }]   sessions: [{ id, unit, minutes, at }]
 // papers: [{ id, unit, label, score, outOf, fileId, at }]   teach: [{ id, unit, topic, text, feedback, at }]
-const EMPTY = { units: [], topics: [], cards: [], reviews: [], sessions: [], papers: [], teach: [] };
+// questions: [{ id, unit, topic, q, a, marks, from, at }]   (CAT-style practice bank for mocks)
+// mocks: [{ id, unit, name, questions: [{q,a,marks,topic}], answers: [{user,earned,note}], score, outOf, overall, finishedAt, at }]
+// settings: { aiProvider: 'gemini'|'deepseek'|'anthropic' }
+const EMPTY = { units: [], topics: [], cards: [], reviews: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], settings: { aiProvider: 'gemini' } };
 
 export const data = existsSync(FILE) ? { ...EMPTY, ...JSON.parse(readFileSync(FILE, 'utf8')) } : structuredClone(EMPTY);
 
@@ -21,7 +24,7 @@ export function save() {
   renameSync(tmp, FILE);
 }
 
-export const LISTS = ['topics', 'cards', 'sessions', 'papers', 'teach'];
+export const LISTS = ['topics', 'cards', 'sessions', 'papers', 'teach', 'questions', 'mocks'];
 
 export function add(list, row) {
   const item = { id: randomUUID().slice(0, 8), at: new Date().toISOString(), ...row };

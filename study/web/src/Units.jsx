@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, daysUntil } from './api.js';
 
-const NEXT = { red: 'amber', amber: 'green', green: 'red' };
+const CYCLE = [null, 'green', 'amber', 'red']; // manual override: auto → green → amber → red → auto
 
 function Picker({ s, refresh, close }) {
   const [cat, setCat] = useState(null);
@@ -65,13 +65,19 @@ function Unit({ u, s, refresh, go }) {
   const topics = s.data.topics.filter((t) => t.unit === u.code);
   const due = s.data.cards.filter((c) => c.unit === u.code && c.due <= s.today).length;
   const cat = u.catDate || s.next?.start;
+  const rated = topics.map((t) => ({ t, m: s.mastery?.[t.id] || { status: 'red', manual: false, why: '', next: '' } }));
+  const green = rated.filter((x) => x.m.status === 'green').length;
+  const amber = rated.filter((x) => x.m.status === 'amber').length;
+  const covered = topics.length ? Math.round(((green + amber * 0.5) / topics.length) * 100) : 0;
+  const pending = rated.find((x) => x.m.status !== 'green');
   const set = (body) => api('PATCH', `units?code=${encodeURIComponent(u.code)}`, body).then(refresh);
   const addTopic = async (e) => {
     e.preventDefault();
-    for (const name of topic.split(',').map((x) => x.trim()).filter(Boolean)) await api('POST', 'topics', { unit: u.code, name, status: 'red' });
+    for (const name of topic.split(',').map((x) => x.trim()).filter(Boolean)) await api('POST', 'topics', { unit: u.code, name });
     setTopic('');
     refresh();
   };
+  const nextManual = (t, m) => CYCLE[(CYCLE.indexOf(t.manual ?? null) + 1) % CYCLE.length];
   return (
     <article className="unit">
       <header>
@@ -85,14 +91,28 @@ function Unit({ u, s, refresh, go }) {
         </div>
       </header>
       <div className="topics">
-        {topics.map((t) => (
-          <span key={t.id} className={`chip ${t.status}`}>
-            <button onClick={() => api('PATCH', `topics/${t.id}`, { status: NEXT[t.status] }).then(refresh)} title="Click: red → amber → green">{t.name}{t.taughtAt ? ' ✓' : ''}</button>
+        {rated.map(({ t, m }) => (
+          <span key={t.id} className={`chip ${m.status}`}>
+            <button onClick={() => api('PATCH', `topics/${t.id}`, { manual: nextManual(t, m) }).then(refresh)} title={`${m.why}\nNext: ${m.next}`}>
+              {t.name}{t.taughtAt ? ' ✓' : ''}{m.manual ? ' · you' : ''}
+            </button>
             <button className="x" aria-label={`remove ${t.name}`} onClick={() => api('DELETE', `topics/${t.id}`).then(refresh)}>×</button>
           </span>
         ))}
         <form onSubmit={addTopic}><input placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
       </div>
+      {topics.length > 0 && (
+        <div className="cover" role="img" aria-label={`${u.code}: ${covered}% covered`}>
+          <span className="muted small">{covered}%</span>
+          <span className="track">
+            <i className="seg-g" style={{ width: `${green / topics.length * 100}%` }} />
+            <i className="seg-a" style={{ width: `${amber / topics.length * 100}%` }} />
+            <i className="seg-r" style={{ width: `${(topics.length - green - amber) / topics.length * 100}%` }} />
+          </span>
+          <span className="muted small">{green}/{topics.length} mastered</span>
+        </div>
+      )}
+      {pending && <p className="muted small next">Next to turn green: <b>{pending.t.name}</b> — {pending.m.next}.</p>}
       <div className="row small">
         <button className="link" onClick={() => go('recall', { unit: u.code })}>{due} due cards</button>
         <button className="link" onClick={() => go('teach', { unit: u.code })}>teach a topic</button>
@@ -111,7 +131,7 @@ export default function Units(props) {
       <div className="head"><h2>Units</h2>{!picking && <button className="ghost" onClick={() => setPicking(true)}>Edit units</button>}</div>
       {picking ? <Picker {...props} close={() => setPicking(false)} /> : (
         <>
-          <p className="muted small">Topics start red. Click to move them red → amber → green as you can recall and teach them. ✓ means you've done a teach-back.</p>
+          <p className="muted small">A topic's colour now follows the evidence (teach-back score, recall reviews, solved questions), not a tick. Hover a chip to see why, and what's missing. Click a chip to force a colour yourself — it shows "· you". ✓ means you've done a teach-back.</p>
           {s.data.units.map((u) => <Unit key={u.code} u={u} {...props} />)}
         </>
       )}

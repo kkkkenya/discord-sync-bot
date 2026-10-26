@@ -1,9 +1,8 @@
-// Teach-back feedback: you explain a topic as if teaching a classmate, Claude marks it like a tough tutor and
-// hands back recall cards for the gaps. Needs ANTHROPIC_API_KEY (pc/.env already has one if daily problems were set up).
-import Anthropic from '@anthropic-ai/sdk';
+// Teach-back feedback: you explain a topic as if teaching a classmate, the AI marks it like a tough tutor and
+// hands back recall cards for the gaps. Uses the shared ai.js helper, so it follows the provider toggle.
+import { aiReady, structured } from './ai.js';
 
-let client;
-export const coachReady = () => Boolean(process.env.ANTHROPIC_API_KEY);
+export const coachReady = () => aiReady();
 
 const SCHEMA = {
   type: 'object',
@@ -29,18 +28,6 @@ Be direct and specific: name the exact equation, sign convention, assumption or 
 Do not rewrite their explanation for them. Plain text, no markdown. Use ^ and _ for powers and subscripts.`;
 
 export async function coach({ unit, topic, text }) {
-  if (!coachReady()) throw new Error('No ANTHROPIC_API_KEY in pc/.env, so teach-backs are saved without feedback.');
-  client ||= new Anthropic();
-  const response = await client.beta.messages.create({
-    model: 'claude-opus-5-5',
-    max_tokens: 4000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
-    system: SYSTEM,
-    messages: [{ role: 'user', content: `Unit: ${unit}\nTopic: ${topic}\n\nMy explanation:\n${text}` }],
-  });
-  if (response.stop_reason === 'refusal') throw new Error('Claude declined to mark this one.');
-  if (response.stop_reason === 'max_tokens') throw new Error('The feedback was cut off. Try a shorter explanation.');
-  return JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
+  if (!coachReady()) throw new Error('No AI key for the selected provider. Pick another provider in the top bar, or add the key.');
+  return structured(SCHEMA, SYSTEM, `Unit: ${unit}\nTopic: ${topic}\n\nMy explanation:\n${text}`, 4000);
 }

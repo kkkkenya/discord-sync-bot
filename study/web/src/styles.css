@@ -59,6 +59,9 @@ a { color: var(--accent); }
 .top nav { display: flex; gap: 14px; overflow-x: auto; }
 .top nav a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
 .top nav a:hover { color: var(--ink); }
+.ai-toggle { font-size: 0.82rem; padding: 4px 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; color: var(--muted); white-space: nowrap; }
+.ai-toggle.off { color: var(--amber); border-color: var(--amber); }
+.next { margin-top: 6px; }
 
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; margin-top: 18px; }
 .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
@@ -161,6 +164,50 @@ th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
 
 .banner { padding: 10px 14px; border-radius: 8px; margin-top: 20px; }
 .banner.bad { background: var(--red-bg); color: var(--red); }
+.banner.good { background: var(--green-bg); color: var(--green); }
+
+/* Mock exam */
+.mock { margin-top: 12px; }
+.mock-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 6px; }
+.mock-head .clock { margin-left: auto; }
+.mq { border-top: 1px dashed var(--line); padding: 12px 0; }
+.mq .q { margin-top: 0; }
+.mock label { display: inline-flex; gap: 8px; align-items: center; }
+
+/* Coverage tracker */
+.cover { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 0.85rem; }
+.cover .track { display: flex; flex: 1; height: 8px; border-radius: 4px; overflow: hidden; background: var(--line); }
+.cover .track i { display: block; height: 100%; }
+.seg-g { background: var(--green); }
+.seg-a { background: var(--amber); }
+.seg-r { background: var(--red); }
+
+/* Progress charts */
+.col2 { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin-top: 8px; }
+.bars { display: flex; gap: 8px; align-items: flex-end; height: 120px; margin-top: 8px; }
+.barbar { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; }
+.bv { font-size: 0.7rem; min-height: 1em; }
+.btrack { flex: 1; width: 100%; max-width: 42px; display: flex; align-items: flex-end; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.btrack i { display: block; width: 100%; background: var(--accent); }
+.btrack i.today { background: var(--green); }
+.bl { font-size: 0.72rem; }
+.bl.today { color: var(--green); font-weight: 600; }
+
+.line { width: 100%; height: 120px; margin-top: 6px; }
+.line .axis { stroke: var(--line); stroke-width: 0.5; }
+.line .path { fill: none; stroke: var(--accent); stroke-width: 1.4; }
+.line .dot { fill: var(--accent); }
+.linekeys { display: flex; justify-content: space-between; gap: 8px; }
+
+.mastery { margin-top: 8px; }
+.mrow { margin: 10px 0; }
+.mhead { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.mbar { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--line); margin-top: 4px; }
+.mbar i { display: block; height: 100%; }
+
+@media (max-width: 640px) {
+  .col2 { grid-template-columns: 1fr; }
+}
 
 @media (max-width: 640px) {
   .tiles { grid-template-columns: repeat(2, 1fr); }

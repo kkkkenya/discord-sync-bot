@@ -1,6 +1,7 @@
 // Recall scheduling and the daily plan. Shared by the dashboard and the DM bot so both say the same thing.
 import { data } from './store.js';
 import { nextAssessment } from './library.js';
+import { topicStatus } from './mastery.js';
 
 export const nairobiDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
 const addDays = (day, n) => { const d = new Date(`${day}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -40,8 +41,8 @@ export function todayPlan(today = nairobiDay()) {
     const cat = catDay(u, today);
     const days = cat ? Math.max(0, daysBetween(today, cat)) : 60;
     const topics = data.topics.filter((t) => t.unit === u.code);
-    const red = topics.filter((t) => t.status === 'red');
-    const amber = topics.filter((t) => t.status === 'amber');
+    const red = topics.filter((t) => topicStatus(t, today) === 'red');
+    const amber = topics.filter((t) => topicStatus(t, today) === 'amber');
     const due = dueCards(u.code, today).length;
     const papers = data.papers.filter((p) => p.unit === u.code).length;
     const weakness = red.length * 2 + amber.length + due / 5 + (5 - (u.confidence || 3)) + (papers ? 0 : 1.5);

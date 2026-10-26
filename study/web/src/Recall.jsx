@@ -8,7 +8,7 @@ export default function Recall({ s, refresh, focus }) {
   const [cards, setCards] = useState(null);
   const [attempt, setAttempt] = useState('');
   const [shown, setShown] = useState(false);
-  const [form, setForm] = useState({ q: '', a: '' });
+  const [form, setForm] = useState({ q: '', a: '', topic: '' });
 
   useEffect(() => { if (focus?.section === 'recall') setUnit(focus.unit || ''); }, [focus]);
   useEffect(() => { api('GET', `due?unit=${encodeURIComponent(unit)}`).then(setCards); }, [unit, s.data.cards.length]);
@@ -24,10 +24,11 @@ export default function Recall({ s, refresh, focus }) {
     e.preventDefault();
     const u = unit || s.data.units[0]?.code;
     if (!u || !form.q.trim() || !form.a.trim()) return;
-    await api('POST', 'cards', { unit: u, q: form.q.trim(), a: form.a.trim() });
-    setForm({ q: '', a: '' });
+    await api('POST', 'cards', { unit: u, q: form.q.trim(), a: form.a.trim(), topic: form.topic.trim() });
+    setForm({ q: '', a: '', topic: '' });
     refresh();
   };
+  const topicOptions = s.data.topics.filter((t) => t.unit === (unit || s.data.units[0]?.code));
 
   return (
     <section id="recall" className="reveal">
@@ -61,6 +62,8 @@ export default function Recall({ s, refresh, focus }) {
       <form className="add" onSubmit={addCard}>
         <h4>New card {unit ? `for ${unit}` : s.data.units[0] ? `for ${s.data.units[0].code}` : ''}</h4>
         <input placeholder="Question (e.g. State the bending equation and what each term means)" value={form.q} onChange={(e) => setForm({ ...form, q: e.target.value })} />
+        <input list="card-topics" placeholder="Topic (optional, so it counts toward that topic's mastery)" value={form.topic} onChange={(e) => setForm({ ...form, topic: e.target.value })} />
+        <datalist id="card-topics">{topicOptions.map((t) => <option key={t.id} value={t.name} />)}</datalist>
         <textarea rows={2} placeholder="Answer" value={form.a} onChange={(e) => setForm({ ...form, a: e.target.value })} />
         <button disabled={!s.data.units.length}>Add card</button>
       </form>

@@ -61,6 +61,12 @@ async function checkAnthropic(key) {
   return red(r.status === 401 ? 'Anthropic rejected that key. Check you copied all of it (it starts with sk-ant-).' : `Anthropic answered ${r.status}. The key is saved; try again later.`);
 }
 
+async function checkDeepSeek(key) {
+  const r = await fetch('https://api.deepseek.com/models', { headers: { Authorization: `Bearer ${key}` } });
+  if (r.ok) return green('✓ DeepSeek key works.');
+  return red(r.status === 401 ? 'DeepSeek rejected that key. Check you copied all of it.' : `DeepSeek answered ${r.status}. The key is saved; try again later.`);
+}
+
 console.log('Study dashboard setup. Your bot token and Supabase keys are read from pc/.env.');
 
 const OWNER_ID = await ask('Your Discord user ID (Developer Mode on → right-click your name → Copy User ID):', { current: saved.OWNER_ID });
@@ -76,6 +82,14 @@ else {
   if (ANTHROPIC_API_KEY) console.log(await checkAnthropic(ANTHROPIC_API_KEY));
 }
 
-const lines = [`OWNER_ID=${OWNER_ID}`, `PORT=${PORT}`, ...(ANTHROPIC_API_KEY ? [`ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}`] : [])];
+const AI_PROVIDER = await ask('AI provider for Notes/Mock/Teach marking (gemini, deepseek or anthropic):', { current: saved.AI_PROVIDER || 'gemini' });
+if (AI_PROVIDER === 'gemini') console.log(dim('Gemini will use the GEMINI_API_KEY already in community/.env.'));
+let DEEPSEEK_API_KEY = saved.DEEPSEEK_API_KEY || '';
+if (AI_PROVIDER === 'deepseek') {
+  DEEPSEEK_API_KEY = await ask('DeepSeek API key (platform.deepseek.com → API keys):', { secret: true, current: DEEPSEEK_API_KEY });
+  if (DEEPSEEK_API_KEY) console.log(await checkDeepSeek(DEEPSEEK_API_KEY));
+}
+
+const lines = [`OWNER_ID=${OWNER_ID}`, `PORT=${PORT}`, `AI_PROVIDER=${AI_PROVIDER}`, ...(ANTHROPIC_API_KEY ? [`ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}`] : []), ...(DEEPSEEK_API_KEY ? [`DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}`] : [])];
 writeFileSync(ENV, `${lines.join('\n')}\n`);
 console.log(green('\nSaved study/.env. Start the dashboard with start.bat.'));

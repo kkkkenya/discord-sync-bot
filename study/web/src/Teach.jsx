@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 
-function Feedback({ f, unit, refresh }) {
+function Feedback({ f, unit, topic, refresh }) {
   const [added, setAdded] = useState(false);
   const addAll = async () => {
-    for (const c of f.cards) await api('POST', 'cards', { unit, q: c.q, a: c.a, from: 'teach' });
+    for (const c of f.cards) await api('POST', 'cards', { unit, topic, q: c.q, a: c.a, from: 'teach' });
     setAdded(true);
     refresh();
   };
@@ -59,7 +59,7 @@ export default function Teach({ s, refresh, focus }) {
         <button disabled={busy || !unit || !topic.trim() || text.trim().length < 40}>{busy ? 'Marking…' : s.coach ? 'Get it marked' : 'Save teach-back'}</button>
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}
-      {result?.item?.feedback && <Feedback f={result.item.feedback} unit={result.item.unit} refresh={refresh} />}
+      {result?.item?.feedback && <Feedback f={result.item.feedback} unit={result.item.unit} topic={result.item.topic} refresh={refresh} />}
       {result?.item && !result.item.feedback && <p className="muted">Saved.</p>}
       {past.length > 0 && (
         <details className="past">

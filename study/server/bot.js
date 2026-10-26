@@ -125,7 +125,7 @@ export async function reply(text) {
     const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
     if (tp) { tp.taughtAt = new Date().toISOString(); save(); }
     if (!feedback) return `Saved your teach-back on ${topic}.${note}`;
-    for (const c of feedback.cards) add('cards', { unit, q: c.q, a: c.a, due: nairobiDay(), interval: 0, ease: 2.5, reps: 0, lapses: 0, from: 'teach' });
+    for (const c of feedback.cards) add('cards', { unit, topic, q: c.q, a: c.a, due: nairobiDay(), interval: 0, ease: 2.5, reps: 0, lapses: 0, from: 'teach' });
     return [
       `**${topic}: ${feedback.score}/5**`,
       `✓ ${feedback.good}`,

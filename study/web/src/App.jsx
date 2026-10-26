@@ -4,7 +4,10 @@ import { ReactLenis } from 'lenis/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import Hero from './Hero.jsx';
+import Mock from './Mock.jsx';
+import Notes from './Notes.jsx';
 import Papers from './Papers.jsx';
+import Progress from './Progress.jsx';
 import Recall from './Recall.jsx';
 import Teach from './Teach.jsx';
 import Timer from './Timer.jsx';
@@ -14,7 +17,7 @@ import Units from './Units.jsx';
 gsap.registerPlugin(useGSAP);
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const NAV = [['today', 'Today'], ['units', 'Units'], ['recall', 'Recall'], ['teach', 'Teach'], ['papers', 'Papers']];
+const NAV = [['today', 'Today'], ['units', 'Units'], ['notes', 'Notes'], ['recall', 'Recall'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['progress', 'Progress']];
 
 export default function App() {
   const [s, setS] = useState(null);
@@ -65,6 +68,17 @@ export default function App() {
         <div className="shell top-in">
           <strong className="brand">Study Desk</strong>
           <nav>{NAV.map(([id, label]) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); go(id); }}>{label}</a>)}</nav>
+          <select
+            className={`ai-toggle${s.ai ? '' : ' off'}`}
+            value={s.settings.aiProvider}
+            aria-label="AI provider"
+            title={s.ai ? `AI ready (${s.provider})` : `No key for ${s.provider} — pick another provider or add the key`}
+            onChange={(e) => api('POST', 'settings', { aiProvider: e.target.value }).then(refresh).catch((err) => setProblem(err.message))}
+          >
+            <option value="gemini">AI: Gemini</option>
+            <option value="deepseek">AI: DeepSeek</option>
+            <option value="anthropic">AI: Claude</option>
+          </select>
         </div>
       </header>
       {problem && (
@@ -74,9 +88,12 @@ export default function App() {
         <Hero {...props} />
         <Today {...props} />
         <Units {...props} />
+        <Notes {...props} />
         <Recall {...props} />
         <Teach {...props} />
+        <Mock {...props} />
         <Papers {...props} />
+        <Progress {...props} />
       </main>
       <Timer {...props} />
     </>

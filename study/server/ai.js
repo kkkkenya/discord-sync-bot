@@ -17,12 +17,18 @@ const model = () => process.env.AI_MODEL || MODELS[provider()];
 
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || lo)));
 
-// Never let a hung provider request freeze the dashboard: abort after 45s.
-const fetchWithTimeout = (url, options, ms = 45000) => {
+// Never let a hung provider request freeze the dashboard: abort after 30s. A timeout is retryable, not fatal.
+const fetchWithTimeout = (url, options, ms = 30000) => {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
-  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(t));
+  return fetch(url, { ...options, signal: ctrl.signal })
+    .catch((e) => {
+      if (e.name === 'AbortError') throw Object.assign(new Error('AI request timed out'), { retryable: true });
+      throw e;
+    })
+    .finally(() => clearTimeout(t));
 };
+const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
 // ---- Anthropic (structured output enforced server-side) ----
 async function anthropicCall(schema, system, content, maxTokens) {
@@ -69,16 +75,16 @@ async function geminiCall(schema, system, content, maxTokens) {
       body: body(m),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`), { busy: [429, 500, 502, 503, 504].includes(r.status) });
+    if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`), { retryable: [429, 500, 502, 503, 504].includes(r.status) });
     const text = d.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
     if (!text) throw new Error(`Gemini gave no answer (${d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || 'empty'})`);
     return JSON.parse(text);
   };
-  // Busy servers are common and short-lived: retry the primary three times, then fall back to the lighter model.
+  // Busy/hung servers are common and short-lived: retry the primary, then fall back to the lighter model.
   let last;
-  for (const [n, m] of [model(), model(), model(), GEMINI_FALLBACK].entries()) {
-    if (n) await new Promise((ok) => setTimeout(ok, 5000 * n));
-    try { return await run(m); } catch (e) { last = e; if (!e.busy) throw e; }
+  for (const [n, m] of [model(), model(), GEMINI_FALLBACK].entries()) {
+    if (n) await sleep(4000 * n);
+    try { return await run(m); } catch (e) { last = e; if (!e.retryable) throw e; }
   }
   throw last;
 }
@@ -120,13 +126,21 @@ async function deepseekCall(schema, system, content, maxTokens) {
     { role: 'user', content },
   ];
   let last = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
-      body: JSON.stringify({ model: model(), messages, response_format: { type: 'json_object' }, max_tokens: maxTokens, temperature: 0.1 }),
-    });
-    const text = await r.text();
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let r;
+    let text;
+    try {
+      r = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+        body: JSON.stringify({ model: model(), messages, response_format: { type: 'json_object' }, max_tokens: maxTokens, temperature: 0.1 }),
+      });
+      text = await r.text();
+    } catch (e) {
+      if (!e.retryable || attempt === 2) throw e;
+      await sleep(3000 * (attempt + 1));
+      continue;
+    }
     if (!r.ok) throw new Error(`DeepSeek ${r.status}: ${text.slice(0, 200)}`);
     let raw = '';
     let obj;
@@ -136,7 +150,7 @@ async function deepseekCall(schema, system, content, maxTokens) {
     if (err) { last = err; messages.push({ role: 'assistant', content: raw }, { role: 'user', content: `The JSON didn't match the schema (${err}). Return the corrected JSON only.` }); continue; }
     return obj;
   }
-  throw new Error(`DeepSeek returned invalid JSON after retry: ${last}`);
+  throw new Error(`DeepSeek returned invalid JSON after retries: ${last}`);
 }
 
 export async function structured(schema, system, content, maxTokens = 4000) {

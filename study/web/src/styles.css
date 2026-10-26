@@ -157,6 +157,14 @@ input.num { width: 84px; }
 .checklist > div.ok .tick { color: var(--green); }
 @media (prefers-reduced-motion: reduce) { .spotlight { transition: none; } }
 
+/* Session check-in */
+.checkin-backdrop { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: rgba(10, 10, 12, 0.4); }
+.checkin { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px; width: 320px; max-width: calc(100vw - 16px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); }
+.checkin h4 { margin: 0 0 10px; }
+.focus-row { display: flex; gap: 8px; margin-bottom: 4px; }
+.focus-row button { flex: 1; padding: 10px 0; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; }
+.focus-row button.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+
 .card { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 16px; background: var(--paper); }
 .q { font-size: 1.15rem; font-weight: 500; margin: 4px 0 8px; white-space: pre-wrap; }
 .a, .mine { white-space: pre-wrap; }

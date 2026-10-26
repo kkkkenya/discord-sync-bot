@@ -6,6 +6,7 @@ import { api } from './api.js';
 import Hero from './Hero.jsx';
 import Mock from './Mock.jsx';
 import Notes from './Notes.jsx';
+import Onboarding, { Checklist } from './Onboarding.jsx';
 import Papers from './Papers.jsx';
 import Progress from './Progress.jsx';
 import Prompt from './Prompt.jsx';
@@ -29,8 +30,18 @@ export default function App() {
   const root = useRef(null);
 
   const [problem, setProblem] = useState('');
+  const [tourOn, setTourOn] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+  const [checklistOff, setChecklistOff] = useState(false);
   const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(x); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
+  // auto-open the tour on a brand-new (empty) store, once
+  useEffect(() => {
+    if (s && !s.data.units.length && !s.settings.tour?.done && !s.settings.tour?.skipped) {
+      setTourStep(s.settings.tour?.step || 0);
+      setTourOn(true);
+    }
+  }, [s?.data.units.length, s?.settings.tour?.done, s?.settings.tour?.skipped]);
   // any failed save (server closed, bad input) shows up here instead of failing silently
   useEffect(() => {
     const show = (e) => { setProblem(e.reason?.message || String(e.reason)); e.preventDefault(); };
@@ -69,6 +80,7 @@ export default function App() {
         <div className="shell top-in">
           <strong className="brand">Study Desk</strong>
           <nav>{NAV.map(([id, label]) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); go(id); }}>{label}</a>)}</nav>
+          <button className="help" onClick={() => { setTourStep(0); setTourOn(true); }} aria-label="Take the tour" title="Take the tour">?</button>
           <select
             className={`ai-toggle${s.ai ? '' : ' off'}`}
             value={s.settings.aiProvider}
@@ -87,6 +99,7 @@ export default function App() {
       )}
       <main className="shell" ref={root}>
         <Hero {...props} />
+        {!tourOn && (s.settings.tour?.done || s.settings.tour?.skipped) && !checklistOff && <Checklist s={s} onDismiss={() => setChecklistOff(true)} />}
         <Today {...props} />
         <Units {...props} />
         <Notes {...props} />
@@ -98,6 +111,7 @@ export default function App() {
         <Progress {...props} />
       </main>
       <Timer {...props} />
+      {tourOn && <Onboarding s={s} refresh={refresh} initialStep={tourStep} close={() => setTourOn(false)} />}
     </>
   );
 }

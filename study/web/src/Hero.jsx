@@ -15,7 +15,7 @@ export default function Hero({ s }) {
   };
 
   return (
-    <section className="hero reveal">
+    <section className="hero reveal" data-tour="countdown">
       <div className="count">
         {next && days > 0 ? (
           <>

@@ -2,7 +2,7 @@ const SECTION = { recall: 'recall', teach: 'teach', paper: 'papers', topics: 'un
 
 export default function Today({ s, go }) {
   return (
-    <section id="today" className="reveal">
+    <section id="today" className="reveal" data-tour="today">
       <h2>Today</h2>
       {!s.plan.length ? (
         <p className="muted">Pick your units below and the plan fills in: weakest and closest CAT first.</p>

@@ -140,7 +140,7 @@ function Unit({ u, s, refresh, go }) {
             <button className="x" aria-label={`remove ${t.name}`} onClick={() => api('DELETE', `topics/${t.id}`).then(refresh)}>×</button>
           </span>
         ))}
-        <form onSubmit={addTopic}><input placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
+        <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
       </div>
       {topics.length > 0 && (
         <div className="cover" role="img" aria-label={`${u.code}: ${covered}% covered`}>
@@ -157,7 +157,7 @@ function Unit({ u, s, refresh, go }) {
       <div className="row small">
         <button className="link" onClick={() => go('recall', { unit: u.code })}>{due} due cards</button>
         <button className="link" onClick={() => go('teach', { unit: u.code })}>teach a topic</button>
-        <button className="link" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} server files</button>
+        <button className="link" data-tour="sync" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} server files</button>
       </div>
       {open && <Library code={u.code} go={go} />}
     </article>
@@ -168,7 +168,7 @@ export default function Units(props) {
   const { s } = props;
   const [picking, setPicking] = useState(!s.data.units.length);
   return (
-    <section id="units" className="reveal">
+    <section id="units" className="reveal" data-tour="units">
       <div className="head"><h2>Units</h2>{!picking && <button className="ghost" onClick={() => setPicking(true)}>Edit units</button>}</div>
       {picking ? <Picker {...props} close={() => setPicking(false)} /> : (
         <>

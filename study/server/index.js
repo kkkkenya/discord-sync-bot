@@ -19,6 +19,7 @@ const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.
 const { ALL_UNITS, YEAR3_MECH, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { masteryMap } = await import('./mastery.js');
 const { dueCards, grade, nairobiDay, stats, todayPlan } = await import('./plan.js');
+const { buildPrompt } = await import('./prompt.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
 const PORT = Number(process.env.PORT) || 5190;
@@ -126,6 +127,8 @@ const routes = {
     const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} mock`, questions });
     return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
   },
+  // Build a self-contained prompt to paste into any other AI chat, grounded in the synced library.
+  'POST /api/prompt': (q, body) => buildPrompt(body || {}),
   'POST /api/dm-today': async () => {
     if (!bot) throw Object.assign(new Error('Discord DMs are off. Run setup.bat to add your Discord user ID.'), { status: 400 });
     await bot.dm(todayText());

@@ -136,6 +136,8 @@ input.num { width: 84px; }
 .searchresults { border-top: 1px dashed var(--line); margin-top: 10px; padding-top: 8px; }
 .hit { margin: 8px 0; }
 .hit p { margin: 2px 0; white-space: pre-wrap; }
+.promptout { margin-top: 12px; }
+.promptout textarea { font-family: var(--mono); font-size: 0.82rem; }
 
 .card { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 16px; background: var(--paper); }
 .q { font-size: 1.15rem; font-weight: 500; margin: 4px 0 8px; white-space: pre-wrap; }

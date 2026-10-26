@@ -8,6 +8,7 @@ import Mock from './Mock.jsx';
 import Notes from './Notes.jsx';
 import Papers from './Papers.jsx';
 import Progress from './Progress.jsx';
+import Prompt from './Prompt.jsx';
 import Recall from './Recall.jsx';
 import Teach from './Teach.jsx';
 import Timer from './Timer.jsx';
@@ -17,7 +18,7 @@ import Units from './Units.jsx';
 gsap.registerPlugin(useGSAP);
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const NAV = [['today', 'Today'], ['units', 'Units'], ['notes', 'Notes'], ['recall', 'Recall'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['progress', 'Progress']];
+const NAV = [['today', 'Today'], ['units', 'Units'], ['notes', 'Notes'], ['recall', 'Recall'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
 
 export default function App() {
   const [s, setS] = useState(null);
@@ -93,6 +94,7 @@ export default function App() {
         <Teach {...props} />
         <Mock {...props} />
         <Papers {...props} />
+        <Prompt {...props} />
         <Progress {...props} />
       </main>
       <Timer {...props} />

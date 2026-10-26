@@ -119,7 +119,9 @@ unit list, KU calendar and file library from this repo, so nothing on the server
 1. Double-click **`study/setup.bat`**. It asks for your Discord user ID (Developer Mode on, right-click your name,
    Copy User ID) and sends you a test DM. It also asks for an Anthropic key if `pc/.env` doesn't have one; that key
    turns on teach-back marking.
-2. Double-click **`study/start.bat`**. It builds the dashboard, opens it and keeps it running.
+2. Click the **Study Desk** shortcut (Start menu and desktop; right-click → Pin to taskbar). It runs `study/start.bat`
+   minimised: builds the dashboard, opens it and keeps it running. Clicking it again just opens the dashboard.
+   To make the shortcut on another PC: `powershell -File study/make-shortcut.ps1`.
 
 **Dashboard:** countdown to the next CAT week, a daily plan (3 units, weakest and soonest first), your units with
 CAT dates, a confidence rating and topics rated red/amber/green, plus each unit's past papers and CATs from the

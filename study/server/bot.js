@@ -4,13 +4,14 @@
 import { ChannelType, Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import cron from 'node-cron';
 import { coach, coachReady } from './coach.js';
-import { nextAssessment } from './library.js';
+import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
 import { catDay, daysBetween, dueCards, grade, nairobiDay, stats, todayPlan } from './plan.js';
 import { add, data, save } from './store.js';
 
 const HELP = [
   '**Study DMs**: type any of these.',
   '`today`: your plan and the CAT countdown',
+  '`files EMM 302`: past papers and CATs for a unit from the server (`files EMM 302 notes` for notes and slides, `files` for all your units)',
   '`quiz` or `quiz EMM 302`: recall cards that are due. Type your answer, then grade it 1-4',
   '`teach EMM 302 Mohr\'s circle`: explain a topic like you\'re teaching a classmate, get it marked',
   '`log 45 EMM 302`: log 45 minutes of study',
@@ -45,6 +46,47 @@ export function todayText(today = nairobiDay()) {
   return lines.join('\n');
 }
 
+const COMMANDS = ['today', 'files', 'quiz', 'teach', 'log', 'paper', 'card'];
+
+// Links to a unit's files in the server's forum posts. Papers and CATs by default, or notes/slides/books.
+async function filesText(unit, notes) {
+  const title = ALL_UNITS.find((u) => u.codes.includes(unit))?.title || '';
+  const { files, note } = await filesFor(unit);
+  if (note) return `Can't reach the library: ${note}.`;
+  const pick = files.filter((f) => (notes ? !f.paper : f.paper));
+  const other = files.length - pick.length;
+  if (!pick.length) return `No ${notes ? 'notes' : 'past papers or CATs'} for ${unit} on the server yet${other ? `. There ${other === 1 ? 'is 1 other file' : `are ${other} other files`}: \`files ${unit}${notes ? '' : ' notes'}\`` : '.'}`;
+  return [
+    `**${unit} ${title}: ${notes ? 'notes and other files' : 'past papers and CATs'}** (${pick.length})`,
+    ...pick.slice(0, 25).map((f) => `• [${f.name.replace(/[[\]]/g, '')}](<${f.url}>)`),
+    ...(pick.length > 25 ? [`…and ${pick.length - 25} more on the dashboard.`] : []),
+    ...(other ? [`_${other} more under \`files ${unit}${notes ? '' : ' notes'}\`._`] : []),
+    ...(notes ? [] : ['', `Do one timed, then log it: \`paper ${unit} 34/60 2023 CAT 1\``]),
+  ].join('\n');
+}
+
+async function allFilesText() {
+  if (!data.units.length) return 'Pick your units on the dashboard first, or ask for one: `files EMM 302`.';
+  const lines = ['**Server files for your units**'];
+  for (const u of data.units) {
+    const { files, note } = await filesFor(u.code);
+    if (note) return `Can't reach the library: ${note}.`;
+    const papers = files.filter((f) => f.paper).length;
+    lines.push(`• **${u.code}** ${u.title}: ${papers} paper${papers === 1 ? '' : 's'}/CATs, ${files.length - papers} notes and other`);
+  }
+  return [...lines, '', 'Reply `files EMM 302` (your code) for the links.'].join('\n');
+}
+
+// Discord messages max out at 2000 characters: split on line breaks so links stay whole.
+export function chunks(text, size = 1900) {
+  const out = [''];
+  for (const line of text.split('\n')) {
+    if (out.at(-1).length + line.length + 1 > size && out.at(-1)) out.push('');
+    out[out.length - 1] += (out.at(-1) ? '\n' : '') + line.slice(0, size);
+  }
+  return out;
+}
+
 let mode = null; // { kind: 'quiz', unit, card, stage: 'answer'|'grade' } | { kind: 'teach', unit, topic }
 
 const nextCard = (unit) => {
@@ -62,7 +104,7 @@ export async function reply(text) {
   if (word === 'stop') { mode = null; return 'Stopped.'; }
   if (word === 'help') return HELP;
 
-  if (mode?.kind === 'quiz' && mode.stage === 'answer' && !['today', 'quiz', 'teach', 'log', 'paper', 'card'].includes(word)) {
+  if (mode?.kind === 'quiz' && mode.stage === 'answer' && !COMMANDS.includes(word)) {
     mode.stage = 'grade';
     return `**Answer:** ${mode.card.a}\n\nHow did you do? \`1\` forgot · \`2\` hard · \`3\` good · \`4\` easy`;
   }
@@ -71,7 +113,7 @@ export async function reply(text) {
     if (card) { grade(card, Number(t)); save(); }
     return `${t === '1' ? 'Back in the pile for today.' : `Next review ${card?.due}.`}\n\n${nextCard(mode.unit)}`;
   }
-  if (mode?.kind === 'teach' && !['today', 'quiz', 'teach', 'log', 'paper', 'card'].includes(word)) {
+  if (mode?.kind === 'teach' && !COMMANDS.includes(word)) {
     const { unit, topic } = mode;
     mode = null;
     let feedback = null;
@@ -95,6 +137,10 @@ export async function reply(text) {
   }
 
   if (word === 'today') return todayText();
+  if (word === 'files') {
+    const unit = unitOf(t);
+    return unit ? filesText(unit, /\bnotes?\b|slides?|books?/i.test(t)) : allFilesText();
+  }
   if (word === 'quiz') return nextCard(unitOf(t));
   if (word === 'teach') {
     const unit = unitOf(t);
@@ -139,14 +185,14 @@ export function startBot() {
   const client = new Client({ intents: [GatewayIntentBits.DirectMessages], partials: [Partials.Channel] });
   const dm = async (text) => {
     const user = await client.users.fetch(owner);
-    for (let i = 0; i < text.length; i += 1900) await user.send(text.slice(i, i + 1900));
+    for (const part of chunks(text)) await user.send(part);
   };
   client.on(Events.MessageCreate, async (msg) => {
     if (msg.author.bot || msg.channel.type !== ChannelType.DM || msg.author.id !== owner) return;
     try {
       await msg.channel.sendTyping();
       const text = await reply(msg.content);
-      for (let i = 0; i < text.length; i += 1900) await msg.channel.send(text.slice(i, i + 1900));
+      for (const part of chunks(text)) await msg.channel.send(part);
     } catch (e) {
       console.error('DM reply failed:', e);
       msg.channel.send(`Something broke: ${e.message}`).catch(() => {});

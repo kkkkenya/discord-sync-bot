@@ -24,8 +24,15 @@ export default function App() {
   const lenisRef = useRef(null);
   const root = useRef(null);
 
-  const refresh = useCallback(() => api('GET', 'state').then(setS).catch((e) => setError(e.message)), []);
+  const [problem, setProblem] = useState('');
+  const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(x); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
+  // any failed save (server closed, bad input) shows up here instead of failing silently
+  useEffect(() => {
+    const show = (e) => { setProblem(e.reason?.message || String(e.reason)); e.preventDefault(); };
+    window.addEventListener('unhandledrejection', show);
+    return () => window.removeEventListener('unhandledrejection', show);
+  }, []);
 
   useEffect(() => {
     if (calm) return;
@@ -47,7 +54,7 @@ export default function App() {
     else el?.scrollIntoView();
   };
 
-  if (error) return <main className="shell"><p className="banner bad">Can't reach the study server: {error}. Is <code>npm start</code> running?</p></main>;
+  if (error) return <main className="shell"><p className="banner bad">{error} <button className="link" onClick={() => { setError(''); refresh(); }}>Try again</button></p></main>;
   if (!s) return <main className="shell"><p className="muted">Loading…</p></main>;
 
   const props = { s, refresh, go, focus };
@@ -60,6 +67,9 @@ export default function App() {
           <nav>{NAV.map(([id, label]) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); go(id); }}>{label}</a>)}</nav>
         </div>
       </header>
+      {problem && (
+        <div className="shell"><p className="banner bad" role="alert">{problem} <button className="link" onClick={refresh}>Try again</button></p></div>
+      )}
       <main className="shell" ref={root}>
         <Hero {...props} />
         <Today {...props} />

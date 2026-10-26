@@ -27,7 +27,8 @@ export async function filesFor(code) {
   if (hit && Date.now() - hit.at < 10 * 60 * 1000) return { files: hit.files };
   const codes = ALL_UNITS.find((u) => u.codes.includes(code))?.codes || [code];
   const rows = await db.select('files', `select=id,name,kind,channel_id,message_id,created_at&unit_code=in.(${codes.map((c) => `"${enc(c)}"`).join(',')})&order=name`);
-  const files = rows.map((f) => ({ id: f.id, name: f.name, kind: f.kind, url: link(f) }));
+  // paper: a past paper, CAT or test (by the uploader's kind, or by name for files posted by hand)
+  const files = rows.map((f) => ({ id: f.id, name: f.name, kind: f.kind, url: link(f), paper: f.kind === 'paper' || /(?<![a-z])(cats?|exams?|papers?|tests?|quiz)(?![a-z])/i.test(f.name) }));
   cache.set(code, { at: Date.now(), files });
   return { files };
 }

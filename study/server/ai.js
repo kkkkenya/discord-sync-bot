@@ -17,6 +17,13 @@ const model = () => process.env.AI_MODEL || MODELS[provider()];
 
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || lo)));
 
+// Never let a hung provider request freeze the dashboard: abort after 45s.
+const fetchWithTimeout = (url, options, ms = 45000) => {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(t));
+};
+
 // ---- Anthropic (structured output enforced server-side) ----
 async function anthropicCall(schema, system, content, maxTokens) {
   anthropic ||= new Anthropic();
@@ -49,29 +56,31 @@ function toGeminiSchema(s) {
 }
 
 async function geminiCall(schema, system, content, maxTokens) {
+  const key = process.env.GEMINI_API_KEY;
   const body = (m) => JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts: [{ text: content }] }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(schema), temperature: 0.2, maxOutputTokens: maxTokens },
   });
   const run = async (m) => {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+    const r = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: body(m),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`);
+    if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`), { busy: [429, 500, 502, 503, 504].includes(r.status) });
     const text = d.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
     if (!text) throw new Error(`Gemini gave no answer (${d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || 'empty'})`);
     return JSON.parse(text);
   };
-  try {
-    return await run(model());
-  } catch (e) {
-    if (model() === GEMINI_FALLBACK) throw e;
-    return run(GEMINI_FALLBACK); // one fallback to the lighter model on overload/block
+  // Busy servers are common and short-lived: retry the primary three times, then fall back to the lighter model.
+  let last;
+  for (const [n, m] of [model(), model(), model(), GEMINI_FALLBACK].entries()) {
+    if (n) await new Promise((ok) => setTimeout(ok, 5000 * n));
+    try { return await run(m); } catch (e) { last = e; if (!e.busy) throw e; }
   }
+  throw last;
 }
 
 // ---- DeepSeek (OpenAI-compatible; json_object mode, no schema enforcement → validate + retry once) ----
@@ -112,7 +121,7 @@ async function deepseekCall(schema, system, content, maxTokens) {
   ];
   let last = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await fetch('https://api.deepseek.com/chat/completions', {
+    const r = await fetchWithTimeout('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
       body: JSON.stringify({ model: model(), messages, response_format: { type: 'json_object' }, max_tokens: maxTokens, temperature: 0.1 }),

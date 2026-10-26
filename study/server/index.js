@@ -15,6 +15,7 @@ const { startBot, todayText } = await import('./bot.js');
 const { coach, coachReady } = await import('./coach.js');
 const { aiReady, clamp, provider } = await import('./ai.js');
 const { makeQuestions, makeStudyMaterial, markAnswers } = await import('./brain.js');
+const { ingestFile, library, libraryMeta } = await import('./ingest.js');
 const { ALL_UNITS, YEAR3_MECH, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { masteryMap } = await import('./mastery.js');
 const { dueCards, grade, nairobiDay, stats, todayPlan } = await import('./plan.js');
@@ -29,14 +30,33 @@ const state = () => {
   return {
     today, data, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     due: dueCards(null, today).length, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
-    mastery: masteryMap(today), discord: Boolean(bot),
+    mastery: masteryMap(today), library: libraryMeta(), discord: Boolean(bot),
   };
 };
 
 const routes = {
   'GET /api/state': () => state(),
   'GET /api/catalog': () => ({ year3: YEAR3_MECH, all: ALL_UNITS }),
-  'GET /api/library': (q) => filesFor(q.get('unit')),
+  // A unit's server files merged with the ingested context-library cache (sync status + extracted text).
+  'GET /api/library': async (q) => {
+    const unit = q.get('unit');
+    if (!unit) return { files: [] };
+    const { files, note } = await filesFor(unit);
+    const merged = files.map((f) => {
+      const e = library.files[f.id];
+      return { id: f.id, name: f.name, paper: f.paper, url: f.url, synced: Boolean(e), chars: e?.text?.length || 0, pages: e?.pages || 0, text: e?.text || '' };
+    });
+    return { note, files: merged };
+  },
+  // Download + extract every file for a unit into the context library. Skips files already synced.
+  'POST /api/library/ingest': async (q, { unit }) => {
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    const { files, note } = await filesFor(unit);
+    if (note) return { note, files: [] };
+    const results = [];
+    for (const f of files) results.push(await ingestFile(f, unit));
+    return { files: results };
+  },
   'GET /api/due': (q) => dueCards(q.get('unit') || null),
   // body: [{ code, title }] — the units you're taking; keeps CAT dates and confidence you already set
   'PUT /api/units': (q, body) => {

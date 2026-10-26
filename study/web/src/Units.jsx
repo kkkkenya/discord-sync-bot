@@ -38,23 +38,64 @@ function Picker({ s, refresh, close }) {
   );
 }
 
+const snippet = (text, q) => {
+  const i = text.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return text.slice(0, 200);
+  return `${i > 60 ? '…' : ''}${text.slice(Math.max(0, i - 60), i + 180)}${i + 180 < text.length ? '…' : ''}`;
+};
+
 function Library({ code, go }) {
   const [lib, setLib] = useState(null);
-  useEffect(() => { api('GET', `library?unit=${encodeURIComponent(code)}`).then(setLib).catch((e) => setLib({ files: [], note: e.message })); }, [code]);
+  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState('');
+  const load = () => api('GET', `library?unit=${encodeURIComponent(code)}`).then(setLib).catch((e) => setLib({ files: [], note: e.message }));
+  useEffect(() => { load(); }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sync = async () => {
+    setBusy(true);
+    try { await api('POST', 'library/ingest', { unit: code }); await load(); }
+    catch (e) { setLib((x) => ({ ...(x || { files: [] }), note: e.message })); }
+    setBusy(false);
+  };
+
   if (!lib) return <p className="muted small">Checking the server library…</p>;
-  if (!lib.files.length) return <p className="muted small">{lib.note || 'Nothing in the server library for this unit yet.'}</p>;
+  const synced = lib.files.filter((f) => f.synced).length;
   const papers = lib.files.filter((f) => f.paper);
   const rest = lib.files.filter((f) => !papers.includes(f));
+  const withText = lib.files.filter((f) => f.synced && f.text);
+  const hits = q.trim() ? withText.filter((f) => f.text.toLowerCase().includes(q.toLowerCase())) : [];
+
   const item = (f) => (
     <li key={f.id}>
       <a href={f.url} target="_blank" rel="noreferrer">{f.name}</a>
       {papers.includes(f) && <button className="link" onClick={() => go('papers', { unit: code, label: f.name.replace(/\.[a-z0-9]+$/i, ''), fileId: f.id })}>log score</button>}
+      <span className={`muted small ${f.synced ? '' : 'hot'}`}>{f.synced ? (f.chars ? `${f.chars} chars` : 'no text (scanned)') : 'not synced'}</span>
+      {f.synced && f.text && <details className="preview"><summary>preview</summary><p>{f.text.slice(0, 500)}{f.text.length > 500 ? '…' : ''}</p></details>}
     </li>
   );
+
   return (
     <div className="library">
+      <div className="row">
+        <button className="ghost" onClick={sync} disabled={busy || !lib.files.length}>{busy ? 'Syncing…' : `Sync files (${synced}/${lib.files.length})`}</button>
+        <input className="grow" placeholder="Search synced material…" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      {lib.note && <p className="muted small">{lib.note}</p>}
+      {!lib.files.length && <p className="muted small">Nothing in the server library for this unit yet.</p>}
       {papers.length > 0 && <><h4>Past papers and CATs</h4><ul>{papers.map(item)}</ul></>}
       {rest.length > 0 && <details><summary>Notes and other files ({rest.length})</summary><ul>{rest.map(item)}</ul></details>}
+      {q.trim() && (
+        <div className="searchresults">
+          <h4>Matches ({hits.length})</h4>
+          {hits.length === 0 && <p className="muted small">No synced material contains that.</p>}
+          {hits.map((f) => (
+            <div key={f.id} className="hit">
+              <b>{f.name}</b>
+              <p className="small">{snippet(f.text, q)}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

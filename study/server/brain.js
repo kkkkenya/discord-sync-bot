@@ -21,8 +21,8 @@ const QUESTION_TOPIC = {
   additionalProperties: false,
 };
 
-// Notes → recall cards + CAT questions.
-export async function makeStudyMaterial({ unit, topic, text }) {
+// Notes → recall cards + CAT questions. `context` (from the synced library) grounds the output in real material.
+export async function makeStudyMaterial({ unit, topic, text, context = '' }) {
   const schema = {
     type: 'object',
     properties: {
@@ -32,11 +32,12 @@ export async function makeStudyMaterial({ unit, topic, text }) {
     required: ['cards', 'questions'],
     additionalProperties: false,
   };
-  return structured(schema, TUTOR, `Unit: ${unit}\nTopic: ${topic}\n\nStudent's notes:\n${text}`, 8000);
+  const content = `Unit: ${unit}\nTopic: ${topic}${context ? `\n\nRelevant material from the student's library — base the cards and questions on this, not general knowledge:\n${context}` : ''}\n\nStudent's notes:\n${text}`;
+  return structured(schema, TUTOR, content, 8000);
 }
 
 // Fill a mock exam when the question bank is short: generate questions from the unit's topics and cards.
-export async function makeQuestions({ unit, topics, cards, count }) {
+export async function makeQuestions({ unit, topics, cards, count, context = '' }) {
   const schema = {
     type: 'object',
     properties: { questions: { type: 'array', items: QUESTION_TOPIC, description: `${count} CAT-style questions for this unit.` } },
@@ -45,7 +46,7 @@ export async function makeQuestions({ unit, topics, cards, count }) {
   };
   const topicList = topics.length ? topics.map((t) => `- ${t.name} (${t.status || 'red'})`).join('\n') : '(no topics listed)';
   const cardList = cards.length ? cards.slice(0, 20).map((c) => `Q: ${c.q}\nA: ${c.a}`).join('\n\n') : '(no recall cards)';
-  const content = `Unit: ${unit}\n\nTopics the student is working through (put the exact topic name on each question):\n${topicList}\n\nExisting recall cards (avoid repeating them verbatim):\n${cardList}\n\nWrite ${count} fresh exam-style questions for this unit, each tagged with its topic, with a model answer and a mark count (5-20).`;
+  const content = `Unit: ${unit}${context ? `\n\nMaterial from the student's library — draw the questions from this, especially past papers and CATs:\n${context}` : ''}\n\nTopics the student is working through (put the exact topic name on each question):\n${topicList}\n\nExisting recall cards (avoid repeating them verbatim):\n${cardList}\n\nWrite ${count} fresh exam-style questions for this unit, each tagged with its topic, with a model answer and a mark count (5-20).`;
   return structured(schema, TUTOR, content, 8000);
 }
 

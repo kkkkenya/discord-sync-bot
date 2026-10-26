@@ -46,7 +46,7 @@ export default function Teach({ s, refresh, focus }) {
   return (
     <section id="teach" className="reveal">
       <h2>Teach it back</h2>
-      <p className="muted small">Explain a topic as if a classmate missed the lecture: what it is, the key equation and what each term means, when it applies, one worked example. If you get stuck, that's the gap to study.{s.coach ? ' Claude marks it and turns the gaps into recall cards.' : ''}</p>
+      <p className="muted small">Explain a topic as if a classmate missed the lecture: what it is, the key equation and what each term means, when it applies, one worked example. If you get stuck, that's the gap to study.{s.coach ? ' The AI marks it and turns the gaps into recall cards.' : ''}</p>
       <form onSubmit={send}>
         <div className="row">
           <select value={unit} onChange={(e) => setUnit(e.target.value)}>

@@ -19,6 +19,31 @@ export function saveLibrary() {
 export const libraryMeta = () =>
   Object.fromEntries(Object.entries(library.files).map(([id, e]) => [id, { unit: e.unit, name: e.name, chars: e.chars, paper: e.paper }]));
 
+// Relevant material to ground an AI call: the unit's synced text, topic-matching files first, capped.
+export function contextFor(unit, topic, maxChars = 12000) {
+  const entries = Object.entries(library.files)
+    .map(([, e]) => e)
+    .filter((e) => e.unit === unit && e.text);
+  if (!entries.length) return '';
+  const needle = (topic || '').trim().toLowerCase();
+  const score = (e) => {
+    if (!needle) return 0;
+    const name = (e.name || '').toLowerCase();
+    const text = e.text.toLowerCase();
+    if (text.includes(needle)) return 2;
+    const words = needle.split(/\s+/).filter((w) => w.length > 3);
+    if (words.some((w) => text.includes(w) || name.includes(w))) return 1;
+    return 0;
+  };
+  entries.sort((a, b) => score(b) - score(a));
+  let out = '';
+  for (const e of entries) {
+    if (out.length >= maxChars) break;
+    out += `\n\n--- ${e.name} (${e.paper ? 'past paper / CAT' : 'notes'}) ---\n${e.text}`;
+  }
+  return out.slice(0, maxChars);
+}
+
 async function messageFor(channelId, messageId) {
   const r = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
     headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },

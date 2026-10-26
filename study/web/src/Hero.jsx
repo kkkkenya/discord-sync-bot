@@ -34,7 +34,7 @@ export default function Hero({ s }) {
       </dl>
       <div className="hero-foot">
         {s.discord ? <button className="ghost" onClick={dm}>DM me today's plan</button> : <span className="muted">Discord DMs are off. Run <code>setup.bat</code> in the study folder.</span>}
-        {!s.coach && <span className="muted">Teach-back marking is off (no Anthropic key in pc/.env).</span>}
+        {!s.coach && <span className="muted">Teach-back marking is off — no key for the selected AI provider.</span>}
         {sent && <span className="muted">{sent}</span>}
       </div>
     </section>

@@ -15,7 +15,7 @@ const { startBot, todayText } = await import('./bot.js');
 const { coach, coachReady } = await import('./coach.js');
 const { aiReady, clamp, provider } = await import('./ai.js');
 const { makeQuestions, makeStudyMaterial, markAnswers } = await import('./brain.js');
-const { ingestFile, library, libraryMeta } = await import('./ingest.js');
+const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
 const { ALL_UNITS, YEAR3_MECH, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { masteryMap } = await import('./mastery.js');
 const { dueCards, grade, nairobiDay, stats, todayPlan } = await import('./plan.js');
@@ -102,7 +102,7 @@ const routes = {
     if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Pick another provider in the top bar, or add the key.'), { status: 400 });
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     if (!topic?.trim() || !text?.trim()) throw Object.assign(new Error('A topic and some notes are needed.'), { status: 400 });
-    const { cards, questions } = await makeStudyMaterial({ unit, topic: topic.trim(), text: text.trim() });
+    const { cards, questions } = await makeStudyMaterial({ unit, topic: topic.trim(), text: text.trim(), context: contextFor(unit, topic) });
     for (const c of cards) add('cards', { unit, topic: topic.trim(), q: c.q, a: c.a, from: 'notes', due: nairobiDay(), interval: 0, ease: 2.5, reps: 0, lapses: 0 });
     for (const qq of questions) add('questions', { unit, topic: topic.trim(), q: qq.q, a: qq.a, marks: clamp(qq.marks, 5, 25), from: 'notes' });
     return { cards: cards.length, questions: questions.length };
@@ -116,7 +116,7 @@ const routes = {
     let questions = bank.slice(0, count).map((x) => ({ q: x.q, a: x.a, marks: x.marks, topic: x.topic || '' }));
     if (questions.length < count) {
       if (aiReady()) {
-        const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), cards: data.cards.filter((c) => c.unit === unit), count: count - questions.length });
+        const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), cards: data.cards.filter((c) => c.unit === unit), count: count - questions.length, context: contextFor(unit) });
         questions = questions.concat(extra.questions.map((x) => ({ q: x.q, a: x.a, marks: clamp(x.marks, 5, 25), topic: x.topic || '' })));
       } else if (!questions.length) {
         questions = data.cards.filter((c) => c.unit === unit).slice(0, count).map((c) => ({ q: c.q, a: c.a, marks: 5, topic: c.topic || '' }));

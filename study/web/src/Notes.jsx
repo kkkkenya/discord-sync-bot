@@ -30,8 +30,13 @@ export default function Notes({ s, refresh, focus }) {
   return (
     <section id="notes" className="reveal">
       <div className="head"><h2>Notes → cards</h2></div>
-      <p className="muted small">Paste your own notes, a textbook section or slide text. Claude turns it into recall cards (they're due in Recall right away) and CAT-style questions for your mock-exam bank.</p>
-      {!s.ai && <p className="banner bad">This needs an Anthropic key. Run <code>setup.bat</code> in the study folder to add one.</p>}
+      <p className="muted small">Paste your own notes, a textbook section or slide text. The AI turns it into recall cards (they're due in Recall right away) and CAT-style questions for your mock-exam bank.</p>
+      <p className="muted small">
+        {Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length
+          ? `${Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length} file(s) synced for ${unit} — cards and questions will be grounded in them.`
+          : `No files synced for ${unit} yet — sync them in Units to ground the questions in your material.`}
+      </p>
+      {!s.ai && <p className="banner bad">No AI key for the selected provider. Pick another provider in the top bar, or run <code>setup.bat</code> to add one.</p>}
       <form onSubmit={send}>
         <div className="row">
           <select value={unit} onChange={(e) => setUnit(e.target.value)}>

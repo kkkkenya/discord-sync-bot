@@ -9,16 +9,18 @@ const SUB_MARKS = /[([]\s*(\d{1,2}(?:\.\d)?)\s*(?:marks?|mks?)\s*[)\]]/gi;
 
 // Questions in one paper's text (extracted text is whitespace-squashed, so no line starts to lean on).
 // Headers must run 1, 2, 3…; a repeated header replaces the earlier one, so "Answer question ONE and any other
-// TWO" in the instructions doesn't become question 1. Marks: the header's "(20 marks)", else the sum of its
+// TWO" in the instructions doesn't become question 1. When a paper has no "Question N" headers, bare "1." "2."
+// numbering is tried, then one question per "(5 marks)". Marks: the header's "(20 marks)", else the sum of its
 // parts' marks, else null. [{ number, marks, text }]
-export function parseQuestions(text) {
-  const src = String(text || '');
+const BARE = /(?<=(?:^|[.?!:;)\]\d])\s*)(\d{1,2})\s*[.)]\s+(?=[A-Z])/g;
+
+function numbered(src, re, number, replace = true) {
   const starts = [];
-  for (const m of src.matchAll(HEADER)) {
-    const n = NUM[m[1].toLowerCase()] || Number(m[1]);
+  for (const m of src.matchAll(re)) {
+    const n = number(m);
     const last = starts.at(-1)?.n || 0;
     if (n === last + 1) starts.push({ n, at: m.index, body: m.index + m[0].length });
-    else if (n === last && n) starts[starts.length - 1] = { n, at: m.index, body: m.index + m[0].length };
+    else if (replace && n === last && n) starts[starts.length - 1] = { n, at: m.index, body: m.index + m[0].length };
   }
   return starts.map((s, i) => {
     const body = src.slice(s.body, starts[i + 1]?.at ?? src.length).trim();
@@ -26,7 +28,29 @@ export function parseQuestions(text) {
     const parts = [...body.matchAll(SUB_MARKS)].reduce((n, m) => n + Number(m[1]), 0);
     const rest = head ? body.slice(head[0].length) : body;
     return { number: s.n, marks: head ? Number(head[1]) : parts || null, text: rest.replace(/^[\s:.\-–]+/, '').slice(0, 3000) };
-  }).filter((q) => q.text.length >= 20);
+  });
+}
+
+// Unnumbered papers: each question ends in its own "(5 marks)".
+function byMarks(src) {
+  const out = [];
+  let from = 0;
+  for (const m of src.matchAll(SUB_MARKS)) {
+    out.push({ number: out.length + 1, marks: Number(m[1]), text: src.slice(from, m.index).trim().slice(0, 3000) });
+    from = m.index + m[0].length;
+  }
+  return out;
+}
+
+export function parseQuestions(text) {
+  const src = String(text || '');
+  let qs = numbered(src, HEADER, (m) => NUM[m[1].toLowerCase()] || Number(m[1]));
+  if (!qs.length) {
+    qs = numbered(src, BARE, (m) => Number(m[1]), false);
+    const marked = qs.length < 2 ? byMarks(src) : [];
+    if (marked.length > 1) qs = marked;
+  }
+  return qs.filter((q) => q.text.length >= 20);
 }
 
 // From a file name or label: { year, type: 'CAT1'|'CAT2'|'CAT'|'Exam' }.

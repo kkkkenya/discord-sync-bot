@@ -54,6 +54,9 @@ async function messageFor(channelId, messageId) {
   return r.json();
 }
 
+// A forwarded message keeps its files in message_snapshots, not in attachments.
+export const attachmentOf = (msg) => msg.attachments?.[0] || msg.message_snapshots?.[0]?.message?.attachments?.[0] || null;
+
 // Ingest one file record (from library.js filesFor) into the cache. Returns { id, name, chars, cached, error }.
 // A file with no extractable text (a scanned paper) is still recorded, so it isn't re-downloaded every sync.
 export async function ingestFile(f, unitCode) {
@@ -62,7 +65,7 @@ export async function ingestFile(f, unitCode) {
   let att;
   try {
     const msg = await messageFor(f.channel_id, f.message_id);
-    att = msg.attachments?.[0] || null;
+    att = attachmentOf(msg);
   } catch (e) {
     return { id: f.id, name: f.name, error: e.message };
   }

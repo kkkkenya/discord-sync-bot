@@ -86,3 +86,15 @@ test('a predicted mock covers ~65% of the weight with one recent question per to
   const muted = predictions({ topics: TOPICS, questions: Q, hints: [{ kind: 'exclude', topicIds: ['fourier'], at: 'x' }], late: true });
   assert.ok(!predictedMock(muted, Q).some((m) => m.topic === 'Fourier series'));
 });
+
+test('bare 1. 2. numbering works, and figure or decimal numbers do not split a question', () => {
+  const qs = parseQuestions('EAR 306 : CAT 2 ( Due 20 - 11 - 2023 ) 1. Two steel plates are joined by double transverse fillet welds as shown in Figure 1 . Find the length of the weld. 2. Using sketches differentiate between Through Bolt, Tap Bolt and Stud. 3. Discuss FIVE advantages of welded joints compared to rivetted joints. (5 marks) 4. Describe FIVE types of welded joints with neat sketches. (5 marks)');
+  assert.deepEqual(qs.map((q) => [q.number, q.marks]), [[1, null], [2, null], [3, 5], [4, 5]]);
+  assert.equal(parseQuestions('1. Plates carry a stress of 110 N/mm 2 . Find the required length of the weld for the plates. 2. Name any FOUR regions where fatigue failure is likely to occur.').length, 2);
+  assert.match(qs[0].text, /Figure 1 \. Find the length/);
+});
+
+test('an unnumbered paper splits at each (n marks)', () => {
+  const qs = parseQuestions('EMM 305: METROLOGY Continuous Assessment Test Questions State the requirements that the material used to manufacture gauges should satisfy. (5 marks) Define a comparator and give THREE classification of comparators. (5 marks) Discuss the metrological applications of an optical projector (4Marks)');
+  assert.deepEqual(qs.map((q) => [q.number, q.marks]), [[1, 5], [2, 5], [3, 4]]);
+});

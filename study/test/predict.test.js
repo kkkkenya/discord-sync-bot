@@ -98,3 +98,10 @@ test('an unnumbered paper splits at each (n marks)', () => {
   const qs = parseQuestions('EMM 305: METROLOGY Continuous Assessment Test Questions State the requirements that the material used to manufacture gauges should satisfy. (5 marks) Define a comparator and give THREE classification of comparators. (5 marks) Discuss the metrological applications of an optical projector (4Marks)');
   assert.deepEqual(qs.map((q) => [q.number, q.marks]), [[1, 5], [2, 5], [3, 4]]);
 });
+
+test('an unnumbered paper printed twice on one sheet counts its questions once', () => {
+  const sheet = 'SMA 230: VECTOR ANALYSIS - CAT I a) Determine the angle between the two vectors A and B (5 marks) b) Given the vectors A, B and C, determine (A - C) x (B - C) (5 marks) c) Prove the associative property of vector addition (5 marks)';
+  const qs = parseQuestions(`${sheet} ${sheet.replace('Determine', 'D etermine').replace(' x ', 'x ')}`);
+  assert.deepEqual(qs.map((q) => [q.number, q.marks]), [[1, 5], [2, 5], [3, 5]]);
+  assert.match(qs[2].text, /^c\) Prove/);
+});

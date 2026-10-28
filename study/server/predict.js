@@ -31,13 +31,19 @@ function numbered(src, re, number, replace = true) {
   });
 }
 
-// Unnumbered papers: each question ends in its own "(5 marks)".
+// Unnumbered papers: each question ends in its own "(5 marks)". A sheet printed twice in one file (two copies per
+// page) repeats every question; the repeat is dropped.
 function byMarks(src) {
   const out = [];
+  const seen = new Set();
   let from = 0;
   for (const m of src.matchAll(SUB_MARKS)) {
-    out.push({ number: out.length + 1, marks: Number(m[1]), text: src.slice(from, m.index).trim().slice(0, 3000) });
+    const text = src.slice(from, m.index).trim().slice(0, 3000);
     from = m.index + m[0].length;
+    const key = text.replace(/\s+/g, '').toLowerCase(); // extracted text spaces words unevenly ("D etermine")
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ number: out.length + 1, marks: Number(m[1]), text });
   }
   return out;
 }

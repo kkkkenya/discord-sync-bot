@@ -46,6 +46,27 @@ export function contextFor(unit, topic, maxChars = 12000) {
   return out.slice(0, maxChars);
 }
 
+const OUTLINE = /outline|syllabus|course[\s_-]*(content|description)/i;
+
+// What a unit covers, for suggesting its topics: the course outline first, then the parsed past-paper questions,
+// then the opening of each notes file (often its contents page). { text, sources: what was read }.
+export function outlineContext(unit, questions = [], files = library.files, maxChars = 14000) {
+  const mine = Object.values(files).filter((e) => e.unit === unit && e.text);
+  const parts = [];
+  const sources = [];
+  for (const e of mine.filter((x) => OUTLINE.test(x.name))) { parts.push(`--- Course outline: ${e.name} ---\n${e.text.slice(0, 6000)}`); sources.push(e.name); }
+  if (questions.length) {
+    parts.push(`--- Past-paper questions ---\n${questions.map((q) => `- ${q.slice(0, 400)}`).join('\n')}`);
+    sources.push(`${questions.length} past-paper question${questions.length === 1 ? '' : 's'}`);
+  }
+  for (const e of mine.filter((x) => !x.paper && !OUTLINE.test(x.name))) {
+    if (parts.join('').length >= maxChars) break;
+    parts.push(`--- Notes: ${e.name} ---\n${e.text.slice(0, 3000)}`);
+    sources.push(e.name);
+  }
+  return { text: parts.join('\n\n').slice(0, maxChars), sources };
+}
+
 async function messageFor(channelId, messageId) {
   const r = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
     headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },

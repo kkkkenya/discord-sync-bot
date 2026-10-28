@@ -4,6 +4,7 @@ import { api, daysUntil, markUndatedTba } from './api.js';
 const CYCLE = [null, 'green', 'amber', 'red']; // manual override: auto → green → amber → red → auto
 
 const YEARS = [1, 2, 3, 4, 5];
+const FROM = { outline: 'outline', papers: 'past papers', both: 'outline and papers', general: 'general' }; // where a suggested topic came from
 
 // Setup and "Edit units": Course → Year → Semester loads that cohort's units from the Study Hub catalogue. The Hub
 // doesn't record semesters, so the whole year is listed: untick what you aren't sitting. Units you already picked
@@ -102,7 +103,7 @@ function SyncAll({ s }) {
         if (r.note) { out.push(`${u.code}: ${r.note}`); continue; }
         const text = r.files.filter((f) => f.chars > 0).length;
         const failed = r.files.filter((f) => f.error && !/scanned/.test(f.error)).length;
-        out.push(`${u.code}: ${r.files.length} file${r.files.length === 1 ? '' : 's'}, ${text} with text${r.files.length - text - failed ? `, ${r.files.length - text - failed} scanned (no text)` : ''}${failed ? `, ${failed} failed` : ''}`);
+        out.push(`${u.code}: ${r.files.length} file${r.files.length === 1 ? '' : 's'}, ${text} with text${r.files.length - text - failed ? `, ${r.files.length - text - failed} scanned (no text)` : ''}${failed ? `, ${failed} failed` : ''}${r.parsed?.questions ? `, ${r.parsed.questions} past-paper question${r.parsed.questions === 1 ? '' : 's'} read` : ''}`);
       } catch (e) { out.push(`${u.code}: ${e.message}`); }
     }
     setLines(out);
@@ -129,9 +130,10 @@ function Library({ code, go }) {
   const load = () => api('GET', `library?unit=${encodeURIComponent(code)}`).then(setLib).catch((e) => setLib({ files: [], note: e.message }));
   useEffect(() => { load(); }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [read, setRead] = useState(null); // past-paper questions read after the last sync
   const sync = async () => {
     setBusy(true);
-    try { await api('POST', 'library/ingest', { unit: code }); await load(); }
+    try { const r = await api('POST', 'library/ingest', { unit: code }); setRead(r.parsed?.questions ?? null); await load(); }
     catch (e) { setLib((x) => ({ ...(x || { files: [] }), note: e.message })); }
     setBusy(false);
   };
@@ -159,6 +161,7 @@ function Library({ code, go }) {
         <input className="grow" placeholder="Search synced material…" aria-label={`Search ${code} synced material`} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       {lib.note && <p className="muted small">{lib.note}</p>}
+      {read != null && <p className="muted small" role="status">{read} past-paper question{read === 1 ? '' : 's'} read for Predict.</p>}
       {!lib.files.length && <p className="muted small">Nothing in the server library for this unit yet.</p>}
       {papers.length > 0 && <><h4>Past papers and CATs</h4><ul>{papers.map(item)}</ul></>}
       {rest.length > 0 && <details><summary>Notes and other files ({rest.length})</summary><ul>{rest.map(item)}</ul></details>}
@@ -181,7 +184,10 @@ function Library({ code, go }) {
 function Unit({ u, s, refresh, go, notify }) {
   const [topic, setTopic] = useState('');
   const [open, setOpen] = useState(false);
-  const topics = s.data.topics.filter((t) => t.unit === u.code);
+  const [ideas, setIdeas] = useState(null); // { suggestions, sources } from "Suggest topics"
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const topics =s.data.topics.filter((t) => t.unit === u.code);
   const tba = u.catDate === 'TBA';
   const st = s.units[u.code]?.stage;
   const auto = st && st.source !== 'unit' ? st.name : s.stages.find((x) => x.id === (s.settings.stage || 'adequate'))?.name;
@@ -192,11 +198,25 @@ function Unit({ u, s, refresh, go, notify }) {
   const covered = topics.length ? Math.round(((green + amber * 0.5) / topics.length) * 100) : 0;
   const pending = rated.find((x) => x.m.status !== 'green');
   const set = (body) => api('PATCH', `units?code=${encodeURIComponent(u.code)}`, body).then(refresh);
+  // new topics re-tag the unit's past-paper questions straight away (by wording, no AI), so Predict can rank them
+  const addTopics = async (names) => {
+    for (const name of names) await api('POST', 'topics', { unit: u.code, name });
+    await api('POST', 'predict/parse', { unit: u.code }).catch(() => {});
+    refresh();
+  };
   const addTopic = async (e) => {
     e.preventDefault();
-    for (const name of topic.split(',').map((x) => x.trim()).filter(Boolean)) await api('POST', 'topics', { unit: u.code, name });
+    await addTopics(topic.split(',').map((x) => x.trim()).filter(Boolean));
     setTopic('');
-    refresh();
+  };
+  const suggest = async () => {
+    setBusy(true); setError('');
+    try { setIdeas(await api('POST', 'topics/suggest', { unit: u.code })); } catch (x) { setError(x.message); }
+    setBusy(false);
+  };
+  const addIdeas = async (list) => {
+    await addTopics(list.map((i) => i.name));
+    setIdeas((x) => ({ ...x, suggestions: x.suggestions.filter((i) => !list.includes(i)) }));
   };
   const nextManual = (t, m) => CYCLE[(CYCLE.indexOf(t.manual ?? null) + 1) % CYCLE.length];
   return (
@@ -230,7 +250,21 @@ function Unit({ u, s, refresh, go, notify }) {
           </span>
         ))}
         <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} aria-label={`Add topics to ${u.code}, comma separated`} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
+        {s.ai && <button className="ghost small" onClick={suggest} disabled={busy}>{busy ? 'Reading your outline and papers…' : 'Suggest topics'}</button>}
       </div>
+      {error && <p className="hot small" role="alert">{error}</p>}
+      {ideas && (
+        <div className="suggest" aria-label={`Suggested topics for ${u.code}`}>
+          {ideas.suggestions.length
+            ? ideas.suggestions.map((i) => <button key={i.name} className="ghost small" onClick={() => addIdeas([i])}>+ {i.name} <span className="muted">({FROM[i.from] || i.from})</span></button>)
+            : <span className="muted small">Nothing new to suggest.</span>}
+          {ideas.suggestions.length > 1 && <button className="link small" onClick={() => addIdeas(ideas.suggestions)}>add all</button>}
+          <p className="muted small">
+            {ideas.sources.length ? `Read: ${ideas.sources.join(', ')}.` : 'Nothing is synced for this unit, so these are general guesses from its title. Sync its files for topics from your own outline.'}
+            {' '}AI suggestions can be off: keep only what your course actually covers.
+          </p>
+        </div>
+      )}
       {topics.length > 0 && (
         <div className="cover" role="img" aria-label={`${u.code}: ${covered}% covered`}>
           <span className="muted small">{covered}%</span>

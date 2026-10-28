@@ -58,6 +58,34 @@ export async function suggestSubtopics({ unit, topic, have = [], context = '' })
   return structured(schema, TUTOR, content, 2000);
 }
 
+// A unit's exam topics, from its synced course outline and past papers (or the unit title alone when nothing is synced).
+export async function suggestTopics({ unit, title = '', have = [], context = '' }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      topics: {
+        type: 'array',
+        description: '6-14 topics in teaching order, each one a chunk a CAT or exam question is set on.',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'Short name, 2-5 words, as the course outline names it.' },
+            from: { type: 'string', enum: ['outline', 'papers', 'both', 'general'], description: 'Where it comes from: the outline, the past papers, both, or general knowledge of the unit.' },
+          },
+          required: ['name', 'from'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['topics'],
+    additionalProperties: false,
+  };
+  const content = `Unit: ${unit} ${title}${have.length ? `\nAlready listed (don't repeat): ${have.join('; ')}` : ''}${context
+    ? `\n\nThe student's course material. List the topics THIS course teaches and examines, named the way its outline names them:\n${context}`
+    : '\n\nNo course material is synced. List the standard topics for this unit at KU 3rd-year level, and mark each one general.'}`;
+  return structured(schema, TUTOR, content, 2000);
+}
+
 // Past-paper questions → the unit's topics (by exact topic name, or '' when none fits).
 export async function mapQuestions({ unit, topics, questions }) {
   const schema = {

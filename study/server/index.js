@@ -14,8 +14,8 @@ config({ path: fileURLToPath(new URL('../../community/.env', import.meta.url)), 
 const { startBot, todayText } = await import('./bot.js');
 const { coach, coachReady } = await import('./coach.js');
 const { aiReady, clamp, provider } = await import('./ai.js');
-const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics } = await import('./brain.js');
-const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
+const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics, suggestTopics } = await import('./brain.js');
+const { contextFor, ingestFile, library, libraryMeta, outlineContext } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
 const { ERROR_TYPES, STAGES, TBA } = await import('./defs.js');
@@ -70,14 +70,27 @@ const routes = {
     });
     return { note, files: merged };
   },
-  // Download + extract every file for a unit into the context library. Skips files already synced.
+  // Download + extract every file for a unit into the context library. Skips files already synced. Then reads the
+  // unit's past papers into questions (no AI), so Predict is ready without another click.
   'POST /api/library/ingest': async (q, { unit }) => {
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     const { files, note } = await filesFor(unit);
     if (note) return { note, files: [] };
     const results = [];
     for (const f of files) results.push(await ingestFile(f, unit));
-    return { files: results };
+    return { files: results, parsed: parsePapers(unit) };
+  },
+  // AI topic suggestions for a unit from its synced course outline and past papers; nothing is saved until the
+  // student adds them.
+  'POST /api/topics/suggest': async (q, { unit }) => {
+    const u = data.units.find((x) => x.code === unit);
+    if (!u) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Copy the topics from the course outline by hand, or use the Prompt Builder.'), { status: 400 });
+    if (!data.paperq.some((x) => x.unit === unit)) parsePapers(unit);
+    const have = data.topics.filter((t) => t.unit === unit).map((t) => t.name);
+    const { text, sources } = outlineContext(unit, data.paperq.filter((x) => x.unit === unit).map((x) => x.text));
+    const { topics } = await suggestTopics({ unit, title: u.title, have, context: text });
+    return { suggestions: topics.filter((t) => !have.some((h) => h.toLowerCase() === t.name.toLowerCase())), sources };
   },
   // body: [{ code, title }] — the units you're taking. Keeps the dates and confidence you already set; a unit you
   // untick is remembered in settings.unitArchive (its topics and logs are never touched), so ticking it again

@@ -41,6 +41,10 @@ test('AI suggestions explain themselves without a key', async () => {
   const r = await srv.call('POST', 'subtopics/suggest', { topicId: 't1' });
   assert.equal(r.status, 400);
   assert.match(r.body.error, /No AI key/);
+  const t = await srv.call('POST', 'topics/suggest', { unit: 'EMM 302' });
+  assert.equal(t.status, 400);
+  assert.match(t.body.error, /No AI key.*course outline/);
+  assert.equal((await srv.call('POST', 'topics/suggest', { unit: 'XYZ 999' })).status, 400);
 });
 
 test('a teach-back without AI is saved and flags nothing', async () => {

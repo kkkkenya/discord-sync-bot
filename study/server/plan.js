@@ -63,14 +63,14 @@ function taskFor(stage, { topics, red, amber, papers, weak }) {
     return mock(2, shaky);
   }
   if (stage === 'one-week') {
-    if (!topics.length) return { kind: 'topics', text: 'List the CAT topics, then mark what past papers keep asking' };
+    if (!topics.length) return { kind: 'topics', text: 'List the CAT topics: Suggest topics reads your outline and past papers' };
     if (weak) return { ...mock(3, shaky), text: `Solve 3 timed exam questions on ${weak.topic} (weakspot: ${weak.name})` };
     if (!papers) return { kind: 'paper', text: 'Do the most recent past paper or CAT, timed' };
     if (shaky) return mock(3, shaky);
     return untaught ? teach(untaught, ': the standard method, step by step') : mock(3);
   }
   // adequate: fundamentals first
-  if (!topics.length) return { kind: 'topics', text: 'List the topics from the course outline and rate each one' };
+  if (!topics.length) return { kind: 'topics', text: 'List the topics: Suggest topics reads your outline and past papers' };
   if (weak?.audit === 'stuck' || weak?.action === 'teach') return { kind: 'teach', text: `Teach back ${weak.name} (${weak.topic}): derivation, assumptions, when it fails`, topic: weak.topic };
   if (untaught) return teach(untaught, ': derivation, assumptions, when it fails');
   if (!papers) return { kind: 'paper', text: 'Do one past paper or CAT, timed' };

@@ -6,7 +6,7 @@ const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const STEPS = [
   { id: 'countdown', target: '[data-tour="countdown"]', title: 'Your exam countdown', body: (s) => `Each unit counts down to its own CAT or exam date. Until you set one, it uses the KU calendar${s.next ? ` (next CATs: ${s.next.start})` : ''}. If the strike has moved the dates, mark them TBA in Units.` },
   { id: 'units', target: '[data-tour="units"]', title: 'Pick your units', body: 'Pick your course, year and semester, then tick the units you are sitting.', done: (s) => s.data.units.length > 0 },
-  { id: 'topics', target: '[data-tour="topics"]', title: 'Add topics', body: 'Copy them straight from the course outline, comma-separated.', done: (s) => s.data.topics.length >= 3 },
+  { id: 'topics', target: '[data-tour="topics"]', title: 'Add topics', body: 'Type them from the course outline, comma separated, or press Suggest topics: the AI reads your synced outline and past papers, and you keep the ones your course covers.', done: (s) => s.data.topics.length >= 3 },
   { id: 'sync', target: '[data-tour="sync"]', title: 'Sync your files', body: '"Sync all files" pulls every unit\'s notes and past papers from the Study Hub, so the AI and your prompts work from your material. Optional.', done: () => false },
   { id: 'start', target: '[data-tour="today"]', title: 'Start studying', body: 'This is the daily loop: pick a task, focus (the timer bottom-right), solve questions closed book, then teach it back.', done: () => false },
 ];

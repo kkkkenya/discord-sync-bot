@@ -21,7 +21,7 @@ import Units from './Units.jsx';
 gsap.registerPlugin(useGSAP);
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const NAV = [['today', 'Today'], ['units', 'Units'], ['predictions', 'Predict'], ['analysis', 'Weakspots'], ['practice', 'Practice'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
+const NAV = [['today', 'Today'], ['units', 'Units'], ['predictions', 'Predict'], ['analysis', 'Weakspots'], ['practice', 'Check answer'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
 
 export default function App() {
   const [s, setS] = useState(null);
@@ -75,7 +75,8 @@ export default function App() {
   const go = (section, extra = {}) => {
     setFocus({ section, ...extra, at: Date.now() });
     const el = document.getElementById(section);
-    if (lenisRef.current?.lenis) lenisRef.current.lenis.scrollTo(el, { offset: -70 });
+    const offset = -((document.querySelector('.top')?.offsetHeight || 54) + 12); // clear the sticky header
+    if (lenisRef.current?.lenis) lenisRef.current.lenis.scrollTo(el, { offset });
     else el?.scrollIntoView();
   };
 
@@ -105,7 +106,7 @@ export default function App() {
             className={`ai-toggle${s.ai ? '' : ' off'}`}
             value={s.settings.aiProvider}
             aria-label="AI provider"
-            title={s.ai ? `AI ready (${s.provider})` : `No key for ${s.provider} — pick another provider or add the key`}
+            title={s.ai ? `AI ready (${s.provider})` : `No key for ${s.provider}. Pick another provider or add the key.`}
             onChange={(e) => api('POST', 'settings', { aiProvider: e.target.value }).then(refresh).catch((err) => setProblem(err.message))}
           >
             <option value="gemini">AI: Gemini</option>

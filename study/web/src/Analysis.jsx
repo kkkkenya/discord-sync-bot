@@ -132,7 +132,7 @@ function Matrix({ unit, s, go }) {
         </ol>
       )}
       <h3>How you lose marks</h3>
-      {!w.errors.total ? <p className="muted small">No checkpoint mistakes logged yet. When you check an answer step by step (Practice), each broken step is tagged here: sign conventions, units, algebra slips…</p> : (
+      {!w.errors.total ? <p className="muted small">No checkpoint mistakes logged yet. When you check an answer step by step (Check answer), each broken step is tagged here: sign conventions, units, algebra slips…</p> : (
         <>
           {w.errors.takeaway && <p><b>{w.errors.takeaway}</b></p>}
           <div className="ebars" role="img" aria-label={w.errors.counts.map((e) => `${e.label}: ${e.n}`).join(', ')}>

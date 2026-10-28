@@ -3,11 +3,12 @@ import { api } from './api.js';
 import LimitNote from './LimitNote.jsx';
 
 const MINUTE = 60000;
+const PER_MARK = 1.5; // minutes per mark, as in a CAT: 30 marks in about 45 minutes
 
 // Timed, closed-book mock exam. Questions come from your bank (built by Notes) and, if there aren't enough,
-// are generated fresh from the unit's topics. With an Anthropic key it's marked in one go; without,
+// are generated fresh from the unit's topics. With an AI key it's marked in one go; without,
 // you see the model answers and self-mark.
-export default function Mock({ s, refresh, focus, go }) {
+export default function Mock({ s, refresh, focus, go, notify }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const [count, setCount] = useState(5);
   const [name, setName] = useState('');
@@ -41,7 +42,7 @@ export default function Mock({ s, refresh, focus, go }) {
       const m = await api('POST', 'mocks', { unit, count, name, predicted });
       setMock(m);
       setAnswers(m.questions.map(() => ''));
-      duration.current = m.questions.length * 2 * MINUTE;
+      duration.current = m.questions.reduce((n, q) => n + q.marks, 0) * PER_MARK * MINUTE;
       startedAt.current = Date.now();
       setLeft(duration.current);
       refresh();
@@ -85,9 +86,9 @@ export default function Mock({ s, refresh, focus, go }) {
 
       {!mock && !result && (
         <>
-          <p className="muted small">Closed book, timed. {banked > 0 ? `You have ${banked} banked question${banked === 1 ? '' : 's'} for ${unit}.` : 'No banked questions for this unit yet — questions are generated from your topics.'}</p>
+          <p className="muted small">Closed book, timed at {PER_MARK} minutes a mark. {banked > 0 ? `You have ${banked} banked question${banked === 1 ? '' : 's'} for ${unit}.` : 'No banked questions for this unit yet, so questions are generated from your topics.'}</p>
           <form className="row wrap" onSubmit={start}>
-            <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+            <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unit">
               {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code} {u.title}</option>)}
             </select>
             <label className="muted small">Questions
@@ -95,7 +96,7 @@ export default function Mock({ s, refresh, focus, go }) {
                 {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
-            <input className="grow" placeholder="Name (optional, e.g. CAT 1 revision)" value={name} onChange={(e) => setName(e.target.value)} />
+            <input className="grow" placeholder="Name (optional, e.g. CAT 1 revision)" aria-label="Mock name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
             <label className="small"><input type="checkbox" checked={predicted} onChange={(e) => setPredicted(e.target.checked)} /> Predicted (from past papers)</label>
             <button disabled={busy || !unit}>{busy ? 'Building…' : 'Start mock'}</button>
           </form>
@@ -105,9 +106,9 @@ export default function Mock({ s, refresh, focus, go }) {
       {mock && (
         <div className="mock">
           <div className="mock-head">
-            <b>{mock.name}</b> <span className="muted small">{mock.questions.length} questions · {mock.questions.reduce((n, q) => n + q.marks, 0)} marks</span>
+            <b>{mock.name}</b> <span className="muted small">{mock.questions.length} questions · {mock.questions.reduce((n, q) => n + q.marks, 0)} marks · {Math.round(duration.current / MINUTE)} min</span>
             <span className={`clock ${left <= 0 ? 'hot' : ''}`}>{mm(left)}</span>
-            {left <= 0 && <span className="hot small">Time's up — finish and submit.</span>}
+            {left <= 0 && <span className="hot small">Time's up: finish and submit.</span>}
           </div>
           {mock.questions.map((q, i) => (
             <div className="mq" key={i}>
@@ -163,7 +164,7 @@ export default function Mock({ s, refresh, focus, go }) {
                 {m.score != null ? `${m.score}/${m.outOf}` : m.answers?.length ? 'unmarked' : 'unfinished'}
               </span>
               <span className="muted small">{m.at.slice(0, 10)}</span>
-              <button className="x" aria-label="delete" onClick={() => api('DELETE', `mocks/${m.id}`).then(refresh)}>×</button>
+              <button className="x" aria-label={`delete ${m.name}`} onClick={() => api('DELETE', `mocks/${m.id}`).then(() => { notify(`Deleted "${m.name}"`, () => api('POST', 'mocks', { restore: m })); refresh(); })}>×</button>
             </div>
           ))}
         </details>

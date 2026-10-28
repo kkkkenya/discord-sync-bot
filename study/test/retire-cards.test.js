@@ -33,6 +33,16 @@ test('stats no longer count card reviews', () => {
   assert.equal(typeof s.activeToday, 'boolean');
 });
 
+test('a checked answer or a sub-topic audit counts as a study day', () => {
+  assert.equal(stats(TODAY).activeToday, false);
+  data.attempts.push({ id: 'chk1', unit: 'EMM 302', verdict: 'mismatch', at: `${TODAY}T09:00:00.000Z` });
+  assert.equal(stats(TODAY).activeToday, true);
+  data.attempts.pop();
+  data.subtopics.push({ id: 'aud1', unit: 'EMM 302', name: 'x', audit: 'shaky', auditAt: `${TODAY}T10:00:00.000Z`, at: '2026-09-01T00:00:00.000Z' });
+  assert.equal(stats(TODAY).activeToday, true);
+  data.subtopics.pop();
+});
+
 test('the bot has no card commands and says so', async () => {
   const help = await reply('help');
   assert.doesNotMatch(help, /quiz|card/i);

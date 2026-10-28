@@ -60,7 +60,7 @@ export default function Prompt({ s, focus }) {
 
   return (
     <section id="prompt" className="reveal">
-      <div className="head"><h2>Prompt builder</h2></div>
+      <div className="head"><h2>Prompt Builder</h2></div>
       <p className="muted small">
         For heavy work (full derivations, verified step-by-step solutions, deep tutoring on a weakspot) the built-in AI's context and effort limits get in the way.
         Build a <b>Deep Context Pack</b> instead: copy the Master Prompt and attach the <code>.md</code> file in Claude, DeepSeek R1 or ChatGPT. It carries your lecturer's hints, your weakspots, the past-paper questions and your synced notes.
@@ -141,14 +141,14 @@ function QuickPrompt({ s }) {
           <option value="">All units</option>
           {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code}</option>)}
         </select>
-        <input className="grow" placeholder="Topic (optional)" value={topic} onChange={(e) => setTopic(e.target.value)} />
+        <input className="grow" placeholder="Topic (optional)" aria-label="Topic (optional)" value={topic} onChange={(e) => setTopic(e.target.value)} />
         {kind === 'mock' && (
           <label className="muted small">Questions
             <select value={count} onChange={(e) => setCount(Number(e.target.value))}>{[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}</select>
           </label>
         )}
       </form>
-      <textarea rows={isCustom ? 6 : 3} placeholder={isCustom ? 'Write your full instruction…' : 'Optional: paste notes or a paper\u2019s text (added as context)'} value={notes} onChange={(e) => setNotes(e.target.value)} />
+      <textarea rows={isCustom ? 6 : 3} placeholder={isCustom ? 'Write your full instruction…' : 'Optional: paste notes or a paper\u2019s text (added as context)'} aria-label={isCustom ? 'Your instruction' : 'Notes or paper text (optional)'} value={notes} onChange={(e) => setNotes(e.target.value)} />
       <button onClick={build} disabled={busy || (isCustom && !notes.trim())}>{busy ? 'Building…' : 'Generate prompt'}</button>
       {out?.error && <p className="banner bad">{out.error}</p>}
       {out?.prompt && (

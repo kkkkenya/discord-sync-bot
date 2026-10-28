@@ -34,18 +34,18 @@ export default function Notes({ s, refresh, focus, go }) {
       <p className="muted small">Paste your own notes, a textbook section or slide text. The AI turns it into CAT-style questions (derivations, numericals, explain-why) with model answers, for your mock-exam bank.</p>
       <p className="muted small">
         {Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length
-          ? `${Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length} file(s) synced for ${unit} — questions will be grounded in them.`
-          : `No files synced for ${unit} yet — sync them in Units to ground the questions in your material.`}
+          ? `${Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length} file(s) synced for ${unit}. The questions will be grounded in them.`
+          : `No files synced for ${unit} yet. Sync them in Units to ground the questions in your material.`}
       </p>
       {!s.ai && <p className="banner bad">No AI key for the selected provider. Pick another provider in the top bar, or run <code>setup.bat</code> to add one.</p>}
       <form onSubmit={send}>
-        <div className="row">
-          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+        <div className="row wrap">
+          <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unit">
             {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code} {u.title}</option>)}
           </select>
-          <input className="grow" placeholder="Topic (e.g. Mohr's circle, beam deflection)" value={topic} onChange={(e) => setTopic(e.target.value)} />
+          <input className="grow" placeholder="Topic (e.g. Mohr's circle, beam deflection)" aria-label="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} />
         </div>
-        <textarea rows={12} placeholder="Paste notes here — definitions, derivations, worked examples…" value={text} onChange={(e) => setText(e.target.value)} />
+        <textarea rows={12} placeholder="Paste notes here: definitions, derivations, worked examples…" aria-label="Notes" value={text} onChange={(e) => setText(e.target.value)} />
         <button disabled={busy || !s.ai || !unit || !topic.trim() || text.trim().length < 60}>{busy ? 'Writing questions…' : 'Generate questions'}</button>
       </form>
       <LimitNote s={s} unit={unit} topic={topic} go={go} what="model answers with long working" />

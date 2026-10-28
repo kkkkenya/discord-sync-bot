@@ -106,8 +106,10 @@ export function stats(today = nairobiDay()) {
     byUnit[s.unit] = (byUnit[s.unit] || 0) + s.minutes;
   }
   const minutesToday = data.sessions.filter((s) => nairobiDay(new Date(s.at)) === today).reduce((n, s) => n + s.minutes, 0);
-  // streak: days in a row (ending today or yesterday) with any study session, teach-back, mock or paper
-  const active = new Set([...data.sessions, ...data.teach, ...data.mocks, ...data.papers].map((x) => nairobiDay(new Date(x.at))));
+  // streak: days in a row (ending today or yesterday) with any study session, teach-back, mock, paper, checked
+  // answer or sub-topic audit
+  const audits = data.subtopics.filter((x) => x.auditAt).map((x) => ({ at: x.auditAt }));
+  const active = new Set([...data.sessions, ...data.teach, ...data.mocks, ...data.papers, ...data.attempts, ...audits].map((x) => nairobiDay(new Date(x.at))));
   let streak = 0;
   for (let d = active.has(today) ? today : addDays(today, -1); active.has(d); d = addDays(d, -1)) streak++;
   return { minutesWeek: byUnit, minutesToday, activeToday: active.has(today), streak };

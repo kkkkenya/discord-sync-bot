@@ -116,7 +116,7 @@ export default function Predictions({ s, focus, go, notify }) {
           </div>
           {msg && <p className="muted small" role="status">{msg}</p>}
           {p?.scanned.length > 0 && (
-            <p className="small warm">Scanned, no text: {p.scanned.map((f) => f.name).join(', ')}. Paste their questions below, or attach them when you use the Prompt builder.</p>
+            <p className="small warm">Scanned, no text: {p.scanned.map((f) => f.name).join(', ')}. Paste their questions below, or attach them when you use the Prompt Builder.</p>
           )}
           <Paste unit={unit} reload={reload} />
 

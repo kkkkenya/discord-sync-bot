@@ -1,5 +1,5 @@
 // Personal study dashboard on http://localhost:5190, plus your private DMs from the Study Hub bot.
-// Keys come from pc/.env (Discord token, Supabase, Anthropic); study/.env only adds OWNER_ID and PORT.
+// Keys come from pc/.env (Discord token, Supabase, AI keys) and community/.env (Gemini); study/.env only adds OWNER_ID and PORT.
 //   npm start   build the dashboard and run it
 import { config } from 'dotenv';
 import { createReadStream, existsSync, statSync } from 'node:fs';
@@ -227,7 +227,7 @@ const routes = {
   'POST /api/subtopics/suggest': async (q, { topicId }) => {
     const tp = data.topics.find((t) => t.id === topicId);
     if (!tp) throw Object.assign(new Error('pick a topic first'), { status: 400 });
-    if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Add sub-topics by hand, or use the Prompt builder to list them in another AI.'), { status: 400 });
+    if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Add sub-topics by hand, or use the Prompt Builder to list them in another AI.'), { status: 400 });
     const have = data.subtopics.filter((s) => s.topicId === tp.id).map((s) => s.name);
     const { subtopics } = await suggestSubtopics({ unit: tp.unit, topic: tp.name, have, context: contextFor(tp.unit, tp.name) });
     return { suggestions: subtopics.filter((s) => !have.some((h) => h.toLowerCase() === s.name.toLowerCase())) };
@@ -254,11 +254,12 @@ const routes = {
   },
   // Start a mock: bank questions for the unit first, generate more from its topics if needed (and an AI key is set).
   'POST /api/mocks': async (q, body) => {
+    if (body.restore) return add('mocks', body.restore); // undo a delete
     const unit = body.unit;
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     if (body.predicted) {
       const questions = predictedMock(predictFor(unit, nairobiDay()), data.paperq.filter((x) => x.unit === unit))
-        .map((x) => ({ q: x.q, a: `No model answer in your library: mark it against the ${x.source || 'paper'} marking scheme, or get a worked solution from the Prompt builder.`, marks: x.marks, topic: x.topic }));
+        .map((x) => ({ q: x.q, a: `No model answer in your library: mark it against the ${x.source || 'paper'} marking scheme, or get a worked solution from the Prompt Builder.`, marks: x.marks, topic: x.topic }));
       if (!questions.length) throw Object.assign(new Error('No past-paper questions mapped to topics yet. In Predictions, read the past papers and check their topics.'), { status: 400 });
       const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} predicted mock`, questions, predicted: true });
       return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
@@ -270,7 +271,7 @@ const routes = {
       const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), count: count - questions.length, context: contextFor(unit) });
       questions = questions.concat(extra.questions.map((x) => ({ q: x.q, a: x.a, marks: clamp(x.marks, 5, 25), topic: x.topic || '' })));
     }
-    if (!questions.length) throw Object.assign(new Error(aiReady() ? 'Nothing to build a mock from. Add topics in Units, or turn notes into questions (Notes).' : 'No banked questions for this unit and no AI key to write some. Use the Prompt builder (Mock exam questions) in another AI, or add a key.'), { status: 400 });
+    if (!questions.length) throw Object.assign(new Error(aiReady() ? 'Nothing to build a mock from. Add topics in Units, or turn notes into questions (Notes).' : 'No banked questions for this unit and no AI key to write some. Use the Prompt Builder (Mock exam questions) in another AI, or add a key.'), { status: 400 });
     const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} mock`, questions });
     return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
   },
@@ -288,7 +289,7 @@ const mockResult = (mock) => ({
   items: mock.questions.map((qq, i) => ({ q: qq.q, a: qq.a, marks: qq.marks, user: mock.answers?.[i]?.user || '', earned: mock.answers?.[i]?.earned ?? null, note: mock.answers?.[i]?.note || '' })),
 });
 
-// Submit a finished mock. With the Anthropic key it's marked in one call; without, the model answers are
+// Submit a finished mock. With an AI key it's marked in one call; without, the model answers are
 // returned and the dashboard lets you self-mark (then PATCH /api/mocks/<id> saves the score).
 async function submitMock(id, { answers = [] }) {
   const mock = data.mocks.find((m) => m.id === id);

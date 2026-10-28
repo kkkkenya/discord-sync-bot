@@ -76,6 +76,7 @@ export default function Progress({ s }) {
   const mocks = s.data.mocks.filter((m) => m.score != null);
   const avgMock = mocks.length ? Math.round(mocks.reduce((n, m) => n + (m.score / m.outOf) * 100, 0) / mocks.length) : null;
   const papers = s.data.papers.length;
+  const broke = s.data.attempts.filter((a) => a.verdict === 'wrong').length;
 
   return (
     <section id="progress" className="reveal">
@@ -83,7 +84,7 @@ export default function Progress({ s }) {
 
       <dl className="tiles">
         <div><dt>Topics</dt><dd>{s.data.topics.length}</dd></div>
-        <div><dt>Questions banked</dt><dd>{s.data.questions.length}</dd></div>
+        <div><dt>Answers checked</dt><dd>{s.data.attempts.length}{broke > 0 && <span className="muted small"> · {broke} broke</span>}</dd></div>
         <div><dt>Teach-backs</dt><dd>{s.data.teach.length}</dd></div>
         <div><dt>Papers</dt><dd>{papers}</dd></div>
       </dl>

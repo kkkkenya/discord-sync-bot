@@ -2,7 +2,7 @@
   "name": "esh-study",
   "private": true,
   "type": "module",
-  "description": "Personal study dashboard (localhost) + private DMs from the Study Hub bot: CAT countdown, recall cards, teach-backs, past papers.",
+  "description": "Personal study dashboard (localhost) + private DMs from the Study Hub bot: CAT countdown, past-paper predictions, weakspots, checked answers, teach-backs, mocks.",
   "engines": {
     "node": ">=22"
   },

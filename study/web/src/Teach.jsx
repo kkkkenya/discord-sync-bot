@@ -59,14 +59,14 @@ export default function Teach({ s, refresh, focus, go }) {
       <h2>Teach it back</h2>
       <p className="muted small">Explain a topic as if a classmate missed the lecture: what it is, the key equation and what each term means, when it applies, one worked example. If you get stuck, that's the gap to study.{s.coach ? ' The AI marks it and names the exact gaps.' : ''}</p>
       <form onSubmit={send}>
-        <div className="row">
-          <select value={unit} onChange={(e) => setUnit(e.target.value)}>
+        <div className="row wrap">
+          <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unit">
             {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code} {u.title}</option>)}
           </select>
-          <input list="topics" placeholder="Topic (e.g. Mohr's circle)" value={topic} onChange={(e) => setTopic(e.target.value)} />
+          <input className="grow" list="topics" placeholder="Topic (e.g. Mohr's circle)" aria-label="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} />
           <datalist id="topics">{topics.map((t) => <option key={t.id} value={t.name} />)}</datalist>
         </div>
-        <textarea rows={8} placeholder="Start with: 'Imagine you have…'" value={text} onChange={(e) => setText(e.target.value)} />
+        <textarea rows={8} placeholder="Start with: 'Imagine you have…'" aria-label="Your explanation" value={text} onChange={(e) => setText(e.target.value)} />
         <button disabled={busy || !unit || !topic.trim() || text.trim().length < 40}>{busy ? 'Marking…' : s.coach ? 'Get it marked' : 'Save teach-back'}</button>
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}

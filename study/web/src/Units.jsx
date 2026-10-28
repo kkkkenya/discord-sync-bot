@@ -156,7 +156,7 @@ function Library({ code, go }) {
     <div className="library">
       <div className="row">
         <button className="ghost" onClick={sync} disabled={busy || !lib.files.length}>{busy ? 'Syncing…' : `Sync files (${synced}/${lib.files.length})`}</button>
-        <input className="grow" placeholder="Search synced material…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="grow" placeholder="Search synced material…" aria-label={`Search ${code} synced material`} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       {lib.note && <p className="muted small">{lib.note}</p>}
       {!lib.files.length && <p className="muted small">Nothing in the server library for this unit yet.</p>}
@@ -229,7 +229,7 @@ function Unit({ u, s, refresh, go, notify }) {
             <button className="x" aria-label={`remove ${t.name}`} onClick={() => api('DELETE', `topics/${t.id}`).then(() => { notify(`Removed "${t.name}"`, () => api('POST', 'topics', t)); refresh(); })}>×</button>
           </span>
         ))}
-        <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
+        <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} aria-label={`Add topics to ${u.code}, comma separated`} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
       </div>
       {topics.length > 0 && (
         <div className="cover" role="img" aria-label={`${u.code}: ${covered}% covered`}>
@@ -242,7 +242,7 @@ function Unit({ u, s, refresh, go, notify }) {
           <span className="muted small">{green}/{topics.length} mastered</span>
         </div>
       )}
-      {pending && <p className="muted small next">Next to turn green: <b>{pending.t.name}</b> — {pending.m.next}.</p>}
+      {pending && <p className="muted small next">Next to turn green: <b>{pending.t.name}</b>. {pending.m.next}.</p>}
       <div className="row small">
         <button className="link" onClick={() => go('mock', { unit: u.code })}>timed mock</button>
         <button className="link" onClick={() => go('prompt', { unit: u.code })}>prompt pack</button>
@@ -276,7 +276,7 @@ export default function Units(props) {
               </button>
             )}
           </div>
-          <p className="muted small">A topic's colour follows the evidence (a teach-back scored 4/5+ and 2 exam questions solved at 70%+), not a tick. Hover a chip to see why, and what's missing. Click a chip to force a colour yourself — it shows "· you". ✓ means you've done a teach-back.</p>
+          <p className="muted small">A topic's colour follows the evidence (a teach-back scored 4/5+ and 2 exam questions solved at 70%+), not a tick. Hover a chip to see why, and what's missing. Click a chip to force a colour yourself: it shows "· you". ✓ means you've done a teach-back.</p>
           {s.data.units.map((u) => <Unit key={u.code} u={u} {...props} />)}
         </>
       )}

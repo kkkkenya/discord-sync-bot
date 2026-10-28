@@ -44,6 +44,17 @@ test('a predicted mock comes from the mapped questions; nothing mapped says why'
   assert.match(none.body.error, /Predictions/);
 });
 
+test('a deleted mock comes back whole on undo', async () => {
+  const m = (await srv.call('POST', 'mocks', { unit: 'ECU 300', predicted: true })).body;
+  const row = (await srv.call('GET', 'state')).body.data.mocks.find((x) => x.id === m.id);
+  await srv.call('DELETE', `mocks/${m.id}`);
+  const back = (await srv.call('POST', 'mocks', { restore: row })).body;
+  assert.deepEqual(back, row);
+  const mocks = (await srv.call('GET', 'state')).body.data.mocks;
+  assert.equal(mocks.filter((x) => x.id === m.id).length, 1);
+  assert.equal(mocks.length, mocks.filter((x) => x.id !== m.id).length + 1, 'no new mock was started');
+});
+
 test('reading papers without a synced library, and AI mapping without a key, explain themselves', async () => {
   const r = (await srv.call('POST', 'predict/parse', { unit: 'EMM 302' })).body;
   assert.equal(r.papers, 0);

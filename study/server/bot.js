@@ -5,7 +5,9 @@ import { ChannelType, Client, Events, GatewayIntentBits, Partials } from 'discor
 import cron from 'node-cron';
 import { coach, coachReady } from './coach.js';
 import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
-import { catDay, daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
+import { daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
+import { ERROR_TYPES } from './defs.js';
+import { KEY_LABEL, checkAnswer, flagCheckpoint, markBroke } from './practice.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
 import { hintFields, predictFor, teachFlags, weakspotsFor } from './weakspots.js';
@@ -18,6 +20,7 @@ const HELP = [
   '`predict EMM 302`: the topics most likely to come, from past papers and lecturer hints',
   '`hint EMM 302 exam will mainly focus on beta functions`: save what the lecturer said',
   '`weakspots EMM 302`: your highest-risk sub-topics and the mistakes you keep making',
+  '`mark EMM 302`: a past-paper question to try. Then `mark 142.5 MPa` checks your final answer, and `mark broke 3` logs the checkpoint where your working broke',
   '`log 45 EMM 302`: log 45 minutes of study',
   '`paper EMM 302 34/60 2023 CAT 1`: log a past paper score',
   '`stop`: end a teach-back',
@@ -54,7 +57,7 @@ export function todayText(today = nairobiDay()) {
   return lines.join('\n');
 }
 
-const COMMANDS = ['today', 'files', 'teach', 'log', 'paper', 'predict', 'hint', 'weakspots'];
+const COMMANDS = ['today', 'files', 'teach', 'log', 'paper', 'predict', 'hint', 'weakspots', 'mark'];
 
 // Links to a unit's files in the server's forum posts. Papers and CATs by default, or notes/slides/books.
 async function filesText(unit, notes) {
@@ -96,8 +99,83 @@ export function chunks(text, size = 1900) {
 }
 
 let mode = null; // { kind: 'teach', unit, topic }
+let marking = { questionId: null, unit: null, attempt: null, guess: null }; // the question `mark` gave you, and the last check
 
-export async function reply(text) {
+// A past-paper question for `mark EMM 302`: on the top weakspot's topic if one is listed, else the most likely topic,
+// else any; newest paper first.
+function questionFor(unit) {
+  const qs = data.paperq.filter((q) => q.unit === unit && q.text.length >= 20);
+  const weak = weakspotsFor(unit, nairobiDay()).critical[0];
+  const top = predictFor(unit, nairobiDay()).find((r) => !r.muted && r.questions);
+  const on = (topicId) => qs.filter((q) => q.topicId === topicId);
+  const pool = (weak && on(weak.topicId).length ? on(weak.topicId) : top && on(top.topicId).length ? on(top.topicId) : qs);
+  return [...pool].sort((a, b) => (b.year || 0) - (a.year || 0))[0] || null;
+}
+
+// "units", "sign", "algebra"… → an error type id, else null
+const errorTypeOf = (words) => {
+  const w = words.toLowerCase();
+  return w ? ERROR_TYPES.find((e) => e.id.startsWith(w) || e.id.split('-').some((p) => w.startsWith(p)) || e.label.toLowerCase().includes(w))?.id || null : null;
+};
+
+async function markText(t, { photo }) {
+  const rest = t.replace(/^mark\s*/i, '').trim();
+  if (photo) return 'Photos of your working aren\'t read yet (that comes later). For now, type your final answer: `mark 142.5 MPa`.';
+  const unit = /^[A-Za-z]{3}\s?\d{3}$/.test(rest) ? unitOf(rest) : null;
+  if (unit) {
+    if (!known(unit)) return `${unit} isn't one of your units. Add it on the dashboard first.`;
+    const q = questionFor(unit);
+    if (!q) return `No past-paper questions read for ${unit} yet. On the dashboard: Units → Sync all files.`;
+    marking = { questionId: q.id, unit, attempt: null, guess: null };
+    return [`**${q.source} Q${q.number}**${q.marks ? ` (${q.marks} marks)` : ''}`, q.text.length > 1500 ? `${q.text.slice(0, 1500)}…` : q.text, '', 'Solve it on paper, closed book, then reply with your final answer and its unit: `mark 142.5 MPa`.'].join('\n');
+  }
+  const broke = rest.match(/^broke\s+(\d+)\s*(.*)$/i);
+  if (broke) {
+    const a = data.attempts.find((x) => x.id === marking.attempt);
+    if (!a) return 'Check an answer first: `mark EMM 302`, then `mark <your answer>`.';
+    const n = Number(broke[1]);
+    const cp = a.checkpoints?.[n - 1];
+    if (!cp) return `Pick one of the checkpoints, 1 to ${a.checkpoints?.length || 0}.`;
+    const errorType = errorTypeOf(broke[2].trim()) || marking.guess?.errorType || cp.errorType || 'concept-gap';
+    const subtopicId = cp.subtopicId || marking.guess?.subtopicId || null;
+    markBroke({ id: a.id, step: n, subtopicId, errorType });
+    const sub = data.subtopics.find((s) => s.id === subtopicId);
+    return `Logged: your working broke at checkpoint ${n} (${cp.step})${sub ? ` · ${sub.name}` : ''} · ${ERROR_TYPES.find((e) => e.id === errorType).label}. Your weakspots are updated. Another one: \`mark ${a.unit}\`.`;
+  }
+  if (/^dispute\b/i.test(rest)) {
+    if (!marking.attempt) return 'Check an answer first: `mark EMM 302`, then `mark <your answer>`.';
+    flagCheckpoint({ id: marking.attempt });
+    return 'Saved: the checkpoints look wrong to you, so nothing is held against you. Get a verified solution from the Prompt Builder on the dashboard.';
+  }
+  if (!rest) return HELP;
+  if (!marking.questionId) return 'First get a question: `mark EMM 302` (your unit), solve it, then `mark <your final answer>`.';
+  const out = await checkAnswer({ unit: marking.unit, questionId: marking.questionId, answer: rest });
+  if (out.needKey) return `${out.message} On the dashboard, Check answer lets you type the key from your marking scheme.`;
+  if (out.verdict === 'unreadable') return out.note;
+  marking.attempt = out.attempt.id;
+  marking.guess = out.guess;
+  const key = `Key: **${out.key.answer}** (${KEY_LABEL[out.key.source]})`;
+  if (out.verdict === 'right') return [`✓ **Matches the key.** ${key}`, out.assumedUnit ? '_One of the two had no unit, so the numbers were compared as they are._' : '', `Another one: \`mark ${marking.unit}\`.`].filter(Boolean).join('\n');
+  return [
+    `✗ **Doesn't match.** ${key}${out.note ? `\n_${out.note}_` : ''}`,
+    ...(out.checkpoints.length ? ['', ...out.checkpoints.map((c) => `${c.n}. ${c.step}${c.equation ? `: \`${c.equation}\`` : ''}${c.value ? ` = ${c.value}` : ''}`), '', 'Find the first step your paper disagrees with and reply `mark broke <number>` (add the kind of mistake if you know it: `mark broke 2 units`). If a checkpoint looks wrong, reply `mark dispute`.'] : [out.checkpointNote || 'No checkpoints for this one. Open it in Check answer on the dashboard.']),
+  ].join('\n');
+}
+
+// The 20:30 nudge when nothing was logged today, shaped by the most urgent unit's stage. null when you studied.
+export function eveningText(today = nairobiDay()) {
+  if (stats(today).activeToday) return null;
+  const p = todayPlan(today)[0];
+  if (!p) return null;
+  const when = p.days != null && p.days >= 0 ? (p.days === 0 ? 'today' : p.days === 1 ? 'tomorrow' : `in ${p.days} days`) : null;
+  const weak = p.weak ? ` on ${p.weak.topic}` : '';
+  if (p.stage.id === 'exam-eve') return `**${p.code}** is ${when || 'next'}. Read your formula sheet (Study kit on the dashboard) and do one past-paper question: \`mark ${p.code}\`.`;
+  if (p.stage.id === 'last-minute') return `Nothing logged today, and **${p.code}** is ${when}. 20 minutes on your formula sheet (Study kit), then one past-paper question: \`mark ${p.code}\`.`;
+  if (p.stage.id === 'one-week') return `Nothing logged today. **${p.code}** is ${when}: one past-paper question${weak} keeps it moving: \`mark ${p.code}\`.`;
+  return `Nothing logged today. 15 minutes counts: one past-paper question (\`mark ${p.code}\`) or teach back a topic (\`teach ${p.code} <topic>\`).`;
+}
+
+export async function reply(text, { photo = false } = {}) {
   const t = text.trim();
   const word = t.split(/\s+/)[0].toLowerCase();
 
@@ -184,6 +262,7 @@ export async function reply(text) {
     const names = data.topics.filter((x) => h.topicIds.includes(x.id)).map((x) => x.name);
     return `Saved as a **${h.kind}** hint for ${unit}${names.length ? ` on ${names.join(', ')}` : ' (no topic matched: tag it on the dashboard)'}.`;
   }
+  if (word === 'mark') return markText(t, { photo });
   if (word === 'quiz' || word === 'card') return 'Flashcards are retired in Study Desk. Try `teach EMM 302 <topic>`, or a timed mock on the dashboard.';
   return mode ? 'Type `stop` to end this first.' : HELP;
 }
@@ -205,7 +284,7 @@ export function startBot() {
     if (msg.author.bot || msg.channel.type !== ChannelType.DM || msg.author.id !== owner) return;
     try {
       await msg.channel.sendTyping();
-      const text = await reply(msg.content);
+      const text = await reply(msg.content, { photo: msg.attachments.size > 0 });
       for (const part of chunks(text)) await msg.channel.send(part);
     } catch (e) {
       console.error('DM reply failed:', e);
@@ -218,11 +297,8 @@ export function startBot() {
     // 07:00 plan, 20:30 nudge if nothing was done today. Nairobi time.
     cron.schedule('0 7 * * *', () => dm(todayText()).catch((e) => console.error('morning DM failed:', e.message)), { timezone: 'Africa/Nairobi' });
     cron.schedule('30 20 * * *', () => {
-      const s = stats();
-      if (s.activeToday) return;
-      const next = data.units.map((u) => catDay(u)).filter(Boolean).sort()[0];
-      const d = next ? daysBetween(nairobiDay(), next) : null;
-      dm(`Nothing logged today${d !== null && d >= 0 ? ` and CATs are ${d} day${d === 1 ? '' : 's'} away` : ''}. 15 minutes counts: reply \`today\` for your plan.`).catch((e) => console.error('evening DM failed:', e.message));
+      const text = eveningText();
+      if (text) dm(text).catch((e) => console.error('evening DM failed:', e.message));
     }, { timezone: 'Africa/Nairobi' });
   });
 

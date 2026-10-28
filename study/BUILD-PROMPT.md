@@ -1,248 +1,144 @@
-# Build prompt: Study Desk, from "I remember it" to "I understand it and can teach it"
+# Build Prompt: Study Desk — Personal Weakspot Analysis, Exam Predictions & Deep Context Engine (No Flashcards)
 
-Paste everything below the line into DeepSeek (or any coding model) at the start of a session.
-Paste it again at the start of each new session. It is long on purpose: it tells the model who you are,
-what is already built, what "understanding" means for you, and the rules for changing your code.
+Paste everything below into DeepSeek, Claude, or Gemini at the start of a coding session. Paste it again at the start of each new session so the model knows the codebase, the product vision, and the rules.
 
----
+## 1. Product Vision & Who This Is For
 
-## 1. Who I am and what I need
+I run **Engineering Study Hub** at Kenyatta University (KU), and I am building **Study Desk** (`study/` inside `C:\Users\grego\Downloads\discord-sync-bot`, branch `study-dashboard`).
+CAT and exam dates are uncertain because of the lecturers' strike: every date-driven feature must work with a date set, changed, or `TBA`.
 
-I'm a 3rd-year Mechanical Engineering student at Kenyatta University (KU), Year 3 Semester 1 (3.1).
-My 2nd CATs are 2–6 November 2026 and my end-of-semester exams start 30 November 2026.
+I want to **test this on my own 3.1 Mechanical Engineering units first**, and then roll it out to **50–100 paying KU engineering students**—without premature cloud-scaling work yet.
 
-My goal is to **understand** what I'm learning, well enough to:
-1. solve a CAT question I have never seen before
-2. explain *why* each step works: where an equation comes from, what each term means, and when it stops applying
-3. teach the topic to a classmate who missed the lecture, and answer their follow-up questions.
+**Strict Product Rules (What Makes Study Desk a Necessity):**
+1. **NO FLASHCARDS EVER.** Remove and never build flashcard decks, spaced-repetition card flipping (`Recall`), or SM-2 card scheduling. Engineering is learned by diagnosing conceptual/mathematical weakspots and solving problems step by step.
+2. **Course / Year / Sem Cohort Auto-Sorting (with Edit Override):** Students pick their Course (`EMM`, `EAR`, `EBE`, `ECV`, `EEE`, `EBM`, `EPL`), Year (`1–5`), and Semester (`1` or `2`) to auto-load their units, with an easy Edit button for retakes or dropped units.
+3. **4 Explicit Study Stages:** Asked explicitly during setup and planning (`Adequate Prep`, `1-Week Mode`, `Last-Minute Mode`, `Exam-Eve Triage`) to control whether the student sees first-principles derivations, high-yield shortcuts, or emergency formula sheets.
+4. **Personal Sub-Topic & Concept Weakspot Analysis:** Students can break any unit topic into sub-topics and core concepts, run a personal diagnostic/self-audit, and see their exact weakspots cross-referenced against past-paper mark weightings and recurring operation errors (`sign convention`, `unit conversion`, `concept gap`, `algebra/calculus slip`).
+5. **Past-Paper Prediction Generator + Lecturer Hints:** Ranks topics and sub-topics by past-paper mark frequency plus classroom hints (e.g., *"the exam will mainly focus on beta functions"*).
+6. **Deep Context Prompt Builder for External AI:** Built-in API calls have context and effort limits. Whenever a task needs heavy problem solving, full derivations, or deep weakspot tutoring, warn the student upfront and generate a **detailed, context-rich Prompt + `<UNIT>-context.md` file** (packing synced notes, past papers, lecturer hints, and the student's personal weakspot profile) for them to upload to their own AI (Claude, DeepSeek R1, ChatGPT).
+7. **Step-by-Step Checkpoint Feedback (Photo or Final Answer + Operations):** Students submit a photo of handwritten working or just their final answer + operations. If wrong, dissect the solution into numbered intermediate checkpoints with step solutions so they countercheck their own paper, pinpoint the exact broken step, and feed that data into their Personal Weakspot Analysis.
 
-You are helping me build my personal study tool, called **Study Desk**. It's a small web dashboard on my
-own laptop, plus a Discord bot that DMs only me. Your job is to make it the best possible tool for
-*understanding* engineering. Tracking hours is the easy part. Every feature should check or deepen what I understand.
+## 2. Before Writing Code in a Session, Ask These Setup & Plan Questions
 
-**Studying comes before building.** My CATs are days away. Each feature must be small enough to finish,
-test and commit in one short session. If a request would take longer, split it and tell me the smallest
-useful first piece. Never leave the app broken at the end of a session.
+At the start of a new build or study-setup session, ask these questions in one message, wait for my answers, and propose a short plan before writing code:
 
-## 2. Before you write any code, ask me these questions
+1. **Course, Year & Semester:** Which cohort (`EMM` Mechanical, `EAR` Aerospace, `EBE` Biosystems, `ECV` Civil, `EEE` Electrical, `EBM` Biomedical, `EPL` Energy/Petroleum; Year `1–5`; Sem `1–2`) are we testing with, and do any auto-sorted units need editing?
+2. **Current Study Stage (Pick 1 of the 4 Modes):**
+   - **Adequate Prep (`adequate` — 2+ weeks out):** Fundamentals, first principles, derivations, and full sub-topic conceptual mastery.
+   - **1-Week Mode (`one-week` — 3–7 days out):** Main high-yield predicted topics, standard solving recipes, and shortcuts.
+   - **Last-Minute Mode (`last-minute` — 24–72 hours out):** Formula sheets, unit/symbol checks, shortcuts, and high-risk weakspots.
+   - **Exam-Eve Triage (`exam-eve` — <24 hours):** Step-by-step walkthroughs of the top 1–2 predicted questions + 1-page survival sheet.
+3. **Lecturer Hints & Known Weakspots:** Did the lecturer emphasize or exclude specific topics in class (e.g., *"focus on beta functions"*), and which sub-topics feel shaky right now?
+4. **Target Feature Slice:** Which feature slice from Section 4 are we building and testing in this session?
 
-Ask them all in one message, wait for my answers, then write a short plan. Don't code before I agree.
+## 3. What Exists Today vs What Is Still To Build (Read Before Changing)
 
-1. Which units am I taking in 3.1, and what is the CAT date for each one if I know it?
-2. For each unit, what does the lecturer usually ask in CATs: derivations, numericals, definitions, sketches? How many marks and how long?
-3. Which 3 topics feel weakest right now, and why? (Lost in the maths? Don't get the physics? Mix up formulas?)
-4. How much time can I study on a normal day, and when (morning, evening, between classes)?
-5. Do I study more on my laptop or my phone? (The dashboard runs on my laptop. Discord works on both.)
-6. Do I have an AI API key, and which one: Anthropic (Claude), DeepSeek, or neither?
+Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` on branch `study-dashboard`. Read the files before modifying them. The build order and "Done when" checks are in `PHASES.md`; the `Status` column below is kept current at the end of every phase.
 
-## 3. What already exists (read the code before changing it)
+| File | What it does today | Status |
+|---|---|---|
+| `study/server/index.js` | Node `http` server on `127.0.0.1:5190`: JSON API under `/api/*`, serves the built frontend from `study/dist/`. Generic list routes: `POST /api/<list>`, `PATCH /api/<list>/<id>`, `DELETE /api/<list>/<id>` for the lists in `store.js` `LISTS`. | exists |
+| `study/server/store.js` | Local JSON store at `study/data/study.json` (git-ignored; `STUDY_DATA_DIR` overrides it for tests). Lists: `units, topics, sessions, papers, teach, questions, mocks` plus empty `subtopics, attempts, hints` (Phase 4+), and `settings`. Legacy `cards`/`reviews` stay in old files, untouched. Backs the file up to `data/backups/` on the first start of a build with a newer `VERSION`. | exists |
+| `study/server/defs.js` | Shared definitions: study stages, self-audit values, sub-topic kinds, error types, weakness and hint weights, `TBA`. | exists (Phase 0) |
+| `study/server/plan.js` | Daily plan (top 3 units, one task each) and study stats. | exists |
+| `study/server/mastery.js` | Evidence-based topic colour (red/amber/green). | exists |
+| `study/server/library.js` | Unit catalogue from `lib/units.json`, the KU `CALENDAR` from `lib/config.js`, and each unit's files from the Supabase `files` table. | exists |
+| `study/server/ingest.js`, `extract.js` | Context library: downloads a unit's Discord files, extracts text (PDF/DOCX/PPTX) into `study/data/library.json`; `contextFor(unit, topic)` returns grounding text. | exists |
+| `study/server/bot.js` | DM-only Discord bot (`OWNER_ID` only). Commands: `today, files, teach, log, paper, help, stop`. 07:00 plan and 20:30 nudge (Nairobi). | exists |
+| `study/server/coach.js` | Marks Feynman teach-backs (score 1-5, gaps, follow-up question). | exists |
+| `study/server/brain.js` | AI: notes to CAT questions, mock question fill, mock marking. | exists |
+| `study/server/prompt.js` | Prompt builder for external AI, grounded in the synced library (short context cap). | exists; deep `.md` pack is Phase 7 |
+| `study/server/ai.js` | Shared AI provider wrapper (`Gemini` default / `DeepSeek` / `Claude`): `structured(schema, system, content)`, `aiReady()`. | exists |
+| `study/server/insights.js` | Pure activity/performance functions (WIP, not wired into the UI; its "deeper dive" still reads retired flashcard reviews). | superseded by Phase 6 |
+| `study/web/src/*.jsx` | React frontend: `Hero, Today, Units, Notes, Teach, Mock, Papers, Prompt, Progress, Timer, CheckIn, Onboarding`. Plain CSS in `styles.css`. | exists |
+| `study/server/cohort.js` | Course / year / semester to units. | Phase 2 |
+| `study/server/stages.js` | Per-unit study stage from the unit's own date, with overrides. | Phase 3 |
+| `study/server/analysis.js`, `web/src/Analysis.jsx` | Sub-topics, self-audit, weakspot matrix. | Phases 4 and 6 |
+| `study/server/predict.js`, `web/src/Predictions.jsx` | Past-paper question map, lecturer hints, predictions. | Phase 5 |
+| `study/server/context-pack.js` | `<UNIT>-<TOPIC>-context.md` pack + limit guard. | Phase 7 |
+| `web/src/Practice.jsx` | Checkpoint dissection (answer + operations, then photo). | Phases 8 and 9 |
+| Bot commands `predict, hint, weakspots, mark` | | Phases 5-9, aligned in Phase 11 |
 
-Everything is in `study/` inside my bot repo `C:\Users\grego\Downloads\discord-sync-bot`, on the git branch
-`study-dashboard`. Read these files first. Don't guess how they work.
+**Do not modify files outside `study/`** (`api/`, `lib/`, `pc/`) unless explicitly requested. Reading `lib/` is fine.
 
-| File | What it does |
-|---|---|
-| `study/server/index.js` | Node `http` server on `127.0.0.1:5190`: JSON API under `/api/*`, serves the built dashboard from `study/dist/`. Generic list routes: `POST /api/<list>`, `PATCH /api/<list>/<id>`, `DELETE /api/<list>/<id>`. |
-| `study/server/store.js` | All my data in one JSON file, `study/data/study.json` (git-ignored). Lists: `units, topics, cards, reviews, sessions, papers, teach, questions, mocks`. The shape of each is in the comment at the top. |
-| `study/server/plan.js` | Recall scheduling (SM-2 style: grades 1 forgot, 2 hard, 3 good, 4 easy. No review is ever scheduled after the unit's CAT), the daily plan (3 units, weakest and soonest first) and stats (minutes, streak). |
-| `study/server/library.js` | Unit list from `lib/units.json`, the KU calendar from `lib/config.js` (`CALENDAR`), and the unit's files from the bot's Supabase `files` table (past papers, CATs and notes the uploader posted to Discord). |
-| `study/server/bot.js` | DM-only Discord connection, answers only `OWNER_ID`. Commands: `today, files, quiz, teach, log, paper, card, stop, help`. 07:00 plan DM, 20:30 nudge. Plain typed replies only: **buttons and slash commands go to Vercel, not here.** |
-| `study/server/coach.js` | Marks a teach-back (score 1–5, gaps, follow-up question, cards for the gaps). |
-| `study/server/ai.js`, `brain.js` | Shared AI helper (`structured(schema, system, content)`) plus notes → cards and questions, generating mock questions, marking a mock. |
-| `study/web/src/*.jsx` | React dashboard: Hero (countdown), Today, Units, Notes, Recall, Teach, Mock, Papers, Progress, Timer. GSAP and Lenis for motion, plain CSS in `styles.css` with light and dark colour tokens. |
-| `study/setup.js` / `setup.bat` | Asks for my Discord user ID and an optional AI key (hidden input), checks them, writes `study/.env`. |
-| `study/start.bat`, `make-shortcut.ps1` | The **Study Desk** shortcut: builds the dashboard and runs the server minimised. If it's already running, it just opens the browser. |
+## 4. Prioritized Feature Roadmap (No Flashcards — Personal Analysis & Context First)
 
-The rest of the repo is my **community** Discord bot (Engineering Study Hub): `api/` and `lib/` run on
-Vercel, `pc/` runs on my PC. **Don't change anything outside `study/`** unless I ask. The Study Desk only
-*reads* `lib/units.json`, `lib/config.js` and the Supabase `files` table. It never writes to Supabase
-or posts in the server.
+Build these one at a time in this exact order.
 
-## 4. What "understanding" means here: build around these, in this order
+### 4.1 Remove Flashcards + Cohort Auto-Sorting & 4-Stage Prep Engine (Priority #1)
 
-Each idea below is a feature request. Each has a **"done when"** check. Build them one at a time, in this order unless I say otherwise.
+- **Retire Flashcards Completely:** Remove `Recall.jsx`, SM-2 scheduling, and all card generation from UI, server, and bot.
+- **Cohort Auto-Sorting (`Course → Year → Sem`):** Auto-populate units for the chosen department, year, and semester using `lib/units.json`, `lib/threads.json`, and `files` folder metadata, with an **"Edit Units"** drawer for retakes/electives.
+- **4-Stage Prep Mode (`adequate` | `one-week` | `last-minute` | `exam-eve`):** Explicitly asked during setup and planning; dynamically changes the daily plan, sub-topic recommendations, and prompt templates.
 
-### 4.1 Mastery is earned, not ticked (highest priority)
-Right now I set a topic to red, amber or green by hand, which means I can fool myself. Make the status follow evidence:
-- **Green** only when all three are true:
-  - a teach-back on that topic scored 4/5 or better,
-  - at least 85% of that topic's recall reviews in the last 14 days were "good" or "easy" (minimum 6 reviews),
-  - at least 2 exam-style questions on that topic were solved in a mock or past paper with 70% or more of the marks.
-- **Amber** when at least one of those is true.
-- **Red** otherwise.
-- Cards and questions need a `topic` field so this can be counted. Existing cards without a topic count only for the unit.
-- Show *why* a topic has its colour: "Teach-back 3/5 (needs 4) · recall 91% · 1 of 2 questions".
-- Keep a manual override, but show it as "marked green by you" so I can tell the difference.
+**Done when:** There are zero flashcards in the app, picking `EMM · Year 3 · Sem 1` loads your 3.1 units with edit controls, and switching Study Stages reshapes `Today`.
 
-**Done when:** a topic I've never been tested on can't show green, and the dashboard tells me the exact next step to make it green.
+### 4.2 Personal Sub-Topic & Concept Weakspot Analysis (`server/analysis.js` + `Analysis.jsx`) (Priority #2)
 
-### 4.2 Confidence before the answer (calibration)
-Before revealing a recall card or a mock answer, ask "How sure are you?" (guessing / fairly sure / certain).
-Record it with the grade. On Progress, show my **calibration**: how often I was right when I said "certain".
-If I'm certain and wrong more than 20% of the time on a topic, flag it as a "false confidence" topic. These go in the daily plan before topics I know are weak.
+Let students run a personal analysis so they know exactly which sub-topics, concepts, and operations are holding them back:
+- **Sub-Topic Decomposition:** Break each unit Topic into granular **Sub-Topics & Concepts** (e.g., governing principle, derivation assumptions, sign conventions, standard calculation method, boundary conditions).
+- **Personal Diagnostic / Self-Audit:** Let the student rate sub-topics (`Solid` / `Shaky` / `Stuck` / `Untested`) or take a quick 2-question diagnostic check per topic.
+- **Automatic Weakspot Tracking from Mistakes & Teach-Backs:** Every failed step checkpoint (Section 4.5) and every gap in a Feynman teach-back tags the specific **Sub-Topic** and **Failure Mode** (`concept gap`, `wrong governing equation`, `sign convention`, `unit conversion`, `algebra/calculus slip`, `boundary condition`).
+- **Weakspot Dashboard:** Shows:
+  1. **Critical Sub-Topic Weakspots:** Ranked by `Predicted Exam Weight × Personal Weakness`.
+  2. **Operation Error Breakdown:** Visualizes *why* the student loses marks across a unit (e.g., unit conversions vs. conceptual gaps vs. sign conventions).
 
-**Done when:** after 20 reviews, Progress shows calibration per unit, and false-confidence topics come first in Today.
+**Done when:** For any unit, you can view a sub-topic tree, run a personal self-audit, and see a ranked list of your weakest sub-topics and most common operation errors.
 
-### 4.3 "Why" cards alongside "what" cards
-Engineering understanding is mostly *why* and *when*. When cards are generated (Notes, teach-back gaps), make
-at least half of them one of these types, and store the type on the card:
-- **why**: "Why does the bending stress formula assume plane sections remain plane?"
-- **when-not**: "When does Bernoulli's equation NOT apply? Give two conditions."
-- **derive**: "Derive the torsion equation T/J = τ/r starting from shear strain." (graded against the key steps, not the final line)
-- **units**: "Check the units of σ = My/I." (dimensional analysis)
-- **trap**: a common mistake: "A student uses diameter instead of radius in τ = Tr/J. What happens to the answer?"
-- **what**: plain fact or formula (allowed, but no more than half).
+### 4.3 Past-Paper Prediction Generator + Lecturer Hints (`server/predict.js`) (Priority #3)
 
-In Recall, let me filter by type, so on a given day I can drill only "derive" or "when-not" cards.
+- **Past-Paper Topic & Sub-Topic Map:** Parse synced past papers and CATs in `library.json` into individual questions with marks, year, and paper type (`CAT 1`, `CAT 2`, `Exam`), mapping each to a Topic and Sub-Topic. Flag scanned image-only PDFs clearly.
+- **Lecturer Hints (`lecturerNotes`):** Let the student add classroom hints per unit (e.g., *"the exam will mainly focus on beta functions"*, *"skip thick cylinders"*).
+- **Dynamic Re-Weighting:** Boost lecturer-focused topics (`2.5x` weight, **"Pinned by Lecturer"** badge), mute excluded topics in `one-week` / `last-minute` / `exam-eve` modes, and feed the prediction weights directly into the Personal Weakspot ranking and **Predicted Mock Generator**.
 
-**Done when:** generated sets have a mix of types, and I can filter Recall by type.
+**Done when:** Adding *"the exam will mainly focus on beta functions"* pins `Beta functions` to #1 in Predictions, elevates its sub-topics in Personal Weakspot Analysis, and weights it first in `Today` and generated mocks.
 
-### 4.4 My mistake log (error notebook)
-Every time I lose marks (a mock, a past paper, a card I forgot), let me log *why* in one tap:
-**concept** (didn't understand the idea), **method** (knew the idea, wrong approach), **maths/algebra slip**,
-**units/conversion**, **misread the question**, **ran out of time**, **forgot a formula**.
-- Mock marking should suggest the category for each lost mark. I confirm or change it.
-- Progress shows the counts per unit, plus the trend over the last 3 weeks.
-- The daily plan uses it:
-  - lots of "concept" mistakes → a teach-back
-  - "maths slip" → timed drill questions
-  - "forgot formula" → formula cards
-  - "ran out of time" → a timed mock
-- Each mistake can be turned into a card with one click ("trap" type).
+### 4.4 Deep Context & Effort-Limit Prompt Builder (`Prompt.jsx` + `server/context-pack.js`) (Priority #4)
 
-**Done when:** after a marked mock I can categorise each lost mark in under a minute, and Today changes because of it.
+Because the built-in AI has context window and reasoning-effort limits on complex engineering problems:
+- **Upfront Context & Effort Disclaimer:** Before running heavy derivations, complex problem solutions, or deep weakspot tutoring, warn the student when the built-in AI may truncate steps or slip on math, and offer a 1-click handoff to the **Prompt Builder**.
+- **Comprehensive Prompt Generator (1-Click Copy):** Generates a deeply structured prompt tailored to external reasoning models (Claude, DeepSeek R1, ChatGPT) that embeds:
+  - Unit code, title, and active **Study Stage** (`adequate` = first principles & full derivations; `one-week` = high-yield patterns & shortcuts; `last-minute` = formulas, units & traps; `exam-eve` = step-by-step survival walkthrough).
+  - All **Lecturer Hints** for the unit.
+  - The student's **Personal Weakspot Profile** for the selected topic (listing the exact sub-topics marked `Stuck`/`Shaky` and their top mistake categories so the external AI targets their exact blind spots).
+  - Strict formatting instructions requiring numbered intermediate checkpoints with SI units at every step.
+- **Full Context `.md` Pack (`<UNIT_CODE>-<TOPIC>-context.md` Download):** Exports a single Markdown file containing all relevant extracted past-paper questions, CATs, synced lecture notes from `library.json`, and the student's recent failed checkpoints—plus a clear checklist of which original PDFs/diagrams to attach alongside the `.md` file.
 
-### 4.5 Past papers become a topic map (what actually gets asked)
-The server already has past papers and CATs for my units (`library.js` → Supabase `files`. Open them via the
-Discord link). Add: "Analyse this paper" for a PDF, which:
-- downloads the attachment through the Discord message link, using the bot token from `pc/.env` (for reference, the PC bot reads PDF text with `pdfjs-dist` in `pc/src/uploader/extract.js`). Scanned papers may have no text: say so clearly and let me paste the questions instead
-- splits it into questions with their marks and maps each to one of my topics (or suggests a new topic)
-- saves them to the `questions` bank, tagged with the paper and year.
+**Done when:** From any weak sub-topic or past-paper question, one click downloads `<UNIT_CODE>-<TOPIC>-context.md` and copies a complete, stage- and weakspot-aware prompt ready to upload to an external AI.
 
-Then show, for each unit, a **topic frequency table**: how often each topic appeared, and its average marks.
-The daily plan's priority becomes roughly *(how often it's asked × marks) × (how weak I am on it) × (how close the CAT is)*.
+### 4.5 Step-by-Step Checkpoint Feedback: Photo OR Final Answer + Operations (Priority #5)
 
-**Done when:** for EMM 302 I can see which 3 topics carry the most marks across past papers, and Today reflects it.
+- **Two Fast Submission Modes:**
+  1. **Final Answer + Operations:** Student enters just their final answer + units (e.g., `142.5 MPa`) and optionally a 1-line summary of the operations they performed.
+  2. **Photo Upload (Dashboard & Discord DM):** Student uploads or DMs a photo of their handwritten working. If vision/effort limits apply, fall back cleanly to Checkpoint Dissection or the Prompt Builder.
+- **Step-by-Step Dissection & Countercheck:**
+  - When an answer is wrong, dissect the solution into **3 to 6 numbered Operation Checkpoints**, displaying the intermediate equation and solved value at each step.
+  - The student counterchecks their own paper step by step, clicks **"Broke here ❌"** on the diverging step, and tags the **Sub-Topic** + **Operation Error Type**—which immediately updates their **Personal Weakspot Analysis** (Section 4.2).
 
-### 4.6 Worked example → faded → on my own
-For a numerical topic, generate a 3-step ladder:
-1. a **fully worked example**: every step written out, with the reason for each step
-2. the **same type of problem with different numbers**, with some steps blanked out for me to fill in
-3. a **fresh problem** I solve alone, marked step by step (method marks as well as the final answer).
+**Done when:** Submitting a wrong final answer displays numbered intermediate step solutions, lets you click the exact step where your paper diverged, and logs that sub-topic and error type into your Personal Weakspot Analysis.
 
-I move up a level only after passing the one before. Steps I get wrong become "trap" cards.
+### 4.6 Stage-Adaptive Study Artifacts: Worked Ladders, Shortcuts & Printable Formula Sheets (Priority #6)
 
-**Done when:** I can run the ladder for one topic (e.g. Mohr's circle) from start to finish on the dashboard.
+- **Adequate Prep (`adequate`):** 3-step problem ladders (1. Fully worked example with physical reasons → 2. Faded steps to fill in → 3. Solo problem) + Feynman concept teach-backs.
+- **1-Week Mode (`one-week`):** High-yield method recipes and calculation shortcuts for the top predicted sub-topics.
+- **Last-Minute & Exam-Eve (`last-minute` / `exam-eve`):** Auto-generated printable **Unit Formula & Shortcut Sheet** with symbol definitions, SI units, sign conventions, **when the formula does NOT apply**, and the student's personal recurring traps.
 
-### 4.7 Photo of my handwritten working
-Most of my working is on paper. Let me upload a photo (on the dashboard, or as an image attachment in my
-Discord DM with the bot) of a solved question. The AI reads it, marks it against the model answer step by
-step, names the first wrong step, and logs any lost marks in the mistake log. The model must support image
-input. If the one in use doesn't, say so plainly instead of guessing.
+## 5. Rules for Changing Code
 
-**Done when:** I DM a photo of a solution with `mark EMM 302 Q3` and get step-by-step marks back.
+- **Read before writing:** Open every file you touch and its callers. Match existing style: ES modules, 2-space indents, single quotes, small functions, plain CSS tokens in `styles.css`. No TypeScript, Tailwind, UI frameworks, or external databases.
+- **Never build flashcards:** All learning, testing, and mastery tracking must flow through **Sub-Topic Analysis**, **Step-by-Step Checkpoints**, **Teach-Backs**, and **Past-Paper/Mock Problems**.
+- **Preserve student data:** Old `study.json` files must load cleanly with safe defaults. Always test against a copy of `study/data/study.json` and restore it afterwards.
+- **All AI calls go through `study/server/ai.js`:** Validate structured JSON responses and degrade gracefully to the **Deep Context Prompt Builder** whenever no key is set or when context/effort limits would hurt answer quality.
+- **Secrets:** Never hardcode or commit API keys. Keep `.env`, `data/`, and `dist/` git-ignored.
 
-### 4.8 Teach mode for real people
-I want to be able to teach classmates. From a teach-back that scored 4/5 or better, generate:
-- a **one-page explainer** in my own words (cleaned up, not rewritten): definition, key equation and every term,
-  when it applies, one worked example, 3 common mistakes
-- **3 check questions** to ask the people I'm teaching, with answers
-- a **5-minute lesson outline** (what to say first, what to draw, which question to ask).
+## 6. Session Workflow
 
-Show it so I can copy it or download it as Markdown. **Never post anything to the Discord server
-automatically.** If I want to share it, I'll paste it myself.
-
-**Done when:** I can produce a teachable one-pager for any topic I've mastered.
-
-### 4.9 Blank-page brain dump
-For a topic, give me a timer (5 minutes) and an empty box: "Write everything you know about X." Then compare it
-with the topic's cards, questions and teach-back, and list what I left out, ranked by how often it shows up
-in past papers. The missed items become cards.
-
-**Done when:** a 5-minute dump on a topic gives me a ranked list of what I forgot.
-
-### 4.10 Interleaved practice
-In Recall and Mock, add a "mixed" mode that rotates between my units and topics instead of drilling one at a time
-(practising them mixed is harder, and it's what the exam does). Default the morning DM `quiz` to mixed.
-
-### 4.11 Weekly review DM (Sunday 18:00 Nairobi)
-One message: minutes per unit, topics that turned green this week, false-confidence topics, top 3 mistake
-categories, mock or paper scores vs last week, and the 3 things to fix next week. Under 1,500 characters.
-End with: "Reply with how you'd rate your week (1–5) and one thing you'll change." Save my reply.
-
-### 4.12 Formula sheet per unit
-Build it automatically from "what" and "derive" cards plus the questions bank: every formula with what each
-symbol means, its units, and when it doesn't apply. Printable (a clean print stylesheet). If a formula has no
-"when-not" card yet, flag it.
-
-## 5. Rules for changing my code
-
-**Read before writing.** Open every file you'll touch, and the files that call into it. Match the existing
-style: ES modules, 2-space indents, single quotes, small functions, short comments that say *why*, plain CSS
-using the colour tokens in `:root`. Don't add TypeScript, Tailwind, a database, a UI kit or a router.
-
-**Keep it small.** No new dependency unless it saves a lot of code. Tell me what it is and why first.
-Prefer extending the existing JSON store and the generic list routes over new systems. When you change the
-shape of data in `study.json`, old data must still load: give missing fields sensible defaults, and never delete my data.
-
-**AI calls.**
-- Every AI call goes through `study/server/ai.js`. The code currently uses Claude through the Anthropic SDK.
-  If I'm using DeepSeek instead, add a provider switch in `ai.js` (env `AI_PROVIDER=anthropic|deepseek`), using DeepSeek's
-  OpenAI-compatible API (`https://api.deepseek.com`, model name from env `AI_MODEL`). Keep the same
-  `structured(schema, system, content)` signature, so nothing else changes. DeepSeek's JSON mode doesn't
-  enforce a schema: validate the result yourself and retry once with the validation error if it's wrong.
-- Check what the provider actually supports (image input, JSON output) before building a feature on it.
-  If it's missing, the feature says so in the UI instead of failing silently.
-- Every AI feature must still work in a reduced way without a key (self-marking, model answers shown, cards typed by hand).
-- Prompts must ask for KU-CAT-level technical precision: exact equations, sign conventions, assumptions, units.
-- Generated cards and questions are **suggestions**: show them for me to keep, edit or drop before they go into Recall.
-  Cards I write or edit myself help me learn more than ones I just accept.
-
-**Secrets.**
-- Never ask me to paste a key into the chat, never hardcode one, never commit one.
-- New keys go in `study/setup.js`: hidden input, "Enter keeps the current value", a live check of the key
-  (one cheap API call) with a clear message if it fails. Add the variable name, with no value, to `study/.env.example`.
-- `pc/.env` and `study/.env` are git-ignored. Keep them that way.
-
-**Discord.**
-- The study bot answers only `OWNER_ID`, in DMs only. It must never post in server channels.
-- No buttons, select menus or slash commands for the study bot: those interactions are delivered to the Vercel half, which
-  doesn't know about Study Desk. Use typed commands. Add every new command to `HELP`.
-- Messages over 2,000 characters must be split with `chunks()` in `bot.js` (it splits on line breaks so links stay whole).
-- Times are Nairobi time (`Africa/Nairobi`).
-
-**Dashboard.**
-- Every save that can fail shows the error (the app already shows a banner for unhandled rejections. Use it, don't hide errors).
-- Works at phone width (375 px) with no sideways scrolling, and in light and dark mode.
-- Animate only `transform` and `opacity`, using `useGSAP` with a scope. Respect `prefers-reduced-motion` (`calm` in `App.jsx`).
-- Buttons and inputs need labels a screen reader can read. Keep the visible focus outline.
-
-**Plain language.** All text I read (UI, DMs, errors) is short, direct and specific. Name the next action
-("Do one timed EMM 302 paper"), not a vague one ("keep going!"). No emoji walls, no hype words.
-
-## 6. How to work in each session
-
-1. Restate the one feature we're doing and its "done when" check. If anything is unclear, ask first.
-2. List the files you'll change and why, in a few lines.
-3. Make the change.
-4. **Test it yourself before telling me it's done:**
-   - `cd study` then `npx vite build`: must succeed with no errors.
-   - Start the server (`node server/index.js`) and exercise the new API routes with `curl` or a small script,
-     including the error cases (missing fields, no AI key, server data from before the change).
-   - For bot commands: call the exported `reply()` from `server/bot.js` in a small Node script (that's how it was tested before), using `node --env-file=../pc/.env`.
-   - For learning logic (mastery rules, calibration, scheduling): write a small script with made-up data and check the numbers by hand.
-   - Use a **copy** of `study/data/study.json` for tests, or restore it afterwards. Never wipe my real data.
-5. Tell me exactly what you tested, what passed, and what you couldn't test (e.g. "couldn't check a real DM").
-6. Commit on the `study-dashboard` branch with a short message saying what changed and why. Never commit `.env`, `data/` or `dist/`.
-7. End with **one** suggestion for the next feature, and what it would help me with for my CATs.
-
-## 7. What not to build
-
-- No public website, accounts, logins or hosting. This is for me, on localhost.
-- No leaderboards or social features in the Study Desk (the community bot already has those).
-- No "AI does my homework" mode: the AI asks, marks, explains gaps and generates practice. It doesn't write my answers for me to copy.
-- No features that only track time. Every feature should test or deepen understanding.
-
-## 8. Start
-
-Ask me the questions in section 2. After I answer, propose the plan for **4.1 (mastery is earned)** and wait for my go-ahead.
+1. Restate the single feature slice we are building and its **"Done when"** check.
+2. Ask the Section 2 setup questions if not yet answered.
+3. List the exact files you will create or modify (3–6 lines).
+4. Implement the change cleanly.
+5. **Test before reporting completion:**
+   - Run `cd study && npx vite build` (must succeed with zero errors) and `npm test` (all `node --test` suites pass).
+   - Start `node server/index.js` and test new endpoints (including legacy `study.json` compatibility and no-AI-key fallbacks).
+   - Verify sub-topic weakspot scoring, prediction weighting, prompt/context `.md` generation, and checkpoint dissection with a small Node test script.
+6. Report what was tested, commit on `study-dashboard`, and suggest the single highest-impact next step.

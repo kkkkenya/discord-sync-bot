@@ -1,22 +1,43 @@
 // Everything you log lives in study/data/study.json (git-ignored). One file, rewritten on every change.
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+// STUDY_DATA_DIR points it somewhere else (tests, or trying a copy of your data).
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 
-const DIR = new URL('../data/', import.meta.url);
+const DIR = process.env.STUDY_DATA_DIR ? pathToFileURL(`${process.env.STUDY_DATA_DIR.replace(/[\\/]$/, '')}/`) : new URL('../data/', import.meta.url);
 const FILE = new URL('study.json', DIR);
 mkdirSync(DIR, { recursive: true });
 
 // units: [{ code, title, catDate, confidence }]   (the ones you're taking this semester)
 // topics: [{ id, unit, name, status: red|amber|green, taughtAt }]
 // cards: [{ id, unit, q, a, due, interval, ease, reps, lapses }]
-// reviews: [{ card, unit, grade, at }]   sessions: [{ id, unit, minutes, at }]
+// reviews: [{ card, unit, grade, at }]   sessions: [{ id, unit, minutes, focus, kind, energy, endedEarly, at }]
 // papers: [{ id, unit, label, score, outOf, fileId, at }]   teach: [{ id, unit, topic, text, feedback, at }]
 // questions: [{ id, unit, topic, q, a, marks, from, at }]   (CAT-style practice bank for mocks)
 // mocks: [{ id, unit, name, questions: [{q,a,marks,topic}], answers: [{user,earned,note}], score, outOf, overall, finishedAt, at }]
+// subtopics, attempts, hints: filled from Phase 4 on (see PHASES.md).
 // settings: { aiProvider: 'gemini'|'deepseek'|'anthropic', tour: { step, done, skipped } }
-const EMPTY = { units: [], topics: [], cards: [], reviews: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], settings: { aiProvider: 'gemini', tour: {} } };
+const EMPTY = {
+  units: [], topics: [], cards: [], reviews: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [],
+  settings: { aiProvider: 'gemini', tour: {} },
+};
 
-export const data = existsSync(FILE) ? { ...EMPTY, ...JSON.parse(readFileSync(FILE, 'utf8')) } : structuredClone(EMPTY);
+// Old files load with every list present and every setting defaulted; nothing in them is dropped.
+const load = () => {
+  const saved = JSON.parse(readFileSync(FILE, 'utf8'));
+  return { ...structuredClone(EMPTY), ...saved, settings: { ...structuredClone(EMPTY.settings), ...saved.settings } };
+};
+export const data = existsSync(FILE) ? load() : structuredClone(EMPTY);
+
+// Bump when a build changes what's stored. The first start of a newer build copies study.json to
+// data/backups/pre-v<N>-<day>.json before anything rewrites it.
+export const VERSION = 1;
+if (existsSync(FILE) && (data.version || 0) < VERSION) {
+  const dir = new URL('backups/', DIR);
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(FILE, new URL(`pre-v${VERSION}-${new Date().toISOString().slice(0, 10)}.json`, dir));
+}
+data.version = VERSION;
 
 export function save() {
   const tmp = new URL('study.json.tmp', DIR);

@@ -10,7 +10,8 @@
     "setup": "node setup.js",
     "build": "vite build",
     "start": "vite build && node server/index.js",
-    "dev": "vite"
+    "dev": "vite",
+    "test": "node --test \"test/*.test.js\" \"server/*.test.js\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

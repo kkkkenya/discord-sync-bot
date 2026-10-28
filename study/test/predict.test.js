@@ -108,3 +108,10 @@ test('an unnumbered paper printed twice on one sheet counts its questions once',
   assert.deepEqual(qs.map((q) => [q.number, q.marks]), [[1, 5], [2, 5], [3, 5]]);
   assert.match(qs[2].text, /^c\) Prove/);
 });
+
+test('a tutorial sheet: numbering after a heading, a typo, and the given answers lifted out as keys', () => {
+  const qs = parseQuestions('EMM 302: TUTORIAL PROBLEMS I 1. A steel pipe extended by 1 m under a force. Determine the depth. (Ans: 5 km). 2. During a tensile test the data were recorded. Calculate E and the true strain at fracture. (Ans: 162 GPa; 0.51). 3. Calculate the maximum torque in the hollow shaft. (Ans: 414 kNm; 7.8 x 10-3 rad.} 4. Consider the torsional spring shown in Fig. 1. Determine the diameter. (Ans: 46 mm).');
+  assert.deepEqual(qs.map((q) => q.number), [1, 2, 3, 4]);
+  assert.deepEqual(qs.map((q) => q.given), [['5 km'], ['162 GPa', '0.51'], ['414 kNm', '7.8 x 10-3 rad'], ['46 mm']]);
+  assert.doesNotMatch(qs.map((q) => q.text).join(' '), /Ans/, 'the answer is not shown with the question');
+});

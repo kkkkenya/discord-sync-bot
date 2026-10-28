@@ -12,7 +12,7 @@ const SUB_MARKS = /[([]\s*(\d{1,2}(?:\.\d)?)\s*(?:marks?|mks?)\s*[)\]]/gi;
 // TWO" in the instructions doesn't become question 1. When a paper has no "Question N" headers, bare "1." "2."
 // numbering is tried, then one question per "(5 marks)". Marks: the header's "(20 marks)", else the sum of its
 // parts' marks, else null. [{ number, marks, text }]
-const BARE = /(?<=(?:^|[.?!:;)\]\d])\s*)(\d{1,2})\s*[.)]\s+(?=[A-Z])/g;
+const BARE = /(?<=(?:^|[.?!:;)\]}\d]|\b[A-Z]{1,12})\s*)(\d{1,2})\s*[.)]\s+(?=[A-Z])/g;
 
 function numbered(src, re, number, replace = true) {
   const starts = [];
@@ -48,23 +48,33 @@ function byMarks(src) {
   return out;
 }
 
+const GIVEN = /\(\s*Ans(?:wers?)?\s*[.:]?\s*([^)}]*)[)}]?\s*\.?/i;
+function lift(q) {
+  const m = q.text.match(GIVEN);
+  if (!m) return q;
+  const given = m[1].split(';').map((s) => s.trim().replace(/\.$/, '').replace(/\s+(?:for|in|on|at)\s+[a-z ]+$/i, '').trim()).filter(Boolean);
+  return { ...q, text: (q.text.slice(0, m.index) + q.text.slice(m.index + m[0].length)).trim(), ...(given.length && { given }) };
+}
+
 export function parseQuestions(text) {
   const src = String(text || '');
   let qs = numbered(src, HEADER, (m) => NUM[m[1].toLowerCase()] || Number(m[1]));
-  if (!qs.length) {
-    qs = numbered(src, BARE, (m) => Number(m[1]), false);
+  // one "heading" is often a cross-reference ("the flow in Q1"), not a paper laid out in headings
+  if (qs.length < 2) {
+    const bare = numbered(src, BARE, (m) => Number(m[1]), false);
+    if (bare.length > qs.length) qs = bare;
     const marked = qs.length < 2 ? byMarks(src) : [];
     if (marked.length > 1) qs = marked;
   }
-  return qs.filter((q) => q.text.length >= 20);
+  return qs.map(lift).filter((q) => q.text.length >= 20);
 }
 
-// From a file name or label: { year, type: 'CAT1'|'CAT2'|'CAT'|'Exam' }.
+// From a file name or label: { year, type: 'Tutorial'|'CAT1'|'CAT2'|'CAT'|'Exam' }.
 export function paperInfo(name) {
   const s = String(name || '');
   // underscores and digits count as separators: 'emm302_cat-ii_2021'
   const year = Number(s.match(/(?<!\d)(19|20)\d{2}(?!\d)/)?.[0]) || null;
-  const type = /(?<![a-z])cat\s*[-_ ]?\s*(1|i|one)(?![a-z0-9])/i.test(s) ? 'CAT1' : /(?<![a-z])cat\s*[-_ ]?\s*(2|ii|two)(?![a-z0-9])/i.test(s) ? 'CAT2' : /(?<![a-z])cats?(?![a-z])/i.test(s) ? 'CAT' : 'Exam';
+  const type = /tut(?:orial)?/i.test(s) ? 'Tutorial' : /(?<![a-z])cat\s*[-_ ]?\s*(1|i|one)(?![a-z0-9])/i.test(s) ? 'CAT1' : /(?<![a-z])cat\s*[-_ ]?\s*(2|ii|two)(?![a-z0-9])/i.test(s) ? 'CAT2' : /(?<![a-z])cats?(?![a-z])/i.test(s) ? 'CAT' : 'Exam';
   return { year, type };
 }
 

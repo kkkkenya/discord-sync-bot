@@ -16,7 +16,7 @@ const { coach, coachReady } = await import('./coach.js');
 const { aiReady, canRead, clamp, provider } = await import('./ai.js');
 const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics, suggestTopics, transcribe } = await import('./brain.js');
 const { checkMedia, saveUpload } = await import('./uploads.js');
-const { contextFor, ingestFile, library, libraryMeta, outlineContext } = await import('./ingest.js');
+const { LOCAL_TYPES, addLocalFile, contextFor, ingestFile, library, libraryMeta, localFiles, outlineContext, removeLocalFile } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
 const { ERROR_TYPES, STAGES, TBA } = await import('./defs.js');
@@ -65,10 +65,11 @@ const routes = {
   'GET /api/library': async (q) => {
     const unit = q.get('unit');
     if (!unit) return { files: [] };
-    const { files, note } = await filesFor(unit);
+    const { files: hub, note } = await filesFor(unit);
+    const files = [...hub, ...localFiles(unit)];
     const merged = files.map((f) => {
       const e = library.files[f.id];
-      return { id: f.id, name: f.name, paper: f.paper, url: f.url, synced: Boolean(e), chars: e?.text?.length || 0, pages: e?.pages || 0, text: e?.text || '' };
+      return { id: f.id, name: f.name, paper: f.paper, url: f.url, synced: Boolean(e), chars: e?.text?.length || 0, pages: e?.pages || 0, text: e?.text || '', local: Boolean(e?.local) };
     });
     return { note, files: merged };
   },
@@ -81,6 +82,21 @@ const routes = {
     const results = [];
     for (const f of files) results.push(await ingestFile(f, unit));
     return { files: results, parsed: parsePapers(unit) };
+  },
+  // A file from this computer: { unit, name, file: { data (base64) } }. Kept in the library, then the unit's papers are
+  // read again, so a tutorial's questions (and its printed answers, as keys) show up straight away.
+  'POST /api/library/upload': async (q, { unit, name, file }) => {
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (!LOCAL_TYPES.test(String(name || '')) || !file?.data) throw Object.assign(new Error('Add a PDF, Word (.docx), PowerPoint (.pptx) or text file.'), { status: 400 });
+    const added = await addLocalFile(unit, String(name), Buffer.from(file.data, 'base64'));
+    if (!added.chars) return { ...added, note: 'No text could be read from it (a scan or picture). Paste its questions in Predict instead.' };
+    return { ...added, parsed: parsePapers(unit) };
+  },
+  'POST /api/library/remove': (q, { id }) => {
+    const unit = library.files[id]?.unit;
+    const removed = removeLocalFile(id);
+    if (removed) { data.paperq = data.paperq.filter((x) => x.fileId !== id); save(); }
+    return { removed, ...(removed && unit && { parsed: parsePapers(unit) }) };
   },
   // AI topic suggestions for a unit from its synced course outline and past papers; nothing is saved until the
   // student adds them.

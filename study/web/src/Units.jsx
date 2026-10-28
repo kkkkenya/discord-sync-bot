@@ -125,7 +125,7 @@ const snippet = (text, q) => {
   return `${i > 60 ? '…' : ''}${text.slice(Math.max(0, i - 60), i + 180)}${i + 180 < text.length ? '…' : ''}`;
 };
 
-function Library({ code, go }) {
+function Library({ code, go, refresh }) {
   const [lib, setLib] = useState(null);
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
@@ -140,6 +140,22 @@ function Library({ code, go }) {
     setBusy(false);
   };
 
+  // files from this computer: a tutorial sheet's questions (and printed answers) go straight into Predict and Check answer
+  const [added, setAdded] = useState('');
+  const addFiles = async (list) => {
+    setBusy(true); setAdded('');
+    const lines = [];
+    for (const file of list) {
+      try {
+        const data = await new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = fail; r.readAsDataURL(file); });
+        const r = await api('POST', 'library/upload', { unit: code, name: file.name, file: { data } });
+        lines.push(r.note ? `${file.name}: ${r.note}` : r.duplicate ? `${file.name}: already added.` : `${file.name}: added${r.paper ? `, ${r.parsed?.questions ?? 0} questions now in Predict` : ' (read as notes or an outline)'}.`);
+      } catch (e) { lines.push(`${file.name}: ${e.message}`); }
+    }
+    setAdded(lines.join(' ')); await load(); refresh?.(); setBusy(false);
+  };
+  const removeLocal = async (f) => { await api('POST', 'library/remove', { id: f.id }); await load(); refresh?.(); };
+
   if (!lib) return <p className="muted small">Checking the server library…</p>;
   const synced = lib.files.filter((f) => f.synced).length;
   const papers = lib.files.filter((f) => f.paper);
@@ -149,7 +165,8 @@ function Library({ code, go }) {
 
   const item = (f) => (
     <li key={f.id}>
-      <a href={f.url} target="_blank" rel="noreferrer">{f.name}</a>
+      {f.url ? <a href={f.url} target="_blank" rel="noreferrer">{f.name}</a> : <span>{f.name}</span>}
+      {f.local && <><span className="badge">from this computer</span><button className="link small" onClick={() => removeLocal(f)}>remove</button></>}
       {papers.includes(f) && <button className="link" onClick={() => go('papers', { unit: code, label: f.name.replace(/\.[a-z0-9]+$/i, ''), fileId: f.id })}>log score</button>}
       <span className={`muted small ${f.synced ? '' : 'hot'}`}>{f.synced ? (f.chars ? `${f.chars} chars` : 'no text (scanned)') : 'not synced'}</span>
       {f.synced && f.text && <details className="preview"><summary>preview</summary><p>{f.text.slice(0, 500)}{f.text.length > 500 ? '…' : ''}</p></details>}
@@ -162,6 +179,14 @@ function Library({ code, go }) {
         <button className="ghost" onClick={sync} disabled={busy || !lib.files.length}>{busy ? 'Syncing…' : `Sync files (${synced}/${lib.files.length})`}</button>
         <input className="grow" placeholder="Search synced material…" aria-label={`Search ${code} synced material`} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
+      <div className="row wrap small">
+        <label className={`button ghost${busy ? ' disabled' : ''}`}>
+          Add a file from this computer
+          <input type="file" multiple hidden accept=".pdf,.docx,.pptx,.txt,.md" disabled={busy} onChange={(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
+        </label>
+        <span className="muted">Tutorials, CATs, an outline: PDF, Word or PowerPoint. Answers printed on a tutorial become its answer keys.</span>
+      </div>
+      {added && <p className="muted small" role="status">{added}</p>}
       {lib.note && <p className="muted small">{lib.note}</p>}
       {read != null && <p className="muted small" role="status">{read} past-paper question{read === 1 ? '' : 's'} read for Predict.</p>}
       {!lib.files.length && <p className="muted small">Nothing in the server library for this unit yet.</p>}
@@ -314,9 +339,9 @@ function Unit({ u, s, refresh, go, notify }) {
         <button className="link" onClick={() => go('mock', { unit: u.code })}>timed mock</button>
         <button className="link" onClick={() => go('prompt', { unit: u.code })}>prompt pack</button>
         <button className="link" onClick={() => go('teach', { unit: u.code })}>teach a topic</button>
-        <button className="link" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} server files</button>
+        <button className="link" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} files</button>
       </div>
-      {open && <Library code={u.code} go={go} />}
+      {open && <Library code={u.code} go={go} refresh={refresh} />}
     </article>
   );
 }

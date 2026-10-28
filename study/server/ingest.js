@@ -1,5 +1,6 @@
 // The context library: downloads a unit's files from Discord, extracts their text, and caches it in
 // study/data/library.json (separate from study.json so the daily store stays small). fileId -> entry.
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { extract } from './extract.js';
@@ -65,6 +66,32 @@ export function outlineContext(unit, questions = [], files = library.files, maxC
     sources.push(e.name);
   }
   return { text: parts.join('\n\n').slice(0, maxChars), sources };
+}
+
+// Files added from this computer (a tutorial sheet, an outline you were sent): kept in the library like synced ones,
+// id 'local-<hash of the contents>' so the same file isn't added twice. Tutorials, CATs and papers count as papers.
+const PAPER_NAME = /tut(?:orial)?|(?<![a-z])cats?(?![a-z])|exam|paper|assignment|quiz/i;
+export const LOCAL_TYPES = /\.(pdf|docx|pptx|txt|md)$/i;
+
+export async function addLocalFile(unit, name, buf) {
+  const id = `local-${createHash('sha1').update(buf).digest('hex').slice(0, 12)}`;
+  const had = library.files[id];
+  if (had) return { id, name: had.name, chars: had.chars, paper: had.paper, duplicate: true };
+  const { pages, text } = await extract(buf, name);
+  const paper = PAPER_NAME.test(name) && !OUTLINE.test(name);
+  library.files[id] = { unit, name, kind: 'local', paper, pages, at: new Date().toISOString(), chars: text.length, text, local: true };
+  saveLibrary();
+  return { id, name, chars: text.length, paper };
+}
+
+export const localFiles = (unit) => Object.entries(library.files).filter(([, e]) => e.local && e.unit === unit)
+  .map(([id, e]) => ({ id, name: e.name, paper: e.paper, url: null, synced: true, chars: e.chars, pages: e.pages, text: e.text, local: true }));
+
+export function removeLocalFile(id) {
+  if (!library.files[id]?.local) return false;
+  delete library.files[id];
+  saveLibrary();
+  return true;
 }
 
 async function messageFor(channelId, messageId) {

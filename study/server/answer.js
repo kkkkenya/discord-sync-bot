@@ -46,8 +46,13 @@ const sign = (s) => (/[\-−–]/.test(s || '') ? -1 : 1);
 // A label in front of the value is dropped: "d = 3.23 mm", "∴ d = 3.23 mm", "Ans: 3.23 mm" all read as 3.23 mm.
 const LABEL = /^\s*(?:\u2234|therefore\b)?\s*(?:(?:ans(?:wer)?|final(?: answer)?)\s*[:=]?|[A-Za-z\u0391-\u03c9_]{1,6}(?:_?\{?[\w,]{0,6}\}?)?\s*=)\s*/i;
 
+// superscripts typed or pasted: 10⁻³ → 10^-3
+const SUP = { '⁻': '-', '⁺': '+', '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9' };
+const unSup = (s) => s.replace(/10([⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)/g, (_, e) => `10^${[...e].map((c) => SUP[c]).join('')}`);
+
 export function parseAnswer(text) {
-  const m = String(text ?? '').replace(LABEL, '').match(NUMBER);
+  text = unSup(String(text ?? ''));
+  const m = text.replace(LABEL, '').match(NUMBER);
   if (!m) return { value: null, unitText: '', unit: null };
   const digits = /^\d{1,3}(,\d{3})+(\.\d*)?$/.test(m[2]) ? m[2].replace(/,/g, '') : m[2].replace(',', '.');
   const exp = m[3] ?? m[4];

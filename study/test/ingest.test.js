@@ -22,3 +22,9 @@ test('a file is found on a plain message and on a forwarded one', () => {
   assert.equal(attachmentOf({ attachments: [], message_snapshots: [{ message: { attachments: [file] } }] }), file);
   assert.equal(attachmentOf({ attachments: [] }), null);
 });
+
+test('Word\'s Symbol-font Greek and signs come out as real characters', async () => {
+  const { symbolFont } = await import('../server/extract.js');
+  assert.equal(symbolFont('C = 4.5 x 10-5 m; st = 1.17;  = 50 MPa; 20C; '), 'ΔC = 4.5 x 10-5 m; αst = 1.17; τ = 50 MPa; 20°C; σ×π');
+  assert.equal(symbolFont('plain text, nothing to change'), 'plain text, nothing to change');
+});

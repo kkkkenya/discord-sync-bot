@@ -62,3 +62,22 @@ test('reading papers without a synced library, and AI mapping without a key, exp
   // pasted questions survive a re-read
   assert.equal((await srv.call('GET', 'predict?unit=ECU%20300')).body.questions.length, 2);
 });
+
+test('a tutorial sheet added from this computer: kept in the library, its questions read with their given answers as keys', async () => {
+  const sheet = 'EMM 312 TUTORIAL PROBLEMS 1 1. Water flows through a 50 mm pipe at 2 m/s. Find the flow rate. (Ans: 3.93 L/s). 2. Find the Reynolds number for the flow in Q1 with a viscosity of 1 mPa s. (Ans: 100000).';
+  const up = await srv.call('POST', 'library/upload', { unit: 'EMM 312', name: 'EMM 312 TUT 1.txt', file: { data: Buffer.from(sheet).toString('base64') } });
+  assert.equal(up.status, 200, JSON.stringify(up.body));
+  assert.equal(up.body.paper, true);
+  assert.equal(up.body.parsed.questions, 2);
+  const again = await srv.call('POST', 'library/upload', { unit: 'EMM 312', name: 'copy.txt', file: { data: Buffer.from(sheet).toString('base64') } });
+  assert.equal(again.body.id, up.body.id, 'the same file is not added twice');
+  const lib = (await srv.call('GET', 'library?unit=EMM%20312')).body;
+  assert.ok(lib.files.some((f) => f.id === up.body.id && f.local));
+  const qs = (await srv.call('GET', 'predict?unit=EMM%20312')).body.questions;
+  assert.equal(qs[0].type, 'Tutorial');
+  assert.deepEqual(qs[0].key.parts, ['3.93 L/s']);
+  assert.doesNotMatch(qs[0].text, /Ans/);
+  assert.equal((await srv.call('POST', 'library/upload', { unit: 'EMM 312', name: 'virus.exe', file: { data: 'aGk=' } })).status, 400);
+  assert.equal((await srv.call('POST', 'library/remove', { id: up.body.id })).body.removed, true);
+  assert.equal((await srv.call('GET', 'predict?unit=EMM%20312')).body.questions.length, 0, 'its questions go with it');
+});

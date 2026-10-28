@@ -185,3 +185,14 @@ test('an unreadable photo, or an AI that cannot see, says what to do instead', a
   assert.match(blind.message, /type your final answer/i);
   await assert.rejects(checkPhoto({ unit: 'EMM 302', questionId: 'q1', image: { mime: 'application/pdf', data: 'x' } }, photoDeps(reads('1', []))), /JPEG/);
 });
+
+test('an answer given on a tutorial sheet is the key: any of its parts can be checked, with no AI', async () => {
+  data.paperq.push({ id: 'tut3-2', unit: 'EMM 302', fileId: 'local-tut3', source: 'KU EMM 302 TUT 3.docx', number: 2, marks: null, text: 'The shearing stress in a hollow shaft is limited to 75 MPa. What is the maximum torque? What is the angle of twist?', topicId: 't1', subtopicIds: [], key: { answer: '175 kNm', parts: ['175 kNm', '4.3°'], source: 'sheet', checkpoints: [] } });
+  const torque = await checkAnswer({ unit: 'EMM 302', questionId: 'tut3-2', answer: '175000 N m' }, noAi);
+  assert.equal(torque.verdict, 'right');
+  assert.equal(torque.key.label, 'given on the tutorial sheet');
+  assert.equal((await checkAnswer({ unit: 'EMM 302', questionId: 'tut3-2', answer: '4.3°' }, noAi)).verdict, 'right', 'the second part counts too');
+  const wrong = await checkAnswer({ unit: 'EMM 302', questionId: 'tut3-2', answer: '17.5 kNm' }, noAi);
+  assert.equal(wrong.verdict, 'wrong');
+  assert.match(wrong.key.answer, /175 kNm; 4\.3°/, 'all parts are shown');
+});

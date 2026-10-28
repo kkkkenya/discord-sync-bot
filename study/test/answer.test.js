@@ -64,3 +64,8 @@ test('a final answer written with its symbol, "therefore" or "Ans" is read the s
   assert.equal(v('d = 32.3 mm', '0.0323 m').verdict, 'right');
   assert.equal(parseAnswer('-12 kN').value, -12, 'a leading minus is still a sign');
 });
+
+test('superscript exponents are read: 7.8×10⁻³ rad', () => {
+  assert.ok(Math.abs(parseAnswer('7.8×10⁻³ rad').value - 0.0078) < 1e-12);
+  assert.equal(parseAnswer('ΔC = 4.5 x 10-5 m').value, 0.000045);
+});

@@ -16,7 +16,7 @@ import { checkMedia, saveUpload } from './uploads.js';
 const bad = (message, status = 400) => Object.assign(new Error(message), { status });
 const SCHEME_WORDS = /mark(?:ing)?[\s_-]*scheme|solutions?|memo|answers?/i;
 const ERROR_IDS = ERROR_TYPES.map((e) => e.id);
-export const KEY_LABEL = { you: 'your answer key', scheme: 'from the marking scheme', ai: 'AI-solved: verify' };
+export const KEY_LABEL = { you: 'your answer key', sheet: 'given on the tutorial sheet', scheme: 'from the marking scheme', ai: 'AI-solved: verify' };
 
 // Marking-scheme text for a past-paper question: the paper's own file when it says it is a solution, else a library
 // file of the unit whose name says scheme/solution and that matches the paper's year and type. { name, text } | null.
@@ -71,15 +71,19 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
     key = { answer: String(solved.answer || '').trim(), source: scheme ? 'scheme' : 'ai', schemeFile: scheme?.name || null, checkpoints: tidy(solved.checkpoints, subs, fallbackSub) };
   }
 
-  // 2. compare
-  const cmp = compareAnswers(answer, key.answer);
-  if (cmp.verdict === 'unreadable') return { verdict: 'unreadable', note: cmp.note, key: { answer: key.answer, source: key.source, label: KEY_LABEL[key.source] } };
+  // 2. compare: a key with several parts ("175 kNm; 4.3°" on a tutorial sheet) accepts any one of them; a wrong answer is
+  // judged against the first part of the same kind of quantity
+  const parts = key.parts?.length ? key.parts : [key.answer];
+  const tries = parts.map((p) => compareAnswers(answer, p));
+  const cmp = tries.find((c) => c.verdict === 'right') || tries.find((c) => c.verdict === 'wrong' && c.reason !== 'dimension') || tries[0];
+  const shown = parts.join('; ');
+  if (cmp.verdict === 'unreadable') return { verdict: 'unreadable', note: cmp.note, key: { answer: shown, source: key.source, label: KEY_LABEL[key.source] } };
 
   // 3. the checkpoints: written now when the answer is wrong (a right one gets them on request, see ensureCheckpoints)
   let checkpointNote = '';
   if (!key.checkpoints?.length && cmp.verdict === 'wrong' && ready()) {
     try {
-      const out = await ask({ expected: key.answer });
+      const out = await ask({ expected: shown });
       key.checkpoints = tidy(out.checkpoints, subs, fallbackSub);
     } catch (e) { checkpointNote = `Couldn't write the checkpoints (${e.message}). Take it to the Prompt Builder for a full solution.`; }
   }
@@ -89,12 +93,12 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
   const attempt = add('attempts', {
     unit: unit.code, questionId: row?.id || null, topicId: topic?.id || null, subtopicId: right ? fallbackSub : null,
     answer, operations: String(body.operations || '').trim().slice(0, 500), verdict: right ? 'right' : 'mismatch',
-    keySource: key.source, keyAnswer: key.answer, checkpoints: key.checkpoints || [], brokeAt: null, errorType: null,
+    keySource: key.source, keyAnswer: shown, checkpoints: key.checkpoints || [], brokeAt: null, errorType: null,
     ...(!row && { question: question.slice(0, 1500) }),
   });
   return {
     attempt, verdict: cmp.verdict, reason: cmp.reason, note: cmp.note || '', assumedUnit: Boolean(cmp.assumed),
-    key: { answer: key.answer, source: key.source, label: KEY_LABEL[key.source], schemeFile: key.schemeFile || null },
+    key: { answer: shown, source: key.source, label: KEY_LABEL[key.source], schemeFile: key.schemeFile || null },
     checkpoints: key.checkpoints || [], checkpointNote,
     // the best guess to pre-fill "Broke here": the number checks say units/sign, else the checkpoint's own tag
     guess: { errorType: cmp.errorType || null, subtopicId: fallbackSub },

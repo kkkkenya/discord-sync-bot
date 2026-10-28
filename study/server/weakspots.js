@@ -5,6 +5,9 @@ import { library } from './ingest.js';
 import { mapQuestion, paperInfo, parseQuestions, readHint } from './predict.js';
 import { data, save } from './store.js';
 
+// A tutorial sheet's printed answer as the question's key: "(Ans: 175 kNm; 4.3°)" → any part can be checked, no AI needed.
+const sheetKey = (given) => ({ answer: given[0], parts: given, source: 'sheet', checkpoints: [] });
+
 const topicOf = (unit, name) => data.topics.find((t) => t.unit === unit && t.name.trim().toLowerCase() === String(name || '').trim().toLowerCase());
 
 // After a marked teach-back: flag the topic's sub-topics its gaps name as shaky. { flagged: [names], unmatched }.
@@ -36,7 +39,7 @@ export function parsePapers(unit) {
     for (const q of parseQuestions(e.text)) {
       const prev = old.get(`${fileId}#${q.number}`);
       const kept = prev && prev.topicFrom !== 'auto' ? { topicId: prev.topicId, subtopicIds: prev.subtopicIds || [], topicFrom: prev.topicFrom } : { ...mapQuestion(q.text, topics, subs), topicFrom: 'auto' };
-      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, ...(prev?.key && { key: prev.key }), at: prev?.at || new Date().toISOString() });
+      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, ...((prev?.key || q.given) && { key: prev?.key || sheetKey(q.given) }), at: prev?.at || new Date().toISOString() });
       n++;
     }
   }
@@ -52,7 +55,7 @@ export function pastePaper(unit, label, text) {
   const qs = parseQuestions(text);
   // no QUESTION headers at all: keep the whole paste as one question
   const rows = (qs.length ? qs : [{ number: 1, marks: null, text: String(text).trim().slice(0, 3000) }]).map((q) => ({
-    id: `${fileId}-${q.number}`, unit, fileId, source: label, ...paperInfo(label), ...q, ...mapQuestion(q.text, topics, subs), topicFrom: 'auto', at: new Date().toISOString(),
+    id: `${fileId}-${q.number}`, unit, fileId, source: label, ...paperInfo(label), ...q, ...mapQuestion(q.text, topics, subs), topicFrom: 'auto', ...(q.given && { key: sheetKey(q.given) }), at: new Date().toISOString(),
   }));
   data.paperq.push(...rows);
   save();

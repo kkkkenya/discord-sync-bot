@@ -7,7 +7,15 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const MAX_TEXT = 50000; // ~12k tokens per file is plenty for grounding; keeps the cache small
 const MAX_PAGES = 100;
-const squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+// Word's Symbol font stores Greek letters and maths signs as private-use characters (U+F020-U+F0FF): "ΔC" arrives as
+// "C" and an α vanishes from view. Map them back to the real characters.
+const SYMBOL = {
+  A: 'Α', B: 'Β', C: 'Χ', D: 'Δ', E: 'Ε', F: 'Φ', G: 'Γ', H: 'Η', I: 'Ι', K: 'Κ', L: 'Λ', M: 'Μ', N: 'Ν', O: 'Ο', P: 'Π', Q: 'Θ', R: 'Ρ', S: 'Σ', T: 'Τ', U: 'Υ', W: 'Ω', X: 'Ξ', Y: 'Ψ', Z: 'Ζ',
+  a: 'α', b: 'β', c: 'χ', d: 'δ', e: 'ε', f: 'φ', g: 'γ', h: 'η', i: 'ι', j: 'ϕ', k: 'κ', l: 'λ', m: 'μ', n: 'ν', o: 'ο', p: 'π', q: 'θ', r: 'ρ', s: 'σ', t: 'τ', u: 'υ', v: 'ϖ', w: 'ω', x: 'ξ', y: 'ψ', z: 'ζ',
+  '-': '−', '\xB0': '°', '\xB1': '±', '\xB4': '×', '\xB8': '÷', '\xA3': '≤', '\xB3': '≥', '\xB9': '≠', '\xBB': '≈', '\xD6': '√', '\xB6': '∂', '\xA5': '∞', '\xE5': 'Σ', '\xF2': '∫', '\xAE': '→', '\xDE': '⇒', '\xD7': '·',
+};
+export const symbolFont = (s) => String(s).replace(/[-]/g, (ch) => { const c = String.fromCharCode(ch.charCodeAt(0) - 0xF000); return SYMBOL[c] ?? c; });
+const squash = (s) => symbolFont(String(s || '')).replace(/\s+/g, ' ').trim();
 const xmlText = (xml) => squash([...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join(' '));
 
 async function pdfText(buf) {

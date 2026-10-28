@@ -2,9 +2,20 @@ import { useState } from 'react';
 import { api, daysUntil } from './api.js';
 import CountUp from './components/CountUp.jsx';
 
+// The countdown is to the nearest real date: a unit's own CAT/exam date, or the KU calendar for units that have
+// no date of their own. TBA units (the strike) count down to nothing.
+function nextDate(s) {
+  const own = s.data.units
+    .filter((u) => /^\d{4}-/.test(u.catDate || '') && u.catDate >= s.today)
+    .map((u) => ({ name: `${u.code}`, start: u.catDate, end: u.catDate }));
+  const calendar = (!s.data.units.length || s.data.units.some((u) => !u.catDate)) && s.next ? [s.next] : [];
+  return [...own, ...calendar].sort((a, b) => a.start.localeCompare(b.start))[0] || null;
+}
+
 export default function Hero({ s }) {
   const [sent, setSent] = useState('');
-  const next = s.next;
+  const next = nextDate(s);
+  const allTba = s.data.units.length > 0 && s.data.units.every((u) => u.catDate === 'TBA');
   const days = next ? daysUntil(s.today, next.start) : null;
   const exams = daysUntil(s.today, s.calendar.exams.start);
   const minutes = Object.values(s.stats.minutesWeek).reduce((a, b) => a + b, 0);
@@ -21,12 +32,17 @@ export default function Hero({ s }) {
         {next && days > 0 ? (
           <>
             <span className="big"><CountUp to={days} duration={1.2} /></span>
-            <span className="label">days to <b>{next.name}</b><br />{next.start} to {next.end}</span>
+            <span className="label">days to <b>{next.name}</b><br />{next.start === next.end ? next.start : `${next.start} to ${next.end}`}</span>
           </>
         ) : next ? (
-          <span className="label"><b>{next.name}</b> are on now, until {next.end}. One unit at a time.</span>
-        ) : <span className="label">No CATs or exams left on the calendar.</span>}
+          <span className="label"><b>{next.name}</b> {next.start === next.end ? 'is today' : `are on now, until ${next.end}`}. One unit at a time.</span>
+        ) : <span className="label">{allTba ? 'All your dates are TBA. Set them in Units when they are announced; until then everything is Adequate Prep.' : 'No CATs or exams left on the calendar.'}</span>}
       </div>
+      {s.stageMix.length > 0 && (
+        <p className="stagemix" aria-label="Study stages">
+          {s.stageMix.map((m) => <span key={m.id} className={`stage ${m.id}`}>{m.n} {m.name}</span>)}
+        </p>
+      )}
       <dl className="tiles">
         <div><dt>Exams</dt><dd>{exams > 0 ? `${exams}d` : 'now'}</dd></div>
         <div><dt>Mastered</dt><dd>{green}/{s.data.topics.length}</dd></div>

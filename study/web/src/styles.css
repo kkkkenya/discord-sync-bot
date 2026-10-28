@@ -55,7 +55,7 @@ a { color: var(--accent); }
 
 .top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--paper) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 .top-in { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 54px; }
-.brand { font-weight: 700; }
+.brand { font-weight: 700; white-space: nowrap; }
 .top nav { display: flex; gap: 14px; overflow-x: auto; }
 .top nav a { color: var(--muted); text-decoration: none; font-size: 0.9rem; }
 .top nav a:hover { color: var(--ink); }
@@ -115,9 +115,18 @@ input.num { width: 84px; }
 .picker h4 { margin: 10px 0 0; }
 .synclog { list-style: none; padding: 0; margin: 6px 0 0; width: 100%; }
 
+/* Study stages: one colour per stage, latest is hottest */
+.stagemix { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.stage { display: inline-block; font: 600 0.72rem var(--mono); padding: 2px 8px; border-radius: 999px; margin-left: 8px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.stagemix .stage { margin-left: 0; }
+.stage.exam-eve { color: var(--red); background: var(--red-bg); border-color: transparent; }
+.stage.last-minute { color: var(--amber); background: var(--amber-bg); border-color: transparent; }
+.stage.one-week { color: var(--accent); border-color: var(--accent); }
+.stage.adequate { color: var(--green); background: var(--green-bg); border-color: transparent; }
+
 .unit { border-top: 1px solid var(--line); padding: 14px 0 10px; }
 .unit header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }
-.meta { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 0.85rem; }
 .meta input { padding: 3px 6px; }
 .conf { display: inline-flex; gap: 3px; margin-left: 6px; }
 .conf button { width: 14px; height: 14px; padding: 0; border-radius: 50%; background: var(--line); }
@@ -246,6 +255,7 @@ th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
   .tiles { grid-template-columns: repeat(2, 1fr); }
   .top nav { gap: 10px; }
   .brand { display: none; }
+  .ai-toggle { max-width: 88px; }
   section { padding: 16px; }
   .count { flex-direction: column; align-items: flex-start; gap: 6px; }
   table { font-size: 0.8rem; }

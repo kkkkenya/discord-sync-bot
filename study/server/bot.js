@@ -5,7 +5,8 @@ import { ChannelType, Client, Events, GatewayIntentBits, Partials } from 'discor
 import cron from 'node-cron';
 import { coach, coachReady } from './coach.js';
 import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
-import { catDay, daysBetween, isDay, nairobiDay, stats, todayPlan } from './plan.js';
+import { catDay, daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
+import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
 
 const HELP = [
@@ -25,19 +26,23 @@ const unitOf = (text) => {
 const known = (code) => data.units.some((u) => u.code === code);
 
 export function todayText(today = nairobiDay()) {
-  const next = nextAssessment(today);
+  // the KU calendar only matters while some unit has no date of its own (TBA units have none at all)
+  const next = !data.units.length || data.units.some((u) => !u.catDate) ? nextAssessment(today) : null;
   const lines = [];
   if (next) {
     const d = daysBetween(today, next.start);
     lines.push(d > 0 ? `**${next.name}** start in **${d} day${d === 1 ? '' : 's'}** (${next.start}).` : `**${next.name}** are on now, until ${next.end}.`);
   }
   for (const u of data.units.filter((x) => isDay(x.catDate) && x.catDate >= today).sort((a, b) => a.catDate.localeCompare(b.catDate)).slice(0, 4)) {
-    lines.push(`• ${u.code} CAT: ${u.catDate} (${daysBetween(today, u.catDate)}d)`);
+    lines.push(`• ${u.code} CAT/exam: ${u.catDate} (${daysBetween(today, u.catDate)}d)`);
   }
+  const tba = data.units.filter((u) => u.catDate === 'TBA').length;
+  if (tba) lines.push(`• ${tba} unit${tba === 1 ? '' : 's'} with the date TBA`);
   const plan = todayPlan(today);
   if (!plan.length) return [...lines, '', 'No units yet. Open the dashboard and pick your units.'].join('\n');
-  lines.push('', '**Today**');
-  plan.forEach((p, n) => lines.push(`${n + 1}. **${p.code}** ${p.title}: ${p.task.text}`));
+  const mix = stageMix(data.units.map((u) => unitStage(u, today).stage));
+  lines.push('', `Stages: ${mix.map((m) => `${m.n} ${m.name}`).join(' · ')}`, '', '**Today**');
+  plan.forEach((p, n) => lines.push(`${n + 1}. **${p.code}** ${p.title} _(${p.stage.name})_: ${p.task.text}`));
   const s = stats(today);
   lines.push('', `Streak ${s.streak} day${s.streak === 1 ? '' : 's'} · ${s.minutesToday} min today · log with \`log 45 ${plan[0].code}\``);
   return lines.join('\n');

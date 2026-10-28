@@ -52,7 +52,7 @@ Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` 
 | `study/server/insights.js` | Pure activity/performance functions (WIP, not wired into the UI; its "deeper dive" still reads retired flashcard reviews). | superseded by Phase 6 |
 | `study/web/src/*.jsx` | React frontend: `Hero, Today, Units, Notes, Teach, Mock, Papers, Prompt, Progress, Timer, CheckIn, Onboarding`. Plain CSS in `styles.css`. | exists |
 | `study/server/cohort.js` | Course + year to units from the catalogue (`lib/units.json` plus thread-only units from `lib/threads.json`). The Hub has no semester data, so a cohort lists the whole year and the student unticks. | exists (Phase 2) |
-| `study/server/stages.js` | Per-unit study stage from the unit's own date, with overrides. | Phase 3 |
+| `study/server/stages.js` | Per-unit study stage from the unit's own date (TBA = Adequate), with a per-unit and an all-units override; `plan.js` picks each unit's task by stage. | exists (Phase 3) |
 | `study/server/analysis.js`, `web/src/Analysis.jsx` | Sub-topics, self-audit, weakspot matrix. | Phases 4 and 6 |
 | `study/server/predict.js`, `web/src/Predictions.jsx` | Past-paper question map, lecturer hints, predictions. | Phase 5 |
 | `study/server/context-pack.js` | `<UNIT>-<TOPIC>-context.md` pack + limit guard. | Phase 7 |

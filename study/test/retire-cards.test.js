@@ -14,7 +14,7 @@ test('a store with 500 old cards plans without any card or recall task', () => {
   assert.equal(data.cards.length, 500);
   const plan = todayPlan(TODAY);
   assert.ok(plan.length > 0);
-  for (const p of plan) assert.ok(['teach', 'paper', 'topics', 'mock'].includes(p.task.kind), p.task.kind);
+  for (const p of plan) assert.ok(['teach', 'paper', 'topics', 'mock', 'prompt'].includes(p.task.kind), p.task.kind);
   assert.doesNotMatch(JSON.stringify(plan), /card|recall/i);
 });
 
@@ -39,4 +39,13 @@ test('the bot has no card commands and says so', async () => {
   assert.match(await reply('quiz'), /retired/);
   assert.match(await reply('card EMM 302 | q | a'), /retired/);
   assert.equal(data.cards.length, 500);
+});
+
+test('the bot shows each unit\'s stage and counts TBA units', async () => {
+  for (const u of data.units) u.catDate = 'TBA';
+  const text = await reply('today');
+  assert.match(text, /Stages: 4 Adequate Prep/);
+  assert.match(text, /4 units with the date TBA/);
+  assert.doesNotMatch(text, /CATs\*\* start in/, 'no KU-calendar countdown when every unit is TBA');
+  assert.match(text, /_\(Adequate Prep\)_/);
 });

@@ -11,6 +11,7 @@ const YEARS = [1, 2, 3, 4, 5];
 function Picker({ s, refresh, close }) {
   const saved = s.settings.cohort || { course: 'EMM', year: 3, sem: 1 };
   const [cohort, setCohort] = useState(saved);
+  const [stage, setStage] = useState(s.settings.stage || '');
   const [cat, setCat] = useState(null);
   const [picked, setPicked] = useState(() => new Set(s.data.units.map((u) => u.code)));
   const [q, setQ] = useState('');
@@ -33,7 +34,7 @@ function Picker({ s, refresh, close }) {
   const saveIt = async () => {
     setStatus('Saving…');
     try {
-      await api('POST', 'settings', { cohort });
+      await api('POST', 'settings', { cohort, stage: stage || null });
       await api('PUT', 'units', [...picked].sort().map((code) => ({ code, title: titles.get(code) || '' })));
       await refresh();
       close();
@@ -56,6 +57,12 @@ function Picker({ s, refresh, close }) {
         </label>
         <label className="small">Semester{' '}
           <select value={cohort.sem} onChange={(e) => set('sem', Number(e.target.value))}><option value={1}>1</option><option value={2}>2</option></select>
+        </label>
+        <label className="small">Study stage{' '}
+          <select value={stage} onChange={(e) => setStage(e.target.value)}>
+            <option value="">Auto: from each unit's date (recommended)</option>
+            {s.stages.map((st) => <option key={st.id} value={st.id}>{st.name} ({st.window})</option>)}
+          </select>
         </label>
       </div>
       <p className="muted small">
@@ -176,6 +183,8 @@ function Unit({ u, s, refresh, go }) {
   const [open, setOpen] = useState(false);
   const topics = s.data.topics.filter((t) => t.unit === u.code);
   const tba = u.catDate === 'TBA';
+  const st = s.units[u.code]?.stage;
+  const auto = st && st.source !== 'unit' ? st.name : s.stages.find((x) => x.id === (s.settings.stage || 'adequate'))?.name;
   const cat = tba ? null : u.catDate || s.next?.start;
   const rated = topics.map((t) => ({ t, m: s.mastery?.[t.id] || { status: 'red', manual: false, why: '', next: '' } }));
   const green = rated.filter((x) => x.m.status === 'green').length;
@@ -202,6 +211,10 @@ function Unit({ u, s, refresh, go }) {
               {Math.max(0, daysUntil(s.today, cat))}d{u.catDate ? '' : ' (KU calendar)'}
             </span>
           )}
+          <select value={u.stage || ''} onChange={(e) => set({ stage: e.target.value || null })} aria-label={`${u.code} study stage`}>
+            <option value="">Stage: auto ({auto})</option>
+            {s.stages.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+          </select>
           <span className="conf" title="How ready do you feel?">
             {[1, 2, 3, 4, 5].map((n) => <button key={n} aria-label={`confidence ${n}`} className={n <= (u.confidence || 0) ? 'on' : ''} onClick={() => set({ confidence: n })} />)}
           </span>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api.js';
 
 const KINDS = [
@@ -12,7 +12,7 @@ const KINDS = [
   ['custom', 'Custom instruction'],
 ];
 
-export default function Prompt({ s }) {
+export default function Prompt({ s, focus }) {
   const [kind, setKind] = useState('mock');
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const [topic, setTopic] = useState('');
@@ -21,6 +21,14 @@ export default function Prompt({ s }) {
   const [busy, setBusy] = useState(false);
   const [out, setOut] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (focus?.section !== 'prompt') return;
+    if (focus.kind && KINDS.some(([k]) => k === focus.kind)) setKind(focus.kind);
+    if (focus.unit) setUnit(focus.unit);
+    setTopic(focus.topic || '');
+    setOut(null);
+  }, [focus]);
 
   const isCustom = kind === 'custom';
   const build = async () => {

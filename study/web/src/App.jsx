@@ -81,6 +81,16 @@ export default function App() {
           <nav>{NAV.map(([id, label]) => <a key={id} href={`#${id}`} onClick={(e) => { e.preventDefault(); go(id); }}>{label}</a>)}</nav>
           <button className="help" onClick={() => { setTourStep(0); setTourOn(true); }} aria-label="Take the tour" title="Take the tour">?</button>
           <select
+            className="ai-toggle"
+            value={s.settings.stage || ''}
+            aria-label="Study stage for all units"
+            title={`Stages now: ${s.stageMix.map((m) => `${m.n} ${m.name}`).join(', ') || 'no units'}. A unit's own stage (in Units) wins over this.`}
+            onChange={(e) => api('POST', 'settings', { stage: e.target.value || null }).then(refresh).catch((err) => setProblem(err.message))}
+          >
+            <option value="">Stage: auto</option>
+            {s.stages.map((st) => <option key={st.id} value={st.id}>All: {st.name}</option>)}
+          </select>
+          <select
             className={`ai-toggle${s.ai ? '' : ' off'}`}
             value={s.settings.aiProvider}
             aria-label="AI provider"

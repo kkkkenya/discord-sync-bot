@@ -18,9 +18,10 @@ const { makeQuestions, makeStudyMaterial, markAnswers } = await import('./brain.
 const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
-const { TBA } = await import('./defs.js');
+const { STAGES, TBA } = await import('./defs.js');
+const { stageMix, validStage } = await import('./stages.js');
 const { masteryMap } = await import('./mastery.js');
-const { isDay, nairobiDay, stats, todayPlan } = await import('./plan.js');
+const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
@@ -33,7 +34,9 @@ const bot = startBot();
 const state = () => {
   const today = nairobiDay();
   const { cards, reviews, ...shown } = data;
+  const units = Object.fromEntries(data.units.map((u) => [u.code, unitStage(u, today)]));
   return {
+    units, stageMix: stageMix(Object.values(units).map((x) => x.stage)), stages: STAGES.map(({ maxDays, ...s }) => s),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
     mastery: masteryMap(today), library: libraryMeta(), discord: Boolean(bot),
@@ -87,6 +90,7 @@ const routes = {
     const u = data.units.find((x) => x.code === q.get('code'));
     if (!u) throw Object.assign(new Error('not one of your units'), { status: 404 });
     if ('catDate' in body && !(body.catDate === null || body.catDate === TBA || isDay(body.catDate))) throw Object.assign(new Error('a date (YYYY-MM-DD), TBA, or nothing'), { status: 400 });
+    if ('stage' in body && !validStage(body.stage)) throw Object.assign(new Error('unknown study stage'), { status: 400 });
     Object.assign(u, body, { code: u.code });
     save();
     return state();
@@ -106,6 +110,7 @@ const routes = {
     for (const [k, v] of Object.entries(body || {})) {
       if (k === 'aiProvider' && !['gemini', 'deepseek', 'anthropic'].includes(v)) throw Object.assign(new Error('unknown AI provider'), { status: 400 });
       if (k === 'cohort' && !validCohort(v)) throw Object.assign(new Error('pick a course, a year (1-5) and a semester (1 or 2)'), { status: 400 });
+      if (k === 'stage' && !validStage(v)) throw Object.assign(new Error('unknown study stage'), { status: 400 });
       data.settings[k] = v;
     }
     save();

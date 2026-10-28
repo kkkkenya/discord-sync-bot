@@ -262,7 +262,8 @@ export async function reply(text, { photo = false } = {}) {
     const names = data.topics.filter((x) => h.topicIds.includes(x.id)).map((x) => x.name);
     return `Saved as a **${h.kind}** hint for ${unit}${names.length ? ` on ${names.join(', ')}` : ' (no topic matched: tag it on the dashboard)'}.`;
   }
-  if (word === 'mark') return markText(t, { photo });
+  // a refusal from Check answer (already marked, not a checkpoint…) is an answer to you, not a crash
+  if (word === 'mark') return markText(t, { photo }).catch((e) => (e.status ? e.message : Promise.reject(e)));
   if (word === 'quiz' || word === 'card') return 'Flashcards are retired in Study Desk. Try `teach EMM 302 <topic>`, or a timed mock on the dashboard.';
   return mode ? 'Type `stop` to end this first.' : HELP;
 }

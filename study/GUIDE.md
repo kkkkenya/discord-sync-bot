@@ -24,6 +24,8 @@ The idea behind it: practise on real past-paper questions, closed book, then fin
 
 After that, Today plans itself.
 
+**Tutorial quests.** The first time you open it, a small panel at the bottom left gives you one quest at a time, like a game tutorial: "Hover over a group in the top bar", "Press Sync all files", "Check an answer". A ring shows what to press, **Show me** takes you there, and each quest completes by itself once you have done it (with XP and a rank, Trainee to Chartered Engineer). Anything you have already done counts straight away. Skip any quest, or hide the panel with ×; Settings brings it back.
+
 ---
 
 ## 3. Getting around
@@ -32,7 +34,7 @@ The page has four bands, in the order a study day runs: **Today**, **Plan**, **P
 
 - **Top bar**: hover a group (or tap **Menu** on a phone) to see its sections and what's inside each one. The bar turns to frosted glass once you scroll.
 - **Current unit** (top right): every section follows it. Change it there or in any section's unit picker; opening a task or a weakspot sets it too.
-- **Settings** (the sliders icon): study stage for all units, AI provider, and the tour.
+- **Settings** (the sliders icon): study stage for all units, AI provider, and the tutorial quests.
 - **Focus timer** (bottom right): 25 or 50 minutes on the current unit. A session of a minute or more is logged when it ends or you stop it.
 
 ---
@@ -46,6 +48,7 @@ The page has four bands, in the order a study day runs: **Today**, **Plan**, **P
 | Plan | **Units** | Dates or TBA, stage, topics and their colours, the unit's server files, sync. Click a topic chip to see why it has its colour and what's missing. |
 | Plan | **Predict** | Topics ranked by exam weight (how often they come up × their marks × what the lecturer said), the lecturer's hints, and the past-paper questions under each topic. **Map topics with AI** places questions the wording alone couldn't. |
 | Plan | **Weakspots** | Each topic broken into sub-topics you rate solid, shaky or stuck. **Fix first** ranks sub-topics by exam weight × weakness; **How you lose marks** counts your mistake types. |
+| Practise | **Study kit** | Practice made for the unit's stage. Adequate Prep: a ladder (a worked example, the same method with steps to fill in, then one on your own) plus teach-back prompts. 1-Week Mode: solving recipes for the likely topics (how to spot the question type, the steps, a shortcut, the trap). Last-Minute and Exam-Eve: a formula and shortcut sheet (symbols and SI units, when each formula does NOT apply) with your own recurring mistakes as the first warnings, printable on one A4 page. Everything made is saved and can be edited in place. |
 | Practise | **Check answer** | Type a final answer with its unit. A right answer is accepted in any unit (0.1425 GPa = 142.5 MPa). A wrong one shows numbered checkpoints: tap **Broke here** on the step where your working went wrong. |
 | Practise | **Teach it back** | Explain a topic as if to a classmate. The AI scores it out of 5 and names the gaps; a gap can become a shaky sub-topic in one click. |
 | Practise | **Mock exam** | Timed and closed book, at 1.5 minutes a mark. A predicted mock is built from the most likely past-paper questions. **Add questions from your own notes** (inside Mock) turns pasted notes into CAT questions for the bank. |
@@ -95,12 +98,17 @@ Click a chip to see the breakdown and the next step. You can override the colour
 
 ## 8. Discord DMs
 
-With your user ID set, the bot DMs you the day's plan at **07:00** and, if nothing was logged that day, a nudge at **20:30** (Nairobi time). Checked answers, sub-topic ratings, teach-backs, mocks, papers and timer sessions all count as studying. DM it any of:
+With your user ID set, the bot DMs you the day's plan at **07:00** and, if nothing was logged that day, a nudge at **20:30** (Nairobi time) shaped by your most urgent unit: the night before a paper it points you at your formula sheet and one question. Checked answers, sub-topic ratings, teach-backs, mocks, papers and timer sessions all count as studying. DM it any of:
 
 - `today`: your plan, the countdown, and how many units are TBA
 - `predict EMM 302`: the topics most likely to come
 - `hint EMM 302 exam will mainly focus on beta functions`: save what the lecturer said
 - `weakspots EMM 302`: your highest-risk sub-topics and the mistakes you keep making
+- `mark EMM 302`: a past-paper question to try, picked from your weakspots. Solve it on paper, then:
+  - `mark 142.5 MPa`: checks your final answer (any unit). A wrong one lists the checkpoints.
+  - `mark broke 2` (or `mark broke 2 units`): the checkpoint where your working broke, and the kind of mistake.
+  - `mark dispute`: a checkpoint looks wrong to you; nothing is held against you.
+  - Photos of your working aren't read yet: type the final answer.
 - `teach EMM 302 Mohr's circle`: explain a topic and get it marked (`stop` ends it)
 - `files EMM 302`: past papers and CATs for a unit (`files EMM 302 notes` for notes and slides)
 - `log 45 EMM 302`: log 45 minutes

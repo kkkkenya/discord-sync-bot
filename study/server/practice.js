@@ -152,7 +152,7 @@ export function flagCheckpoint({ id, step = null, note = '' }) {
   const a = data.attempts.find((x) => x.id === id);
   if (!a) throw bad('That attempt was not found.', 404);
   if (a.verdict === 'right') throw bad('That answer matched the key, so there is nothing to dispute.');
-  if (a.verdict === 'wrong') throw bad('You already marked a broken step. Change that mark instead.');
+  if (a.verdict === 'wrong') throw bad('You already marked a broken step. Mark a different one to change it (on Discord: `mark broke <number>`).');
   // an AI or scheme key may be the wrong thing: forget it so the next try solves again (a key you typed stays)
   const row = data.paperq.find((q) => q.id === a.questionId);
   if (row?.key && row.key.source !== 'you') { delete row.key; save(); }

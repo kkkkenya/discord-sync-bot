@@ -14,7 +14,7 @@ config({ path: fileURLToPath(new URL('../../community/.env', import.meta.url)), 
 const { startBot, todayText } = await import('./bot.js');
 const { coach, coachReady } = await import('./coach.js');
 const { aiReady, clamp, provider } = await import('./ai.js');
-const { makeQuestions, makeStudyMaterial, markAnswers, suggestSubtopics } = await import('./brain.js');
+const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics } = await import('./brain.js');
 const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
@@ -22,7 +22,8 @@ const { STAGES, TBA } = await import('./defs.js');
 const { stageMix, validStage } = await import('./stages.js');
 const { masteryMap } = await import('./mastery.js');
 const { checkSubtopic } = await import('./analysis.js');
-const { teachFlags } = await import('./weakspots.js');
+const { hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags } = await import('./weakspots.js');
+const { predictedMock } = await import('./predict.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
@@ -135,6 +136,52 @@ const routes = {
     save();
     return state();
   },
+  // Predictions for one unit: ranked topics, its parsed past-paper questions, hints and scanned papers.
+  'GET /api/predict': (q) => {
+    const unit = q.get('unit');
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    return { ranked: predictFor(unit, nairobiDay()), questions: data.paperq.filter((x) => x.unit === unit), hints: data.hints.filter((h) => h.unit === unit), scanned: scannedPapers(unit) };
+  },
+  // Re-read the unit's synced past papers (no AI). Your topic corrections are kept.
+  'POST /api/predict/parse': (q, { unit }) => {
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    return parsePapers(unit);
+  },
+  // Paste a paper's questions by hand: { unit, label: '2022 CAT 1', text }
+  'POST /api/predict/paste': (q, { unit, label, text }) => {
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (!String(text || '').trim() || !String(label || '').trim()) throw Object.assign(new Error('a label (e.g. 2022 CAT 1) and the question text are needed'), { status: 400 });
+    return { added: pastePaper(unit, label.trim(), text) };
+  },
+  // AI maps the questions it couldn't place (and earlier guesses) to the unit's topics. Yours stay as you set them.
+  'POST /api/predict/map': async (q, { unit }) => {
+    if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Pick each question\'s topic by hand.'), { status: 400 });
+    const topics = data.topics.filter((t) => t.unit === unit);
+    if (!topics.length) throw Object.assign(new Error('Add the unit\'s topics in Units first.'), { status: 400 });
+    const todo = data.paperq.filter((x) => x.unit === unit && x.topicFrom !== 'you');
+    if (!todo.length) return { mapped: 0 };
+    let mapped = 0;
+    for (let i = 0; i < todo.length; i += 25) {
+      const batch = todo.slice(i, i + 25);
+      const { results } = await mapQuestions({ unit, topics: topics.map((t) => t.name), questions: batch.map((x) => x.text) });
+      for (const r of results || []) {
+        const row = batch[r.index];
+        const tp = topics.find((t) => t.name.toLowerCase() === String(r.topic || '').toLowerCase());
+        if (!row) continue;
+        Object.assign(row, { topicId: tp?.id || null, topicFrom: 'ai' });
+        if (tp) mapped++;
+      }
+    }
+    save();
+    return { mapped, of: todo.length };
+  },
+  // A lecturer hint: { unit, text, kind?, topicIds? }. Kind and topics are read from the wording unless given.
+  'POST /api/hints': (q, body) => {
+    if (body.restore) return add('hints', checkHint(body.restore)); // undo a delete
+    if (!data.units.some((u) => u.code === body.unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (!String(body.text || '').trim()) throw Object.assign(new Error('What did the lecturer say?'), { status: 400 });
+    return add('hints', checkHint(hintFields(body.unit, body.text, body)));
+  },
   // AI suggestions from the synced notes for one topic; nothing is saved until the student adds them.
   'POST /api/subtopics/suggest': async (q, { topicId }) => {
     const tp = data.topics.find((t) => t.id === topicId);
@@ -168,6 +215,13 @@ const routes = {
   'POST /api/mocks': async (q, body) => {
     const unit = body.unit;
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (body.predicted) {
+      const questions = predictedMock(predictFor(unit, nairobiDay()), data.paperq.filter((x) => x.unit === unit))
+        .map((x) => ({ q: x.q, a: `No model answer in your library: mark it against the ${x.source || 'paper'} marking scheme, or get a worked solution from the Prompt builder.`, marks: x.marks, topic: x.topic }));
+      if (!questions.length) throw Object.assign(new Error('No past-paper questions mapped to topics yet. In Predictions, read the past papers and check their topics.'), { status: 400 });
+      const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} predicted mock`, questions, predicted: true });
+      return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
+    }
     const count = body.count ? clamp(body.count, 1, 10) : 5;
     const bank = data.questions.filter((x) => x.unit === unit).sort(() => Math.random() - 0.5);
     let questions = bank.slice(0, count).map((x) => ({ q: x.q, a: x.a, marks: x.marks, topic: x.topic || '' }));
@@ -220,8 +274,17 @@ async function submitMock(id, { answers = [] }) {
   return mockResult(mock);
 }
 
+function checkHint(b) {
+  if ('kind' in b && !['focus', 'exclude', 'note'].includes(b.kind)) throw Object.assign(new Error('a hint is focus, exclude or note'), { status: 400 });
+  if ('topicIds' in b && !(Array.isArray(b.topicIds) && b.topicIds.every((id) => data.topics.some((t) => t.id === id)))) throw Object.assign(new Error('unknown topic in the hint'), { status: 400 });
+  return b;
+}
+
 // Validation for generic list writes (undo re-POSTs a deleted row with its id, so create goes through here too).
 const CHECKS = {
+  hints: (b) => checkHint(b),
+  // a topic you pick for a past-paper question is yours: re-reading the papers won't change it
+  paperq: (b) => ('topicId' in b ? { ...b, topicFrom: 'you' } : b),
   subtopics: (b, opts) => {
     const out = checkSubtopic(b, opts);
     if ('audit' in b && !opts?.create) Object.assign(out, { auditAt: new Date().toISOString(), auditFrom: 'you' });

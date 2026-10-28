@@ -20,7 +20,12 @@ export default function Mock({ s, refresh, focus }) {
   const startedAt = useRef(0);
   const duration = useRef(0);
 
-  useEffect(() => { if (focus?.section === 'mock' && focus.unit) setUnit(focus.unit); }, [focus]);
+  const [predicted, setPredicted] = useState(false);
+  useEffect(() => {
+    if (focus?.section !== 'mock') return;
+    if (focus.unit) setUnit(focus.unit);
+    setPredicted(Boolean(focus.predicted));
+  }, [focus]);
 
   useEffect(() => {
     if (left == null || left <= 0) return;
@@ -32,7 +37,7 @@ export default function Mock({ s, refresh, focus }) {
     e.preventDefault();
     setBusy(true); setError(''); setResult(null); setSelfEarned([]);
     try {
-      const m = await api('POST', 'mocks', { unit, count, name });
+      const m = await api('POST', 'mocks', { unit, count, name, predicted });
       setMock(m);
       setAnswers(m.questions.map(() => ''));
       duration.current = m.questions.length * 2 * MINUTE;
@@ -90,6 +95,7 @@ export default function Mock({ s, refresh, focus }) {
               </select>
             </label>
             <input className="grow" placeholder="Name (optional, e.g. CAT 1 revision)" value={name} onChange={(e) => setName(e.target.value)} />
+            <label className="small"><input type="checkbox" checked={predicted} onChange={(e) => setPredicted(e.target.checked)} /> Predicted (from past papers)</label>
             <button disabled={busy || !unit}>{busy ? 'Building…' : 'Start mock'}</button>
           </form>
         </>

@@ -1,9 +1,11 @@
 // The context library: downloads a unit's files from Discord, extracts their text, and caches it in
 // study/data/library.json (separate from study.json so the daily store stays small). fileId -> entry.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { extract } from './extract.js';
 
-const DIR = new URL('../data/', import.meta.url);
+// Same folder as study.json (STUDY_DATA_DIR overrides both).
+const DIR = process.env.STUDY_DATA_DIR ? pathToFileURL(`${process.env.STUDY_DATA_DIR.replace(/[\\/]$/, '')}/`) : new URL('../data/', import.meta.url);
 const FILE = new URL('library.json', DIR);
 const EMPTY = { files: {} };
 

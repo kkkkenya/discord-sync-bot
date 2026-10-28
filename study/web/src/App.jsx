@@ -9,6 +9,7 @@ import Mock from './Mock.jsx';
 import Notes from './Notes.jsx';
 import Onboarding, { Checklist } from './Onboarding.jsx';
 import Papers from './Papers.jsx';
+import Predictions from './Predictions.jsx';
 import Progress from './Progress.jsx';
 import Prompt from './Prompt.jsx';
 import Teach from './Teach.jsx';
@@ -19,7 +20,7 @@ import Units from './Units.jsx';
 gsap.registerPlugin(useGSAP);
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const NAV = [['today', 'Today'], ['units', 'Units'], ['analysis', 'Weakspots'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
+const NAV = [['today', 'Today'], ['units', 'Units'], ['predictions', 'Predict'], ['analysis', 'Weakspots'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
 
 export default function App() {
   const [s, setS] = useState(null);
@@ -128,6 +129,7 @@ export default function App() {
         {!tourOn && (s.settings.tour?.done || s.settings.tour?.skipped) && !checklistOff && <Checklist s={s} onDismiss={() => setChecklistOff(true)} />}
         <Today {...props} />
         <Units {...props} />
+        <Predictions {...props} />
         <Analysis {...props} />
         <Notes {...props} />
         <Teach {...props} />

@@ -8,13 +8,15 @@ import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
 import { catDay, daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
-import { teachFlags } from './weakspots.js';
+import { hintFields, predictFor, teachFlags } from './weakspots.js';
 
 const HELP = [
   '**Study DMs**: type any of these.',
   '`today`: your plan and the CAT countdown',
   '`files EMM 302`: past papers and CATs for a unit from the server (`files EMM 302 notes` for notes and slides, `files` for all your units)',
   '`teach EMM 302 Mohr\'s circle`: explain a topic like you\'re teaching a classmate, get it marked',
+  '`predict EMM 302`: the topics most likely to come, from past papers and lecturer hints',
+  '`hint EMM 302 exam will mainly focus on beta functions`: save what the lecturer said',
   '`log 45 EMM 302`: log 45 minutes of study',
   '`paper EMM 302 34/60 2023 CAT 1`: log a past paper score',
   '`stop`: end a teach-back',
@@ -49,7 +51,7 @@ export function todayText(today = nairobiDay()) {
   return lines.join('\n');
 }
 
-const COMMANDS = ['today', 'files', 'teach', 'log', 'paper'];
+const COMMANDS = ['today', 'files', 'teach', 'log', 'paper', 'predict', 'hint'];
 
 // Links to a unit's files in the server's forum posts. Papers and CATs by default, or notes/slides/books.
 async function filesText(unit, notes) {
@@ -148,6 +150,25 @@ export async function reply(text) {
     const label = t.replace(/^paper\s*/i, '').replace(/\b[A-Za-z]{3}\s?\d{3}\b/, '').replace(m[0], '').trim() || 'Past paper';
     add('papers', { unit, label, score: Number(m[1]), outOf: Number(m[2]) });
     return `Logged ${label}: ${m[1]}/${m[2]} (${Math.round((m[1] / m[2]) * 100)}%). Redo every question you dropped marks on, closed book, then teach back the topic behind it.`;
+  }
+  if (word === 'predict') {
+    const unit = unitOf(t);
+    if (!unit || !known(unit)) return 'Like this: `predict EMM 302` (one of your units)';
+    const ranked = predictFor(unit, nairobiDay());
+    if (!ranked.length) return `No topics for ${unit} yet. Add them on the dashboard (Units).`;
+    const parsed = data.paperq.filter((q) => q.unit === unit).length;
+    return [
+      `**${unit}: most likely topics**${parsed ? '' : ' _(no past papers read yet: open Predictions on the dashboard and read them)_'}`,
+      ...ranked.slice(0, 6).map((r, n) => `${n + 1}. **${r.name}**${r.pinned ? ' 📌 pinned by lecturer' : r.muted ? ' (muted by lecturer)' : ''} · weight ${r.weight} · ${r.evidence}`),
+    ].join('\n');
+  }
+  if (word === 'hint') {
+    const unit = unitOf(t);
+    const text = t.replace(/^hint\s*/i, '').replace(/\b[A-Za-z]{3}\s?\d{3}\b/, '').trim();
+    if (!unit || !known(unit) || !text) return 'Like this: `hint EMM 302 exam will mainly focus on beta functions`';
+    const h = add('hints', hintFields(unit, text));
+    const names = data.topics.filter((x) => h.topicIds.includes(x.id)).map((x) => x.name);
+    return `Saved as a **${h.kind}** hint for ${unit}${names.length ? ` on ${names.join(', ')}` : ' (no topic matched: tag it on the dashboard)'}.`;
   }
   if (word === 'quiz' || word === 'card') return 'Flashcards are retired in Study Desk. Try `teach EMM 302 <topic>`, or a timed mock on the dashboard.';
   return mode ? 'Type `stop` to end this first.' : HELP;

@@ -44,7 +44,7 @@ Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` 
 | `study/server/mastery.js` | Evidence-based topic colour (red/amber/green). | exists |
 | `study/server/library.js` | Unit catalogue (`cohort.js` `catalogue()`), the KU `CALENDAR` from `lib/config.js`, and each unit's files from the Supabase `files` table. | exists |
 | `study/server/ingest.js`, `extract.js` | Context library: downloads a unit's Discord files, extracts text (PDF/DOCX/PPTX) into `study/data/library.json`; `contextFor(unit, topic)` returns grounding text. | exists |
-| `study/server/bot.js` | DM-only Discord bot (`OWNER_ID` only). Commands: `today, files, teach, log, paper, help, stop`. 07:00 plan and 20:30 nudge (Nairobi). | exists |
+| `study/server/bot.js` | DM-only Discord bot (`OWNER_ID` only). Commands: `today, files, predict, hint, teach, log, paper, help, stop`. 07:00 plan and 20:30 nudge (Nairobi). | exists |
 | `study/server/coach.js` | Marks Feynman teach-backs (score 1-5, gaps, follow-up question). | exists |
 | `study/server/brain.js` | AI: notes to CAT questions, mock question fill, mock marking. | exists |
 | `study/server/prompt.js` | Prompt builder for external AI, grounded in the synced library (short context cap). | exists; deep `.md` pack is Phase 7 |
@@ -54,7 +54,7 @@ Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` 
 | `study/server/cohort.js` | Course + year to units from the catalogue (`lib/units.json` plus thread-only units from `lib/threads.json`). The Hub has no semester data, so a cohort lists the whole year and the student unticks. | exists (Phase 2) |
 | `study/server/stages.js` | Per-unit study stage from the unit's own date (TBA = Adequate), with a per-unit and an all-units override; `plan.js` picks each unit's task by stage. | exists (Phase 3) |
 | `study/server/analysis.js`, `weakspots.js`, `web/src/Analysis.jsx` | Sub-topic tree per topic (add, rename, kind, reorder, delete with undo), the keyboard self-audit, AI sub-topic suggestions, teach-back gaps flagging sub-topics shaky. Weakspot matrix: Phase 6. | exists (Phase 4) |
-| `study/server/predict.js`, `web/src/Predictions.jsx` | Past-paper question map, lecturer hints, predictions. | Phase 5 |
+| `study/server/predict.js`, `web/src/Predictions.jsx` | Parses synced past papers into questions (no AI; scanned papers flagged, questions can be pasted), maps them to topics by name (AI optional, your picks win), lecturer hints (kind + topics read from the wording, editable), topics ranked by exam weight with the evidence shown, predicted mock. | exists (Phase 5) |
 | `study/server/context-pack.js` | `<UNIT>-<TOPIC>-context.md` pack + limit guard. | Phase 7 |
 | `web/src/Practice.jsx` | Checkpoint dissection (answer + operations, then photo). | Phases 8 and 9 |
 | Bot commands `predict, hint, weakspots, mark` | | Phases 5-9, aligned in Phase 11 |

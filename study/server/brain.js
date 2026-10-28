@@ -57,6 +57,23 @@ export async function suggestSubtopics({ unit, topic, have = [], context = '' })
   return structured(schema, TUTOR, content, 2000);
 }
 
+// Past-paper questions → the unit's topics (by exact topic name, or '' when none fits).
+export async function mapQuestions({ unit, topics, questions }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      results: {
+        type: 'array',
+        items: { type: 'object', properties: { index: { type: 'integer' }, topic: { type: 'string', description: 'Exactly one of the listed topic names, or an empty string if none fits.' } }, required: ['index', 'topic'], additionalProperties: false },
+      },
+    },
+    required: ['results'],
+    additionalProperties: false,
+  };
+  const content = `Unit: ${unit}\nTopics (use these names exactly):\n${topics.map((t) => `- ${t}`).join('\n')}\n\nQuestions:\n${questions.map((q, i) => `[${i}] ${q.slice(0, 1200)}`).join('\n\n')}\n\nFor each question, give its index and the ONE topic it mainly tests.`;
+  return structured(schema, TUTOR, content, 4000);
+}
+
 // Fill a mock exam when the question bank is short: generate questions from the unit's topics.
 export async function makeQuestions({ unit, topics, count, context = '' }) {
   const schema = {

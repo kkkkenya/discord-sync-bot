@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from './api.js';
+import { api, questEvent } from './api.js';
 
 // Focus timer: 25 or 50 minutes on the current unit. A session of a minute or more is saved when it ends or you stop.
 // The unit is fixed when you press Focus, so switching units elsewhere doesn't move a running session.
@@ -48,7 +48,7 @@ export default function Timer({ s, refresh, unit, setUnit }) {
           <select value={length} onChange={(e) => setLength(Number(e.target.value))} aria-label="Length">
             <option value={25}>25 min</option><option value={50}>50 min</option>
           </select>
-          <button onClick={() => { on.current = unit; started.current = Date.now(); setNow(Date.now()); setEnd(Date.now() + length * 60000); }}>Focus</button>
+          <button onClick={() => { questEvent('focus-start'); on.current = unit; started.current = Date.now(); setNow(Date.now()); setEnd(Date.now() + length * 60000); }}>Focus</button>
         </>
       )}
     </aside>

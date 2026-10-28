@@ -10,12 +10,12 @@ import Kit from './Kit.jsx';
 import Mock from './Mock.jsx';
 import Nav from './Nav.jsx';
 import Notes from './Notes.jsx';
-import Onboarding, { Checklist } from './Onboarding.jsx';
 import Papers from './Papers.jsx';
 import Practice from './Practice.jsx';
 import Predictions from './Predictions.jsx';
 import Progress from './Progress.jsx';
 import Prompt from './Prompt.jsx';
+import Quests from './Quests.jsx';
 import Teach from './Teach.jsx';
 import Timer from './Timer.jsx';
 import Today from './Today.jsx';
@@ -43,9 +43,6 @@ export default function App() {
   const root = useRef(null);
 
   const [problem, setProblem] = useState('');
-  const [tourOn, setTourOn] = useState(false);
-  const [tourStep, setTourStep] = useState(0);
-  const [checklistOff, setChecklistOff] = useState(false);
   // one toast at a time: { text, undo } — deletes happen at once and can be undone for 8 seconds
   const [toast, setToast] = useState(null);
   const notify = useCallback((text, undo) => setToast({ text, undo, id: Date.now() }), []);
@@ -60,13 +57,6 @@ export default function App() {
   const setUnit = useCallback((code) => { setUnitPick(code); try { localStorage.setItem('study-unit', code); } catch { /* private window */ } }, []);
   const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(x); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
-  // auto-open the tour on a brand-new (empty) store, once
-  useEffect(() => {
-    if (s && !s.data.units.length && !s.settings.tour?.done && !s.settings.tour?.skipped) {
-      setTourStep(s.settings.tour?.step || 0);
-      setTourOn(true);
-    }
-  }, [s?.data.units.length, s?.settings.tour?.done, s?.settings.tour?.skipped]);
   // any failed save (server closed, bad input) shows up here instead of failing silently
   useEffect(() => {
     const show = (e) => { setProblem(e.reason?.message || String(e.reason)); e.preventDefault(); };
@@ -114,7 +104,7 @@ export default function App() {
   return (
     <>
       {!calm && <ReactLenis root options={{ autoRaf: false, anchors: true }} ref={lenisRef} />}
-      <Nav s={s} go={go} refresh={refresh} unit={unit} setUnit={setUnit} onProblem={setProblem} onTour={() => { setTourStep(0); setTourOn(true); }} />
+      <Nav s={s} go={go} refresh={refresh} unit={unit} setUnit={setUnit} onProblem={setProblem} onTour={() => api('POST', 'settings', { quest: { ...s.settings.quest, off: false } }).then(refresh)} />
       <main className="shell" ref={root}>
         {problem && <p className="banner bad" role="alert">{problem} <button className="link" onClick={refresh}>Try again</button></p>}
         {s.retiredCards > 0 && !s.settings.cardsNotice && (
@@ -125,7 +115,6 @@ export default function App() {
             <button className="link" onClick={() => api('POST', 'settings', { cardsNotice: true }).then(refresh).catch((e) => setProblem(e.message))}>Got it</button>
           </p>
         )}
-        {!tourOn && (s.settings.tour?.done || s.settings.tour?.skipped) && !checklistOff && <Checklist s={s} onDismiss={() => setChecklistOff(true)} />}
         <Band n="01" label="Today" note="where you stand, and the next thing to do">
           <div className="cols lead"><Hero {...props} /><Today {...props} /></div>
         </Band>
@@ -150,7 +139,7 @@ export default function App() {
           <button className="x" aria-label="Dismiss" onClick={() => setToast(null)}>×</button>
         </div>
       )}
-      {tourOn && <Onboarding s={s} refresh={refresh} initialStep={tourStep} close={() => setTourOn(false)} />}
+      <Quests s={s} refresh={refresh} go={go} />
     </>
   );
 }

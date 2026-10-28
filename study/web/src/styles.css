@@ -304,23 +304,6 @@ input.num { width: 84px; }
 .promptout { margin-top: 12px; }
 .promptout textarea { font-family: var(--mono); font-size: 0.82rem; }
 
-/* Onboarding tour + getting-started checklist */
-.spotlight { position: fixed; z-index: 40; border-radius: 8px; box-shadow: 0 0 0 9999px rgba(10, 10, 12, 0.6); transition: all 0.2s ease; pointer-events: none; }
-.tour-tip { position: fixed; z-index: 41; width: 360px; max-width: calc(100vw - 16px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25); }
-.tour-tip.narrow { left: 8px; right: 8px; bottom: 8px; width: auto; }
-.tour-tip h3 { margin: 4px 0 6px; font-size: 1.05rem; }
-.tour-tip p { margin: 0 0 12px; }
-.tour-progress { text-transform: uppercase; letter-spacing: 0.06em; }
-.tour-actions { display: flex; align-items: center; gap: 8px; }
-.tour-actions .spacer { flex: 1; }
-.help { background: none; color: var(--muted); border: 1px solid var(--line); border-radius: 50%; width: 26px; height: 26px; padding: 0; font-weight: 600; flex: 0 0 auto; }
-.checklist { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin-top: 18px; }
-.checklist-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.checklist > div:not(.checklist-head) { padding: 3px 0; color: var(--muted); }
-.checklist .tick { display: inline-block; width: 18px; }
-.checklist > div.ok { color: var(--ink); }
-.checklist > div.ok .tick { color: var(--green); }
-@media (prefers-reduced-motion: reduce) { .spotlight { transition: none; } }
 
 
 .card { border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 16px; background: var(--paper); }
@@ -439,3 +422,25 @@ th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
 @media (min-width: 1000px) { .recipes-body { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .recipe { border-top: 1px dashed var(--line); padding-top: 6px; }
 .recipe p { margin: 4px 0; }
+
+/* Tutorial quests: a HUD bottom left, and a pulsing ring on what to press */
+.quest {
+  position: fixed; left: 16px; bottom: 16px; z-index: 25; width: min(360px, calc(100vw - 32px)); padding: 14px 16px 16px;
+  background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 14px; box-shadow: var(--shadow);
+}
+.quest h3 { margin: 10px 0 4px; font-size: 1.2rem; }
+.quest-do { margin: 0 0 4px; }
+.quest .muted.small { margin: 0; }
+.quest-top { display: flex; align-items: center; gap: 8px; }
+.quest-xp { margin-left: auto; font: 500 0.78rem var(--mono); color: var(--muted); }
+.quest-xp b { color: var(--accent); }
+.quest-bar { height: 6px; border-radius: 3px; background: var(--line); margin-top: 8px; overflow: hidden; }
+.quest-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.5s ease; }
+.quest-won { position: relative; margin: 10px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--green-bg); color: var(--green); font-weight: 500; }
+.quest-won .spark { position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); opacity: 0; pointer-events: none; }
+.quest-won .spark:nth-child(3n) { background: var(--green); }
+.quest-won .spark:nth-child(3n + 1) { background: var(--amber); }
+.quest-ring { position: fixed; z-index: 24; pointer-events: none; border: 2px solid var(--accent); border-radius: 12px; animation: quest-pulse 1.6s ease-in-out infinite; transition: left 0.25s, top 0.25s, width 0.25s, height 0.25s; }
+@keyframes quest-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 10px transparent; } }
+@media (prefers-reduced-motion: reduce) { .quest-ring { animation: none; transition: none; } .quest-bar i { transition: none; } }
+@media (max-width: 640px) { .quest { bottom: 84px; } }

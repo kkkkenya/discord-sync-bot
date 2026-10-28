@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api } from './api.js';
+import { api, questEvent } from './api.js';
 
 // The sections, grouped the way a study day runs. `inside` is what the menu lists under each section.
 export const GROUPS = [
@@ -88,7 +88,7 @@ export default function Nav({ s, go, refresh, unit, setUnit, onTour, onProblem }
   const timer = useRef(0);
   const bar = useRef(null);
   const later = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setOpen((o) => (o === 'sheet' ? o : null)), 160); };
-  const now = (id) => { clearTimeout(timer.current); setOpen(id); setHot(null); };
+  const now = (id) => { clearTimeout(timer.current); setOpen(id); setHot(null); if (id !== 'settings') questEvent('nav-open'); };
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape') setOpen(null); };
     const away = (e) => { if (bar.current && !bar.current.contains(e.target)) setOpen(null); };
@@ -116,11 +116,11 @@ export default function Nav({ s, go, refresh, unit, setUnit, onTour, onProblem }
         </select>
       </label>
       <p className={`small ${s.ai ? 'muted' : 'warm'}`}>{s.ai ? `AI ready (${s.provider}).` : `No key for ${s.provider}. Pick another provider or add the key with setup.bat.`}</p>
-      <button className="link small" onClick={() => { setOpen(null); onTour(); }}>Take the tour again</button>
+      <button className="link small" onClick={() => { setOpen(null); onTour(); }}>{s.settings.quest?.off ? 'Show the tutorial quests' : 'Tutorial quests are on (bottom left)'}</button>
     </div>
   );
   const unitPick = s.data.units.length > 0 && (
-    <select className="unitpick" value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Current unit (every section follows it)" title="Every section follows this unit">
+    <select className="unitpick" value={unit} onChange={(e) => { setUnit(e.target.value); questEvent('unit-pick'); }} aria-label="Current unit (every section follows it)" title="Every section follows this unit">
       {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code} {u.title}</option>)}
     </select>
   );
@@ -145,7 +145,7 @@ export default function Nav({ s, go, refresh, unit, setUnit, onTour, onProblem }
           <button className={`iconbtn${open === 'settings' ? ' on' : ''}${s.ai ? '' : ' warn'}`} aria-expanded={open === 'settings'} aria-label="Settings: study stage and AI provider" title="Settings" onClick={() => (open === 'settings' ? setOpen(null) : now('settings'))}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2.2" /><circle cx="10" cy="17" r="2.2" /></svg>
           </button>
-          <button className="menubtn" aria-expanded={open === 'sheet'} onClick={() => setOpen(open === 'sheet' ? null : 'sheet')}>{open === 'sheet' ? 'Close' : 'Menu'}</button>
+          <button className="menubtn" aria-expanded={open === 'sheet'} onClick={() => { if (open !== 'sheet') questEvent('nav-open'); setOpen(open === 'sheet' ? null : 'sheet'); }}>{open === 'sheet' ? 'Close' : 'Menu'}</button>
         </div>
       </div>
 

@@ -83,6 +83,7 @@ export default function Predictions({ s, focus, go, notify }) {
         </select>
       </label>
       {q.topicFrom && q.topicId && <span className="muted small"> {q.topicFrom === 'you' ? 'set by you' : q.topicFrom === 'ai' ? 'AI guess' : 'matched by name'}</span>}
+      {' '}<button className="link small" onClick={() => go('prompt', { unit, questionId: q.id })}>Solve in Prompt Builder</button>
     </li>
   );
 
@@ -132,6 +133,7 @@ export default function Predictions({ s, focus, go, notify }) {
                         {r.pinned && <span className="badge pin" title={r.hint || ''}>📌 Pinned by lecturer</span>}
                         {r.muted && <span className="badge" title={r.hint || ''}>Muted by lecturer</span>}
                         <span className="muted small">weight {r.weight}{r.mult !== 1 ? ` (${r.base} × ${r.mult})` : ''} · {r.evidence}</span>
+                        <button className="link small" onClick={() => go('prompt', { unit, topicId: r.topicId })}>Prompt Builder</button>
                         {qs.length > 0 && <button className="link small" onClick={() => setOpen(open === r.topicId ? null : r.topicId)} aria-expanded={open === r.topicId}>{open === r.topicId ? 'hide' : 'show'} questions</button>}
                       </div>
                       {open === r.topicId && <ul className="qlist">{qs.map(qrow)}</ul>}

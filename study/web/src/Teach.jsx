@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import LimitNote from './LimitNote.jsx';
 
 function Feedback({ f }) {
   return (
@@ -29,7 +30,7 @@ function GapsToSubtopics({ topicId, gaps, refresh }) {
   );
 }
 
-export default function Teach({ s, refresh, focus }) {
+export default function Teach({ s, refresh, focus, go }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const [topic, setTopic] = useState('');
   const [text, setText] = useState('');
@@ -69,6 +70,7 @@ export default function Teach({ s, refresh, focus }) {
         <button disabled={busy || !unit || !topic.trim() || text.trim().length < 40}>{busy ? 'Marking…' : s.coach ? 'Get it marked' : 'Save teach-back'}</button>
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}
+      {result?.item && <LimitNote s={s} unit={unit} topic={topic} go={go} what="marking a derivation" />}
       {result?.item?.feedback && <Feedback f={result.item.feedback} />}
       {result?.flags?.flagged?.length > 0 && <p className="muted small" role="status">Marked shaky in your weakspots: <b>{result.flags.flagged.join(', ')}</b>.</p>}
       {result?.flags?.topicId && result.flags.unmatched?.length > 0 && <GapsToSubtopics topicId={result.flags.topicId} gaps={result.flags.unmatched} refresh={refresh} />}

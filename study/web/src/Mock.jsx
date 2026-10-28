@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import LimitNote from './LimitNote.jsx';
 
 const MINUTE = 60000;
 
 // Timed, closed-book mock exam. Questions come from your bank (built by Notes) and, if there aren't enough,
 // are generated fresh from the unit's topics. With an Anthropic key it's marked in one go; without,
 // you see the model answers and self-mark.
-export default function Mock({ s, refresh, focus }) {
+export default function Mock({ s, refresh, focus, go }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const [count, setCount] = useState(5);
   const [name, setName] = useState('');
@@ -137,6 +138,7 @@ export default function Mock({ s, refresh, focus }) {
 
       {result && !result.selfMark && (
         <div className="mock feedback">
+          <LimitNote s={s} unit={result.unit} go={go} what="marking multi-step answers" />
           <p className="score">{result.score}/{result.outOf} <span className="muted small">({Math.round((result.score / result.outOf) * 100)}%)</span></p>
           {result.overall && <p>{result.overall}</p>}
           {result.items.map((it, i) => (

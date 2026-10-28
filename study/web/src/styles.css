@@ -142,6 +142,12 @@ input.num { width: 84px; }
 .gaps { padding-left: 18px; }
 .topicblock form input.grow { flex: 1 1 220px; }
 
+/* Prompt builder */
+.limitnote { border-left: 3px solid var(--amber); padding: 6px 10px; background: var(--amber-bg); color: var(--ink); border-radius: 0 6px 6px 0; }
+.checklist-steps { padding-left: 20px; }
+.checklist-steps li { margin: 3px 0; }
+.promptout details { margin-top: 8px; }
+
 /* Weakspot matrix */
 .matrix { border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 12px 0; background: var(--paper); }
 .matrix h3 { font-size: 0.95rem; margin: 4px 0 6px; }

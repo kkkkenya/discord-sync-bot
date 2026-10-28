@@ -245,6 +245,7 @@ function Unit({ u, s, refresh, go, notify }) {
       {pending && <p className="muted small next">Next to turn green: <b>{pending.t.name}</b> — {pending.m.next}.</p>}
       <div className="row small">
         <button className="link" onClick={() => go('mock', { unit: u.code })}>timed mock</button>
+        <button className="link" onClick={() => go('prompt', { unit: u.code })}>prompt pack</button>
         <button className="link" onClick={() => go('teach', { unit: u.code })}>teach a topic</button>
         <button className="link" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} server files</button>
       </div>

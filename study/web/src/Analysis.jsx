@@ -55,7 +55,7 @@ function SubRow({ sub, prev, next, refresh, notify }) {
   );
 }
 
-function TopicBlock({ topic, subs, s, refresh, notify }) {
+function TopicBlock({ topic, subs, s, refresh, notify, go }) {
   const [text, setText] = useState('');
   const [kind, setKind] = useState('concept');
   const [ideas, setIdeas] = useState(null);
@@ -76,6 +76,7 @@ function TopicBlock({ topic, subs, s, refresh, notify }) {
     <div className="topicblock">
       <header>
         <h3><span className={`chip solo ${m?.status || 'red'}`} title={m ? `${m.why}\nNext: ${m.next}` : ''}>{topic.name}</span></h3>
+        <button className="link small" onClick={() => go('prompt', { unit: topic.unit, topicId: topic.id })}>Open in Prompt Builder</button>
         {s.ai
           ? <button className="ghost small" onClick={suggest} disabled={busy}>{busy ? 'Reading your notes…' : 'Suggest sub-topics'}</button>
           : <span className="muted small">No AI key: add sub-topics by hand</span>}
@@ -122,7 +123,10 @@ function Matrix({ unit, s, go }) {
                 <span className="muted small" title="exam weight × weakness">priority {c.priority} = {c.weight} × {c.weakness}</span>
               </div>
               <p className="small muted">{c.reason}</p>
-              <button className="link small" onClick={() => act(c)}>{c.next} →</button>
+              <div className="row wrap small">
+                <button className="link small" onClick={() => act(c)}>{c.next} →</button>
+                <button className="link small" onClick={() => go('prompt', { unit, topicId: c.topicId, goal: c.topError ? 'diagnose' : 'breakdown' })}>Open in Prompt Builder</button>
+              </div>
             </li>
           ))}
         </ol>
@@ -173,7 +177,7 @@ export default function Analysis({ s, refresh, focus, notify, go }) {
           <Matrix unit={unit} s={s} go={go} />
           {all.length > 0 && <p className="muted small">Audit with the keyboard: focus a row, then <kbd>1</kbd> solid · <kbd>2</kbd> shaky · <kbd>3</kbd> stuck · <kbd>4</kbd> untested; it moves to the next row.</p>}
           {!topics.length && <p className="muted small">No topics for {unit} yet. Add them in Units first.</p>}
-          {topics.map((t) => <TopicBlock key={t.id} topic={t} subs={subsOf(t)} s={s} refresh={refresh} notify={notify} />)}
+          {topics.map((t) => <TopicBlock key={t.id} topic={t} subs={subsOf(t)} s={s} refresh={refresh} notify={notify} go={go} />)}
         </>
       )}
     </section>

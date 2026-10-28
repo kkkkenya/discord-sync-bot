@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import LimitNote from './LimitNote.jsx';
 
 // Paste lecture notes / a textbook section / slide text. The AI turns it into CAT-style questions that land in
 // your mock-exam bank.
-export default function Notes({ s, refresh, focus }) {
+export default function Notes({ s, refresh, focus, go }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const [topic, setTopic] = useState('');
   const [text, setText] = useState('');
@@ -47,6 +48,7 @@ export default function Notes({ s, refresh, focus }) {
         <textarea rows={12} placeholder="Paste notes here — definitions, derivations, worked examples…" value={text} onChange={(e) => setText(e.target.value)} />
         <button disabled={busy || !s.ai || !unit || !topic.trim() || text.trim().length < 60}>{busy ? 'Writing questions…' : 'Generate questions'}</button>
       </form>
+      <LimitNote s={s} unit={unit} topic={topic} go={go} what="model answers with long working" />
       {result?.error && <p className="banner bad">{result.error}</p>}
       {result?.questions != null && (
         <p className="banner good" role="status">Added <b>{result.questions}</b> CAT question{result.questions === 1 ? '' : 's'} to your mock bank. Try a timed mock on them.</p>

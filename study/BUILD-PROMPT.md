@@ -47,7 +47,7 @@ Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` 
 | `study/server/bot.js` | DM-only Discord bot (`OWNER_ID` only). Commands: `today, files, predict, hint, weakspots, teach, log, paper, help, stop`. 07:00 plan and 20:30 nudge (Nairobi). | exists |
 | `study/server/coach.js` | Marks Feynman teach-backs (score 1-5, gaps, follow-up question). | exists |
 | `study/server/brain.js` | AI: notes to CAT questions, mock question fill, mock marking. | exists |
-| `study/server/prompt.js` | Prompt builder for external AI, grounded in the synced library (short context cap). | exists; deep `.md` pack is Phase 7 |
+| `study/server/prompt.js` | Quick prompts for external AI, grounded in a capped slice of the synced library. | exists |
 | `study/server/ai.js` | Shared AI provider wrapper (`Gemini` default / `DeepSeek` / `Claude`): `structured(schema, system, content)`, `aiReady()`. | exists |
 | `study/server/insights.js` | Pure activity/performance functions (WIP, not wired into the UI; its "deeper dive" still reads retired flashcard reviews). | superseded by Phase 6 |
 | `study/web/src/*.jsx` | React frontend: `Hero, Today, Units, Notes, Teach, Mock, Papers, Prompt, Progress, Timer, CheckIn, Onboarding`. Plain CSS in `styles.css`. | exists |
@@ -55,7 +55,7 @@ Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` 
 | `study/server/stages.js` | Per-unit study stage from the unit's own date (TBA = Adequate), with a per-unit and an all-units override; `plan.js` picks each unit's task by stage. | exists (Phase 3) |
 | `study/server/analysis.js`, `weakspots.js`, `web/src/Analysis.jsx` | Sub-topic tree per topic (add, rename, kind, reorder, delete with undo), the keyboard self-audit, AI sub-topic suggestions, teach-back gaps flagging sub-topics shaky. Weakspot matrix (`GET /api/weakspots`): critical sub-topics by exam weight × weakness with reason and next step, error-type breakdown with a takeaway; Today's tasks use the top weakspot. | exists (Phases 4 and 6) |
 | `study/server/predict.js`, `web/src/Predictions.jsx` | Parses synced past papers into questions (no AI; scanned papers flagged, questions can be pasted), maps them to topics by name (AI optional, your picks win), lecturer hints (kind + topics read from the wording, editable), topics ranked by exam weight with the evidence shown, predicted mock. | exists (Phase 5) |
-| `study/server/context-pack.js` | `<UNIT>-<TOPIC>-context.md` pack + limit guard. | Phase 7 |
+| `study/server/context-pack.js`, `web/src/Prompt.jsx`, `web/src/LimitNote.jsx` | Deep Context Pack (`POST /api/pack`, no AI): stage-, hint- and weakspot-aware Master Prompt, `<UNIT>-<TOPIC>-context.md` within a ~120k-token budget, upload checklist; limit notes on Notes, Teach and Mock; "Open in Prompt Builder" from units, topics, weakspots and past-paper questions. | exists (Phase 7) |
 | `web/src/Practice.jsx` | Checkpoint dissection (answer + operations, then photo). | Phases 8 and 9 |
 | Bot commands `predict, hint, weakspots, mark` | | Phases 5-9, aligned in Phase 11 |
 

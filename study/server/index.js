@@ -41,6 +41,7 @@ const state = () => {
   const units = Object.fromEntries(data.units.map((u) => [u.code, unitStage(u, today)]));
   return {
     units, stageMix: stageMix(Object.values(units).map((x) => x.stage)), stages: STAGES.map(({ maxDays, ...s }) => s),
+    goals: Object.entries(GOALS).map(([id, g]) => ({ id, name: g.name })),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
     mastery: masteryMap(today), library: libraryMeta(), discord: Boolean(bot),

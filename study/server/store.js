@@ -19,12 +19,13 @@ mkdirSync(DIR, { recursive: true });
 //   subtopicIds, topicFrom: 'auto'|'ai'|'you' }]   (past-paper questions; fileId 'paste-…' for pasted papers)
 // hints: [{ id, unit, text, kind: 'focus'|'exclude'|'note', topicIds, at }]   (what the lecturer said)
 // attempts: filled from Phase 8 on (see PHASES.md).
+// materials: [{ id, unit, topicId|null, kind: 'ladder'|'recipes'|'sheet', stage, content, edited, at }]   (Phase 10 study kit)
 // cards, reviews: retired flashcards. Left exactly as they are in old files, never read or sent to the dashboard.
 // settings: { aiProvider: 'gemini'|'deepseek'|'anthropic', tour: { step, done, skipped }, cardsNotice: true once
 //   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
 //   unitArchive: { code: { catDate, confidence, ... } } (units you un-ticked, restored if you tick them again) }
 const EMPTY = {
-  units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [],
+  units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [], materials: [],
   settings: { aiProvider: 'gemini', tour: {}, cohort: null, unitArchive: {} },
 };
 
@@ -51,7 +52,7 @@ export function save() {
   renameSync(tmp, FILE);
 }
 
-export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks', 'subtopics', 'hints', 'paperq'];
+export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks', 'subtopics', 'hints', 'paperq', 'materials'];
 
 export function add(list, row) {
   const item = { id: randomUUID().slice(0, 8), at: new Date().toISOString(), ...row };

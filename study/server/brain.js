@@ -180,3 +180,79 @@ export async function solveWithCheckpoints({ unit, topic = '', question, subtopi
   ].filter(Boolean).join('\n\n');
   return structured(schema, TUTOR, content, 4000);
 }
+
+// Study material matched to the stage (Phase 10). kind: 'ladder' (Adequate Prep: worked → faded → solo, plus
+// teach-back prompts), 'recipes' (1-Week Mode: solving recipes and shortcuts for the top predicted topics) or 'sheet'
+// (Last-Minute / Exam-Eve: a one-page formula and shortcut sheet with the student's own traps).
+const STEP = { type: 'array', items: { type: 'string' } };
+const KIT_SCHEMA = {
+  ladder: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      worked: { type: 'object', properties: { problem: { type: 'string' }, steps: { ...STEP, description: '4-7 steps, each written out with the equation, the substituted numbers and SI units. Do not number them.' }, answer: { type: 'string' } }, required: ['problem', 'steps', 'answer'], additionalProperties: false },
+      faded: {
+        type: 'object',
+        description: 'A close variant of the worked problem with the same number of steps (not numbered). About half are left for the student (blank=true shows only the hint), the later ones more than the early ones.',
+        properties: { problem: { type: 'string' }, steps: { type: 'array', items: { type: 'object', properties: { text: { type: 'string', description: 'The full step (the answer to a blank).' }, hint: { type: 'string', description: 'What to do in this step, without the result.' }, blank: { type: 'boolean' } }, required: ['text', 'hint', 'blank'], additionalProperties: false } }, answer: { type: 'string' } },
+        required: ['problem', 'steps', 'answer'], additionalProperties: false,
+      },
+      solo: { type: 'object', properties: { problem: { type: 'string', description: 'KU CAT style, a different situation using the same method.' }, answer: { type: 'string', description: 'Final answer with units only.' } }, required: ['problem', 'answer'], additionalProperties: false },
+      teachPrompts: { ...STEP, description: '3 teach-back prompts: explain-why questions a classmate would ask about this topic.' },
+    },
+    required: ['title', 'worked', 'faded', 'solo', 'teachPrompts'],
+    additionalProperties: false,
+  },
+  recipes: {
+    type: 'object',
+    properties: {
+      recipes: {
+        type: 'array',
+        description: 'One recipe per question type the listed topics produce in KU past papers, at most 5.',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: 'The question type, e.g. "Principal stresses from a stress element".' },
+            when: { type: 'string', description: 'How to recognise it in a question.' },
+            steps: { ...STEP, description: '3-7 standard solving steps.' },
+            shortcut: { type: 'string' },
+            trap: { type: 'string', description: 'The mistake that costs marks here.' },
+            tryIt: { type: 'string', description: 'One short exam-style question to try, with numbers.' },
+          },
+          required: ['name', 'when', 'steps', 'shortcut', 'trap', 'tryIt'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['recipes'],
+    additionalProperties: false,
+  },
+  sheet: {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      formulas: {
+        type: 'array',
+        description: 'At most 14 formulas, the ones this unit\'s CATs use most.',
+        items: { type: 'object', properties: { name: { type: 'string' }, formula: { type: 'string', description: 'Plain text with ^ and _.' }, symbols: { type: 'string', description: 'Each symbol with its SI unit, short.' }, notWhen: { type: 'string', description: 'When this formula does NOT apply.' } }, required: ['name', 'formula', 'symbols', 'notWhen'], additionalProperties: false },
+      },
+      conventions: { ...STEP, description: 'At most 5 sign conventions and unit checks.' },
+      shortcuts: { ...STEP, description: 'At most 5 shortcuts.' },
+      traps: { ...STEP, description: 'At most 5 warnings, starting with the student\'s own recurring mistakes when given.' },
+    },
+    required: ['title', 'formulas', 'conventions', 'shortcuts', 'traps'],
+    additionalProperties: false,
+  },
+};
+
+export async function makeKit({ kind, unit, topic = '', focus = [], subtopics = [], traps = [], context = '' }) {
+  const content = [
+    `Unit: ${unit}`,
+    topic && `Topic: ${topic}`,
+    focus.length && `Most likely exam topics: ${focus.join('; ')}`,
+    subtopics.length && `The student's sub-topics (with their self-rating): ${subtopics.join('; ')}`,
+    traps.length && `The student's recurring mistakes (warn about these first): ${traps.join('; ')}`,
+    context && `\nThe student's course material — use THIS course's notation and methods:\n${context}`,
+  ].filter(Boolean).join('\n');
+  return structured(KIT_SCHEMA[kind], TUTOR, content, 8000);
+}

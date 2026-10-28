@@ -14,7 +14,7 @@ test('a store with 500 old cards plans without any card or recall task', () => {
   assert.equal(data.cards.length, 500);
   const plan = todayPlan(TODAY);
   assert.ok(plan.length > 0);
-  for (const p of plan) assert.ok(['teach', 'paper', 'topics', 'mock', 'practice', 'prompt'].includes(p.task.kind), p.task.kind);
+  for (const p of plan) assert.ok(['teach', 'paper', 'topics', 'mock', 'practice', 'kit', 'prompt'].includes(p.task.kind), p.task.kind);
   assert.doesNotMatch(JSON.stringify(plan), /card|recall/i);
 });
 

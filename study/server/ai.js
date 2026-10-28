@@ -17,7 +17,9 @@ const model = () => process.env.AI_MODEL || MODELS[provider()];
 
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || lo)));
 
-// Never let a hung provider request freeze the dashboard: abort after 30s. A timeout is retryable, not fatal.
+// Never let a hung provider request freeze the dashboard: abort after 30s, or longer for a long answer (about 12ms per
+// token asked for, so an 8000-token study kit gets ~96s). A timeout is retryable, not fatal.
+const waitFor = (maxTokens) => Math.max(30000, (maxTokens || 0) * 12);
 const fetchWithTimeout = (url, options, ms = 30000) => {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -73,7 +75,7 @@ async function geminiCall(schema, system, content, maxTokens) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: body(m),
-    });
+    }, waitFor(maxTokens));
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`), { retryable: [429, 500, 502, 503, 504].includes(r.status) });
     const text = d.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
@@ -135,7 +137,7 @@ async function deepseekCall(schema, system, content, maxTokens) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
         body: JSON.stringify({ model: model(), messages, response_format: { type: 'json_object' }, max_tokens: maxTokens, temperature: 0.1 }),
-      });
+      }, waitFor(maxTokens));
       text = await r.text();
     } catch (e) {
       if (!e.retryable || attempt === 2) throw e;

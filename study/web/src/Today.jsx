@@ -1,4 +1,4 @@
-const SECTION = { teach: 'teach', paper: 'papers', topics: 'units', mock: 'mock', practice: 'practice', prompt: 'prompt' };
+const SECTION = { teach: 'teach', paper: 'papers', topics: 'units', mock: 'mock', practice: 'practice', kit: 'kit', prompt: 'prompt' };
 
 export default function Today({ s, go }) {
   return (
@@ -16,7 +16,7 @@ export default function Today({ s, go }) {
                 <span className={`stage ${p.stage.id}`} title={p.stage.source === 'unit' || p.stage.source === 'all' ? 'Set by you' : p.stage.source === 'tba' ? 'Date TBA' : 'From the date'}>{p.stage.name}</span>
                 {p.cat && p.days >= 0 && <span className={`when ${p.days <= 3 ? 'hot' : ''}`}>{p.days ? `in ${p.days}d` : 'today'}</span>}
               </div>
-              <button onClick={() => go(SECTION[p.task.kind], { unit: p.code, topic: p.task.topic, kind: p.task.promptKind, questionId: p.task.questionId })}>{p.task.text} →</button>
+              <button onClick={() => go(SECTION[p.task.kind], { unit: p.code, topic: p.task.topic, kind: p.task.promptKind, questionId: p.task.questionId, kit: p.task.kit })}>{p.task.text} →</button>
             </li>
           ))}
         </ol>

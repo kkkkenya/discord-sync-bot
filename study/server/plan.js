@@ -68,10 +68,10 @@ function taskFor(stage, { topics, red, amber, papers, weak, pastQs = [] }) {
   const prompt = (promptKind, text, t) => ({ kind: 'prompt', promptKind, text, topic: t?.name });
   if (stage === 'exam-eve') {
     if (weak) return prompt('teach', `Walk through ${weak.name} (${weak.topic}): one worked example, then its formulas`, weakTopic);
-    return shaky ? prompt('teach', `Walk through ${shaky.name}: one worked example, then its formulas`, shaky) : prompt('formula', '1-page survival sheet: formulas, units, traps');
+    return shaky ? prompt('teach', `Walk through ${shaky.name}: one worked example, then its formulas`, shaky) : { kind: 'kit', kit: 'sheet', text: 'Make and read your 1-page survival sheet: formulas, units, your traps' };
   }
   if (stage === 'last-minute') {
-    if (!topics.length || !shaky) return prompt('formula', 'Formula & trap sheet: symbols, units, when each formula does NOT apply');
+    if (!topics.length || !shaky) return { kind: 'kit', kit: 'sheet', text: 'Make your formula and trap sheet: symbols, units, when each formula does NOT apply' };
     if (weak) return { ...mock(2, shaky), text: `Solve 2 exam questions on ${weak.topic}, watching ${weak.name}` };
     return mock(2, shaky);
   }

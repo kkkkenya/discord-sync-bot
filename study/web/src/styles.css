@@ -419,3 +419,23 @@ th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
 .chippanel p { margin: 0 0 4px; }
 .fromnotes { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; scroll-margin-top: calc(var(--bar) + 16px); }
 .fromnotes summary { cursor: pointer; font-weight: 500; }
+
+/* Study kit (Phase 10) */
+.kitlist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.kitdoc { margin-top: 14px; border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 10px; padding: 16px 20px; background: var(--paper); }
+.kitdoc h3 { margin: 4px 0 8px; font-size: 1.25rem; }
+.kitdoc h4 { font-family: var(--display); font-size: 1rem; margin: 14px 0 4px; }
+.kitdoc ol, .kitdoc ul { padding-left: 20px; margin: 4px 0; }
+.kitdoc li { margin: 3px 0; }
+.kitdoc li.blank { color: var(--muted); }
+.kitdoc .gap { display: inline-block; min-width: 140px; border-bottom: 1.5px dashed var(--accent); color: var(--accent); font: 500 0.72rem var(--mono); text-transform: uppercase; letter-spacing: 0.06em; margin-left: 6px; }
+.kitdoc .field[contenteditable='true'] { outline: 1px dashed var(--accent); outline-offset: 2px; border-radius: 3px; background: var(--soft); }
+.kitdoc .eq { font-family: var(--mono); font-size: 0.9em; }
+.kitdoc .formulas { margin-top: 6px; }
+.kitdoc .formulas td { vertical-align: top; }
+.sheetcols { display: grid; gap: 4px 24px; }
+@media (min-width: 800px) { .sheetcols { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.recipes-body { display: grid; gap: 4px 28px; }
+@media (min-width: 1000px) { .recipes-body { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.recipe { border-top: 1px dashed var(--line); padding-top: 6px; }
+.recipe p { margin: 4px 0; }

@@ -27,6 +27,7 @@ const { predictedMock } = await import('./predict.js');
 const { GOALS, buildPack } = await import('./context-pack.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
+const { KITS, KIT_FOR, makeKitFor } = await import('./kit.js');
 const { KEY_LABEL, breakOf, checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke } = await import('./practice.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
@@ -42,7 +43,7 @@ const state = () => {
   const units = Object.fromEntries(data.units.map((u) => [u.code, unitStage(u, today)]));
   return {
     units, stageMix: stageMix(Object.values(units).map((x) => x.stage)), stages: STAGES.map(({ maxDays, ...s }) => s),
-    errorTypes: ERROR_TYPES,
+    errorTypes: ERROR_TYPES, kits: { names: KITS, forStage: KIT_FOR },
     goals: Object.entries(GOALS).map(([id, g]) => ({ id, name: g.name })),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
@@ -180,6 +181,8 @@ const routes = {
   // Checkpoint feedback: { unit, questionId? | question?, topicId?, answer, operations?, key?, showCheckpoints? } →
   // the verdict, the answer key and its source, and numbered checkpoints. Nothing is held against you until you
   // mark the step where your working broke.
+  // Study kit (Phase 10): { unit, kind?, topicId? } → the saved material, or { needKey, goal } with no AI key.
+  'POST /api/materials/make': async (q, body) => makeKitFor(body || {}),
   'POST /api/attempts/check': async (q, body) => checkAnswer(body || {}),
   'POST /api/attempts/checkpoints': async (q, body) => ensureCheckpoints(body || {}),
   'POST /api/attempts/broke': (q, body) => markBroke(body || {}),

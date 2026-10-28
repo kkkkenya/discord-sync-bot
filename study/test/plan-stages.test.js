@@ -42,7 +42,7 @@ test('moving a date reshapes Today straight away', async () => {
 test('a unit override beats the date, and the all-units override fills in the rest', async () => {
   let s = (await srv.call('PATCH', 'units?code=EMM%20312', { stage: 'exam-eve' })).body;
   assert.deepEqual(s.units['EMM 312'].stage, { id: 'exam-eve', name: 'Exam-Eve Triage', source: 'unit' });
-  assert.ok(s.plan.some((p) => p.code === 'EMM 312' && p.task.kind === 'prompt'), 'an exam-eve override puts a TBA unit into Today');
+  assert.ok(s.plan.some((p) => p.code === 'EMM 312' && ['prompt', 'kit'].includes(p.task.kind)), 'an exam-eve override puts a TBA unit into Today');
   assert.equal((await srv.call('PATCH', 'units?code=EMM%20312', { stage: 'tomorrow' })).status, 400);
   assert.equal((await srv.call('POST', 'settings', { stage: 'soon' })).status, 400);
   s = (await srv.call('POST', 'settings', { stage: 'one-week' })).body;

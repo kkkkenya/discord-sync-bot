@@ -13,6 +13,7 @@ export const GROUPS = [
     { id: 'analysis', name: 'Weakspots', inside: ['Fix first: weight × weakness', 'How you lose marks', 'Sub-topic audit'] },
   ] },
   { id: 'practise', label: 'Practise', blurb: 'Closed book first, then check where it broke.', art: 'beam', items: [
+    { id: 'kit', name: 'Study kit', inside: ['Made for the unit’s stage', 'Ladders, recipes, a one-page formula sheet'] },
     { id: 'practice', name: 'Check answer', inside: ['Final answer with its unit', 'Numbered checkpoints', 'Broke here → weakspots'] },
     { id: 'teach', name: 'Teach it back', inside: ['Explain a topic, get it marked', 'Gaps become sub-topics'] },
     { id: 'mock', name: 'Mock exam', inside: ['Timed at 1.5 minutes a mark', 'Predicted mock from past papers'] },

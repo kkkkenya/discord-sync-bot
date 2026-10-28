@@ -4,7 +4,7 @@ import { api } from './api.js';
 const MINUTE = 60000;
 
 // Timed, closed-book mock exam. Questions come from your bank (built by Notes) and, if there aren't enough,
-// are generated fresh from the unit's topics and cards. With an Anthropic key it's marked in one go; without,
+// are generated fresh from the unit's topics. With an Anthropic key it's marked in one go; without,
 // you see the model answers and self-mark.
 export default function Mock({ s, refresh, focus }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
@@ -79,7 +79,7 @@ export default function Mock({ s, refresh, focus }) {
 
       {!mock && !result && (
         <>
-          <p className="muted small">Closed book, timed. {banked > 0 ? `You have ${banked} banked question${banked === 1 ? '' : 's'} for ${unit}.` : 'No banked questions for this unit yet — questions are generated from your topics and cards.'}</p>
+          <p className="muted small">Closed book, timed. {banked > 0 ? `You have ${banked} banked question${banked === 1 ? '' : 's'} for ${unit}.` : 'No banked questions for this unit yet — questions are generated from your topics.'}</p>
           <form className="row wrap" onSubmit={start}>
             <select value={unit} onChange={(e) => setUnit(e.target.value)}>
               {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code} {u.title}</option>)}

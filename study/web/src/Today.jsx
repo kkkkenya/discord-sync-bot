@@ -1,4 +1,4 @@
-const SECTION = { recall: 'recall', teach: 'teach', paper: 'papers', topics: 'units' };
+const SECTION = { teach: 'teach', paper: 'papers', topics: 'units', mock: 'mock' };
 
 export default function Today({ s, go }) {
   return (
@@ -20,7 +20,7 @@ export default function Today({ s, go }) {
           ))}
         </ol>
       )}
-      <p className="muted small">Active recall beats re-reading: answer from memory first, then check. Teach a topic out loud before you call it done.</p>
+      <p className="muted small">Solve before you re-read: attempt the question closed book, then check. Teach a topic out loud before you call it done.</p>
     </section>
   );
 }

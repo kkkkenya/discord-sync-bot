@@ -24,7 +24,7 @@ export default function Papers({ s, refresh, focus }) {
   return (
     <section id="papers" className="reveal">
       <h2>Past papers</h2>
-      <p className="muted small">Do them timed, closed book, then mark honestly. Every question you lost marks on becomes a recall card. Open papers from a unit's "server files".</p>
+      <p className="muted small">Do them timed, closed book, then mark honestly. Redo every question you lost marks on, closed book, then teach back the topic behind it. Open papers from a unit's "server files".</p>
       <form className="row wrap" onSubmit={save}>
         <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })}>
           {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code}</option>)}

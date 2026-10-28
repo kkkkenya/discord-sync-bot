@@ -3,13 +3,12 @@ import { api } from './api.js';
 
 const KINDS = [
   ['mock', 'Mock exam questions'],
-  ['cards', 'Flashcards from material'],
   ['teach', 'Teach me a topic'],
   ['ladder', 'Worked → faded → alone'],
   ['formula', 'Formula sheet'],
   ['paper', 'Analyse a past paper'],
   ['dump', 'Self-test questions'],
-  ['why', '"Why" cards'],
+  ['why', 'Understanding check (why / when-not)'],
   ['custom', 'Custom instruction'],
 ];
 

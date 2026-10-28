@@ -1,4 +1,4 @@
-// Turns study material into recall cards and CAT-style questions, and marks mock-exam answers.
+// Turns study material into CAT-style questions, and marks mock-exam answers.
 // All three calls go through the shared structured() helper so they match coach.js behaviour.
 import { structured } from './ai.js';
 
@@ -6,7 +6,6 @@ const TUTOR = `You are a tough but fair Mechanical Engineering tutor at Kenyatta
 for CATs and exams. Be specific and technically correct at KU CAT level: name the exact equation, sign convention,
 assumption or step. Use ^ and _ for powers and subscripts. Plain text, no markdown.`;
 
-const CARD = { type: 'object', properties: { q: { type: 'string' }, a: { type: 'string' } }, required: ['q', 'a'], additionalProperties: false };
 const QUESTION = {
   type: 'object',
   properties: { q: { type: 'string' }, a: { type: 'string' }, marks: { type: 'integer' } },
@@ -21,23 +20,22 @@ const QUESTION_TOPIC = {
   additionalProperties: false,
 };
 
-// Notes → recall cards + CAT questions. `context` (from the synced library) grounds the output in real material.
+// Notes → CAT questions for the mock bank. `context` (from the synced library) grounds them in real material.
 export async function makeStudyMaterial({ unit, topic, text, context = '' }) {
   const schema = {
     type: 'object',
     properties: {
-      cards: { type: 'array', items: CARD, description: '6-10 short recall cards: one fact, formula or method each, answerable in a line or short working.' },
-      questions: { type: 'array', items: QUESTION, description: '2-4 CAT-style exam questions drawn from the notes, each with a concise model answer and a mark count (5-20).' },
+      questions: { type: 'array', items: QUESTION, description: '3-6 CAT-style exam questions drawn from the notes (derivations, numericals, explain-why), each with a step-by-step model answer and a mark count (5-20).' },
     },
-    required: ['cards', 'questions'],
+    required: ['questions'],
     additionalProperties: false,
   };
-  const content = `Unit: ${unit}\nTopic: ${topic}${context ? `\n\nRelevant material from the student's library — base the cards and questions on this, not general knowledge:\n${context}` : ''}\n\nStudent's notes:\n${text}`;
+  const content = `Unit: ${unit}\nTopic: ${topic}${context ? `\n\nRelevant material from the student's library — base the questions on this, not general knowledge:\n${context}` : ''}\n\nStudent's notes:\n${text}`;
   return structured(schema, TUTOR, content, 8000);
 }
 
-// Fill a mock exam when the question bank is short: generate questions from the unit's topics and cards.
-export async function makeQuestions({ unit, topics, cards, count, context = '' }) {
+// Fill a mock exam when the question bank is short: generate questions from the unit's topics.
+export async function makeQuestions({ unit, topics, count, context = '' }) {
   const schema = {
     type: 'object',
     properties: { questions: { type: 'array', items: QUESTION_TOPIC, description: `${count} CAT-style questions for this unit.` } },
@@ -45,8 +43,7 @@ export async function makeQuestions({ unit, topics, cards, count, context = '' }
     additionalProperties: false,
   };
   const topicList = topics.length ? topics.map((t) => `- ${t.name} (${t.status || 'red'})`).join('\n') : '(no topics listed)';
-  const cardList = cards.length ? cards.slice(0, 20).map((c) => `Q: ${c.q}\nA: ${c.a}`).join('\n\n') : '(no recall cards)';
-  const content = `Unit: ${unit}${context ? `\n\nMaterial from the student's library — draw the questions from this, especially past papers and CATs:\n${context}` : ''}\n\nTopics the student is working through (put the exact topic name on each question):\n${topicList}\n\nExisting recall cards (avoid repeating them verbatim):\n${cardList}\n\nWrite ${count} fresh exam-style questions for this unit, each tagged with its topic, with a model answer and a mark count (5-20).`;
+  const content = `Unit: ${unit}${context ? `\n\nMaterial from the student's library — draw the questions from this, especially past papers and CATs:\n${context}` : ''}\n\nTopics the student is working through (put the exact topic name on each question):\n${topicList}\n\nWrite ${count} fresh exam-style questions for this unit, each tagged with its topic, with a model answer and a mark count (5-20).`;
   return structured(schema, TUTOR, content, 8000);
 }
 

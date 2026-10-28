@@ -10,7 +10,6 @@ import Onboarding, { Checklist } from './Onboarding.jsx';
 import Papers from './Papers.jsx';
 import Progress from './Progress.jsx';
 import Prompt from './Prompt.jsx';
-import Recall from './Recall.jsx';
 import Teach from './Teach.jsx';
 import Timer from './Timer.jsx';
 import Today from './Today.jsx';
@@ -19,12 +18,12 @@ import Units from './Units.jsx';
 gsap.registerPlugin(useGSAP);
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const NAV = [['today', 'Today'], ['units', 'Units'], ['notes', 'Notes'], ['recall', 'Recall'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
+const NAV = [['today', 'Today'], ['units', 'Units'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
 
 export default function App() {
   const [s, setS] = useState(null);
   const [error, setError] = useState('');
-  // what a "Today" task asks for: { section, unit, topic } — Recall and Teach preselect from it
+  // what a "Today" task asks for: { section, unit, topic } — Teach and Mock preselect from it
   const [focus, setFocus] = useState(null);
   const lenisRef = useRef(null);
   const root = useRef(null);
@@ -98,12 +97,19 @@ export default function App() {
         <div className="shell"><p className="banner bad" role="alert">{problem} <button className="link" onClick={refresh}>Try again</button></p></div>
       )}
       <main className="shell" ref={root}>
+        {s.retiredCards > 0 && !s.settings.cardsNotice && (
+          <p className="banner" role="status">
+            Flashcards are retired: Study Desk now works from teach-backs, exam questions and (soon) your sub-topic weakspots.
+            Your {s.retiredCards} old card{s.retiredCards === 1 ? ' is' : 's are'} still saved in <code>study.json</code>, just not used.
+            Topic colours no longer count recall reviews, so some topics may change colour.{' '}
+            <button className="link" onClick={() => api('POST', 'settings', { cardsNotice: true }).then(refresh).catch((e) => setProblem(e.message))}>Got it</button>
+          </p>
+        )}
         <Hero {...props} />
         {!tourOn && (s.settings.tour?.done || s.settings.tour?.skipped) && !checklistOff && <Checklist s={s} onDismiss={() => setChecklistOff(true)} />}
         <Today {...props} />
         <Units {...props} />
         <Notes {...props} />
-        <Recall {...props} />
         <Teach {...props} />
         <Mock {...props} />
         <Papers {...props} />

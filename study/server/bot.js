@@ -5,19 +5,17 @@ import { ChannelType, Client, Events, GatewayIntentBits, Partials } from 'discor
 import cron from 'node-cron';
 import { coach, coachReady } from './coach.js';
 import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
-import { catDay, daysBetween, dueCards, grade, nairobiDay, stats, todayPlan } from './plan.js';
+import { catDay, daysBetween, nairobiDay, stats, todayPlan } from './plan.js';
 import { add, data, save } from './store.js';
 
 const HELP = [
   '**Study DMs**: type any of these.',
   '`today`: your plan and the CAT countdown',
   '`files EMM 302`: past papers and CATs for a unit from the server (`files EMM 302 notes` for notes and slides, `files` for all your units)',
-  '`quiz` or `quiz EMM 302`: recall cards that are due. Type your answer, then grade it 1-4',
   '`teach EMM 302 Mohr\'s circle`: explain a topic like you\'re teaching a classmate, get it marked',
   '`log 45 EMM 302`: log 45 minutes of study',
   '`paper EMM 302 34/60 2023 CAT 1`: log a past paper score',
-  '`card EMM 302 | question | answer`: add a recall card',
-  '`stop`: end a quiz or teach-back',
+  '`stop`: end a teach-back',
 ].join('\n');
 
 const unitOf = (text) => {
@@ -40,13 +38,12 @@ export function todayText(today = nairobiDay()) {
   if (!plan.length) return [...lines, '', 'No units yet. Open the dashboard and pick your units.'].join('\n');
   lines.push('', '**Today**');
   plan.forEach((p, n) => lines.push(`${n + 1}. **${p.code}** ${p.title}: ${p.task.text}`));
-  const due = dueCards(null, today).length;
   const s = stats(today);
-  lines.push('', `${due} card${due === 1 ? '' : 's'} due · streak ${s.streak} day${s.streak === 1 ? '' : 's'} · reply \`quiz\` to start`);
+  lines.push('', `Streak ${s.streak} day${s.streak === 1 ? '' : 's'} · ${s.minutesToday} min today · log with \`log 45 ${plan[0].code}\``);
   return lines.join('\n');
 }
 
-const COMMANDS = ['today', 'files', 'quiz', 'teach', 'log', 'paper', 'card'];
+const COMMANDS = ['today', 'files', 'teach', 'log', 'paper'];
 
 // Links to a unit's files in the server's forum posts. Papers and CATs by default, or notes/slides/books.
 async function filesText(unit, notes) {
@@ -87,15 +84,7 @@ export function chunks(text, size = 1900) {
   return out;
 }
 
-let mode = null; // { kind: 'quiz', unit, card, stage: 'answer'|'grade' } | { kind: 'teach', unit, topic }
-
-const nextCard = (unit) => {
-  const card = dueCards(unit)[0];
-  if (!card) { mode = null; return `No cards due${unit ? ` for ${unit}` : ''}. ${data.cards.length ? 'Nice. Add more on the dashboard or with `card`.' : 'Add some on the dashboard or with `card EMM 302 | question | answer`.'}`; }
-  mode = { kind: 'quiz', unit, card, stage: 'answer' };
-  const left = dueCards(unit).length;
-  return `**${card.unit}** (${left} due)\n${card.q}\n\n_Type your answer from memory (or \`?\` if you don't know)._`;
-};
+let mode = null; // { kind: 'teach', unit, topic }
 
 export async function reply(text) {
   const t = text.trim();
@@ -104,15 +93,6 @@ export async function reply(text) {
   if (word === 'stop') { mode = null; return 'Stopped.'; }
   if (word === 'help') return HELP;
 
-  if (mode?.kind === 'quiz' && mode.stage === 'answer' && !COMMANDS.includes(word)) {
-    mode.stage = 'grade';
-    return `**Answer:** ${mode.card.a}\n\nHow did you do? \`1\` forgot · \`2\` hard · \`3\` good · \`4\` easy`;
-  }
-  if (mode?.kind === 'quiz' && mode.stage === 'grade' && /^[1-4]$/.test(t)) {
-    const card = data.cards.find((c) => c.id === mode.card.id);
-    if (card) { grade(card, Number(t)); save(); }
-    return `${t === '1' ? 'Back in the pile for today.' : `Next review ${card?.due}.`}\n\n${nextCard(mode.unit)}`;
-  }
   if (mode?.kind === 'teach' && !COMMANDS.includes(word)) {
     const { unit, topic } = mode;
     mode = null;
@@ -125,14 +105,12 @@ export async function reply(text) {
     const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
     if (tp) { tp.taughtAt = new Date().toISOString(); save(); }
     if (!feedback) return `Saved your teach-back on ${topic}.${note}`;
-    for (const c of feedback.cards) add('cards', { unit, topic, q: c.q, a: c.a, due: nairobiDay(), interval: 0, ease: 2.5, reps: 0, lapses: 0, from: 'teach' });
     return [
       `**${topic}: ${feedback.score}/5**`,
       `✓ ${feedback.good}`,
       ...feedback.gaps.map((g) => `✗ ${g}`),
       '',
       `**Next question:** ${feedback.followUp}`,
-      `_Added ${feedback.cards.length} recall cards for the gaps. Reply \`quiz ${unit}\` to drill them._`,
     ].join('\n');
   }
 
@@ -141,7 +119,6 @@ export async function reply(text) {
     const unit = unitOf(t);
     return unit ? filesText(unit, /\bnotes?\b|slides?|books?/i.test(t)) : allFilesText();
   }
-  if (word === 'quiz') return nextCard(unitOf(t));
   if (word === 'teach') {
     const unit = unitOf(t);
     const topic = t.replace(/^teach\s*/i, '').replace(/\b[A-Za-z]{3}\s?\d{3}\b/, '').trim();
@@ -162,15 +139,9 @@ export async function reply(text) {
     if (!unit || !m) return 'Like this: `paper EMM 302 34/60 2023 CAT 1`';
     const label = t.replace(/^paper\s*/i, '').replace(/\b[A-Za-z]{3}\s?\d{3}\b/, '').replace(m[0], '').trim() || 'Past paper';
     add('papers', { unit, label, score: Number(m[1]), outOf: Number(m[2]) });
-    return `Logged ${label}: ${m[1]}/${m[2]} (${Math.round((m[1] / m[2]) * 100)}%). Turn every question you dropped marks on into a card.`;
+    return `Logged ${label}: ${m[1]}/${m[2]} (${Math.round((m[1] / m[2]) * 100)}%). Redo every question you dropped marks on, closed book, then teach back the topic behind it.`;
   }
-  if (word === 'card') {
-    const [head, q, a] = t.split('|').map((s) => s.trim());
-    const unit = unitOf(head);
-    if (!unit || !q || !a) return 'Like this: `card EMM 302 | What is the principal stress formula? | σ1,2 = (σx+σy)/2 ± √(((σx−σy)/2)² + τxy²)`';
-    add('cards', { unit, q, a, due: nairobiDay(), interval: 0, ease: 2.5, reps: 0, lapses: 0 });
-    return `Card added to ${unit}.`;
-  }
+  if (word === 'quiz' || word === 'card') return 'Flashcards are retired in Study Desk. Try `teach EMM 302 <topic>`, or a timed mock on the dashboard.';
   return mode ? 'Type `stop` to end this first.' : HELP;
 }
 
@@ -205,10 +176,10 @@ export function startBot() {
     cron.schedule('0 7 * * *', () => dm(todayText()).catch((e) => console.error('morning DM failed:', e.message)), { timezone: 'Africa/Nairobi' });
     cron.schedule('30 20 * * *', () => {
       const s = stats();
-      if (s.minutesToday || s.reviewedToday) return;
+      if (s.activeToday) return;
       const next = data.units.map((u) => catDay(u)).filter(Boolean).sort()[0];
       const d = next ? daysBetween(nairobiDay(), next) : null;
-      dm(`Nothing logged today${d !== null && d >= 0 ? ` and CATs are ${d} day${d === 1 ? '' : 's'} away` : ''}. 15 minutes counts: reply \`quiz\`.`).catch((e) => console.error('evening DM failed:', e.message));
+      dm(`Nothing logged today${d !== null && d >= 0 ? ` and CATs are ${d} day${d === 1 ? '' : 's'} away` : ''}. 15 minutes counts: reply \`today\` for your plan.`).catch((e) => console.error('evening DM failed:', e.message));
     }, { timezone: 'Africa/Nairobi' });
   });
 

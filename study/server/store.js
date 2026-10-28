@@ -10,15 +10,16 @@ mkdirSync(DIR, { recursive: true });
 
 // units: [{ code, title, catDate, confidence }]   (the ones you're taking this semester)
 // topics: [{ id, unit, name, status: red|amber|green, taughtAt }]
-// cards: [{ id, unit, q, a, due, interval, ease, reps, lapses }]
-// reviews: [{ card, unit, grade, at }]   sessions: [{ id, unit, minutes, focus, kind, energy, endedEarly, at }]
+// sessions: [{ id, unit, minutes, focus, kind, energy, endedEarly, at }]
 // papers: [{ id, unit, label, score, outOf, fileId, at }]   teach: [{ id, unit, topic, text, feedback, at }]
 // questions: [{ id, unit, topic, q, a, marks, from, at }]   (CAT-style practice bank for mocks)
 // mocks: [{ id, unit, name, questions: [{q,a,marks,topic}], answers: [{user,earned,note}], score, outOf, overall, finishedAt, at }]
 // subtopics, attempts, hints: filled from Phase 4 on (see PHASES.md).
-// settings: { aiProvider: 'gemini'|'deepseek'|'anthropic', tour: { step, done, skipped } }
+// cards, reviews: retired flashcards. Left exactly as they are in old files, never read or sent to the dashboard.
+// settings: { aiProvider: 'gemini'|'deepseek'|'anthropic', tour: { step, done, skipped }, cardsNotice: true once
+//   the "flashcards retired" note was dismissed }
 const EMPTY = {
-  units: [], topics: [], cards: [], reviews: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [],
+  units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [],
   settings: { aiProvider: 'gemini', tour: {} },
 };
 
@@ -45,7 +46,7 @@ export function save() {
   renameSync(tmp, FILE);
 }
 
-export const LISTS = ['topics', 'cards', 'sessions', 'papers', 'teach', 'questions', 'mocks'];
+export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks'];
 
 export function add(list, row) {
   const item = { id: randomUUID().slice(0, 8), at: new Date().toISOString(), ...row };

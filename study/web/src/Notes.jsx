@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 
-// Paste lecture notes / a textbook section / slide text. Claude turns it into recall cards (due now in Recall)
-// and CAT-style questions that land in your mock-exam bank.
+// Paste lecture notes / a textbook section / slide text. The AI turns it into CAT-style questions that land in
+// your mock-exam bank.
 export default function Notes({ s, refresh, focus }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const [topic, setTopic] = useState('');
@@ -29,11 +29,11 @@ export default function Notes({ s, refresh, focus }) {
 
   return (
     <section id="notes" className="reveal">
-      <div className="head"><h2>Notes → cards</h2></div>
-      <p className="muted small">Paste your own notes, a textbook section or slide text. The AI turns it into recall cards (they're due in Recall right away) and CAT-style questions for your mock-exam bank.</p>
+      <div className="head"><h2>Notes → questions</h2></div>
+      <p className="muted small">Paste your own notes, a textbook section or slide text. The AI turns it into CAT-style questions (derivations, numericals, explain-why) with model answers, for your mock-exam bank.</p>
       <p className="muted small">
         {Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length
-          ? `${Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length} file(s) synced for ${unit} — cards and questions will be grounded in them.`
+          ? `${Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length} file(s) synced for ${unit} — questions will be grounded in them.`
           : `No files synced for ${unit} yet — sync them in Units to ground the questions in your material.`}
       </p>
       {!s.ai && <p className="banner bad">No AI key for the selected provider. Pick another provider in the top bar, or run <code>setup.bat</code> to add one.</p>}
@@ -45,11 +45,11 @@ export default function Notes({ s, refresh, focus }) {
           <input className="grow" placeholder="Topic (e.g. Mohr's circle, beam deflection)" value={topic} onChange={(e) => setTopic(e.target.value)} />
         </div>
         <textarea rows={12} placeholder="Paste notes here — definitions, derivations, worked examples…" value={text} onChange={(e) => setText(e.target.value)} />
-        <button disabled={busy || !s.ai || !unit || !topic.trim() || text.trim().length < 60}>{busy ? 'Turning into cards…' : 'Generate cards & questions'}</button>
+        <button disabled={busy || !s.ai || !unit || !topic.trim() || text.trim().length < 60}>{busy ? 'Writing questions…' : 'Generate questions'}</button>
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}
-      {result?.cards != null && (
-        <p className="banner good" role="status">Added <b>{result.cards}</b> recall card{result.cards === 1 ? '' : 's'} and <b>{result.questions}</b> CAT question{result.questions === 1 ? '' : 's'} to your mock bank. Cards are due now — go to Recall, or try a mock.</p>
+      {result?.questions != null && (
+        <p className="banner good" role="status">Added <b>{result.questions}</b> CAT question{result.questions === 1 ? '' : 's'} to your mock bank. Try a timed mock on them.</p>
       )}
     </section>
   );

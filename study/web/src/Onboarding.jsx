@@ -8,7 +8,7 @@ const STEPS = [
   { id: 'units', target: '[data-tour="units"]', title: 'Pick your units', body: 'Tick the units you are sitting this semester.', done: (s) => s.data.units.length > 0 },
   { id: 'topics', target: '[data-tour="topics"]', title: 'Add topics', body: 'Copy them straight from the course outline, comma-separated.', done: (s) => s.data.topics.length >= 3 },
   { id: 'sync', target: '[data-tour="sync"]', title: 'Sync your files', body: 'Open "show server files", then "Sync files" to pull your notes and past papers from Discord so the AI answers from your material. Optional.', done: () => false },
-  { id: 'start', target: '[data-tour="today"]', title: 'Start studying', body: 'This is the daily loop: pick a task, focus (the timer bottom-right), then recall and teach it back.', done: () => false },
+  { id: 'start', target: '[data-tour="today"]', title: 'Start studying', body: 'This is the daily loop: pick a task, focus (the timer bottom-right), solve questions closed book, then teach it back.', done: () => false },
 ];
 
 const CHECK = [

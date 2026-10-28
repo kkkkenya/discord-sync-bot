@@ -1,20 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 
-function Feedback({ f, unit, topic, refresh }) {
-  const [added, setAdded] = useState(false);
-  const addAll = async () => {
-    for (const c of f.cards) await api('POST', 'cards', { unit, topic, q: c.q, a: c.a, from: 'teach' });
-    setAdded(true);
-    refresh();
-  };
+function Feedback({ f }) {
   return (
     <div className="feedback">
       <p className="score">{f.score}/5</p>
       <p>✓ {f.good}</p>
       <ul>{f.gaps.map((g) => <li key={g}>✗ {g}</li>)}</ul>
       <p><b>Answer this next, from memory:</b> {f.followUp}</p>
-      {f.cards.length > 0 && <button onClick={addAll} disabled={added}>{added ? 'Added to Recall' : `Add ${f.cards.length} cards for the gaps`}</button>}
     </div>
   );
 }
@@ -46,7 +39,7 @@ export default function Teach({ s, refresh, focus }) {
   return (
     <section id="teach" className="reveal">
       <h2>Teach it back</h2>
-      <p className="muted small">Explain a topic as if a classmate missed the lecture: what it is, the key equation and what each term means, when it applies, one worked example. If you get stuck, that's the gap to study.{s.coach ? ' The AI marks it and turns the gaps into recall cards.' : ''}</p>
+      <p className="muted small">Explain a topic as if a classmate missed the lecture: what it is, the key equation and what each term means, when it applies, one worked example. If you get stuck, that's the gap to study.{s.coach ? ' The AI marks it and names the exact gaps.' : ''}</p>
       <form onSubmit={send}>
         <div className="row">
           <select value={unit} onChange={(e) => setUnit(e.target.value)}>
@@ -59,7 +52,7 @@ export default function Teach({ s, refresh, focus }) {
         <button disabled={busy || !unit || !topic.trim() || text.trim().length < 40}>{busy ? 'Marking…' : s.coach ? 'Get it marked' : 'Save teach-back'}</button>
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}
-      {result?.item?.feedback && <Feedback f={result.item.feedback} unit={result.item.unit} topic={result.item.topic} refresh={refresh} />}
+      {result?.item?.feedback && <Feedback f={result.item.feedback} />}
       {result?.item && !result.item.feedback && <p className="muted">Saved.</p>}
       {past.length > 0 && (
         <details className="past">

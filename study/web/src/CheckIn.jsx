@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-const KINDS = ['reading', 'problems', 'recall', 'teaching', 'past-paper'];
+const KINDS = ['reading', 'problems', 'teaching', 'past-paper', 'mock'];
 
 // One-screen check-in shown when a focus session ends. Everything is optional; Skip logs the session bare.
 export default function CheckIn({ onSave, onSkip }) {

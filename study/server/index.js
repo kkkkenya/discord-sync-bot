@@ -18,7 +18,7 @@ const { makeQuestions, makeStudyMaterial, markAnswers } = await import('./brain.
 const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
 const { ALL_UNITS, YEAR3_MECH, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { masteryMap } = await import('./mastery.js');
-const { dueCards, grade, nairobiDay, stats, todayPlan } = await import('./plan.js');
+const { nairobiDay, stats, todayPlan } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
@@ -26,11 +26,14 @@ const PORT = Number(process.env.PORT) || 5190;
 const DIST = new URL('../dist/', import.meta.url);
 const bot = startBot();
 
+// The retired flashcards (cards, reviews) stay in study.json but never go to the dashboard; only their count does,
+// for the one-time "flashcards retired" note.
 const state = () => {
   const today = nairobiDay();
+  const { cards, reviews, ...shown } = data;
   return {
-    today, data, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
-    due: dueCards(null, today).length, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
+    today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
+    retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
     mastery: masteryMap(today), library: libraryMeta(), discord: Boolean(bot),
   };
 };
@@ -58,7 +61,6 @@ const routes = {
     for (const f of files) results.push(await ingestFile(f, unit));
     return { files: results };
   },
-  'GET /api/due': (q) => dueCards(q.get('unit') || null),
   // body: [{ code, title }] — the units you're taking; keeps CAT dates and confidence you already set
   'PUT /api/units': (q, body) => {
     data.units = body.map((u) => ({ ...data.units.find((x) => x.code === u.code), code: u.code, title: u.title }));
@@ -71,13 +73,6 @@ const routes = {
     Object.assign(u, body, { code: u.code });
     save();
     return state();
-  },
-  'POST /api/review': (q, { id, grade: g }) => {
-    const card = data.cards.find((c) => c.id === id);
-    if (!card || ![1, 2, 3, 4].includes(g)) throw Object.assign(new Error('bad review'), { status: 400 });
-    grade(card, g);
-    save();
-    return card;
   },
   'POST /api/teach': async (q, { unit, topic, text }) => {
     if (!unit || !topic || !text?.trim()) throw Object.assign(new Error('unit, topic and text are needed'), { status: 400 });
@@ -98,32 +93,27 @@ const routes = {
     save();
     return state();
   },
-  // Notes → recall cards + CAT questions (requires the AI key).
+  // Notes → CAT questions for the mock bank (requires the AI key).
   'POST /api/notes': async (q, { unit, topic, text }) => {
     if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Pick another provider in the top bar, or add the key.'), { status: 400 });
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     if (!topic?.trim() || !text?.trim()) throw Object.assign(new Error('A topic and some notes are needed.'), { status: 400 });
-    const { cards, questions } = await makeStudyMaterial({ unit, topic: topic.trim(), text: text.trim(), context: contextFor(unit, topic) });
-    for (const c of cards) add('cards', { unit, topic: topic.trim(), q: c.q, a: c.a, from: 'notes', due: nairobiDay(), interval: 0, ease: 2.5, reps: 0, lapses: 0 });
+    const { questions } = await makeStudyMaterial({ unit, topic: topic.trim(), text: text.trim(), context: contextFor(unit, topic) });
     for (const qq of questions) add('questions', { unit, topic: topic.trim(), q: qq.q, a: qq.a, marks: clamp(qq.marks, 5, 25), from: 'notes' });
-    return { cards: cards.length, questions: questions.length };
+    return { questions: questions.length };
   },
-  // Start a mock: bank questions for the unit first, generate more from topics/cards if needed.
+  // Start a mock: bank questions for the unit first, generate more from its topics if needed (and an AI key is set).
   'POST /api/mocks': async (q, body) => {
     const unit = body.unit;
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     const count = body.count ? clamp(body.count, 1, 10) : 5;
     const bank = data.questions.filter((x) => x.unit === unit).sort(() => Math.random() - 0.5);
     let questions = bank.slice(0, count).map((x) => ({ q: x.q, a: x.a, marks: x.marks, topic: x.topic || '' }));
-    if (questions.length < count) {
-      if (aiReady()) {
-        const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), cards: data.cards.filter((c) => c.unit === unit), count: count - questions.length, context: contextFor(unit) });
-        questions = questions.concat(extra.questions.map((x) => ({ q: x.q, a: x.a, marks: clamp(x.marks, 5, 25), topic: x.topic || '' })));
-      } else if (!questions.length) {
-        questions = data.cards.filter((c) => c.unit === unit).slice(0, count).map((c) => ({ q: c.q, a: c.a, marks: 5, topic: c.topic || '' }));
-      }
+    if (questions.length < count && aiReady()) {
+      const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), count: count - questions.length, context: contextFor(unit) });
+      questions = questions.concat(extra.questions.map((x) => ({ q: x.q, a: x.a, marks: clamp(x.marks, 5, 25), topic: x.topic || '' })));
     }
-    if (!questions.length) throw Object.assign(new Error('Nothing to build a mock from. Generate some notes (Notes), or add topics and cards first.'), { status: 400 });
+    if (!questions.length) throw Object.assign(new Error(aiReady() ? 'Nothing to build a mock from. Add topics in Units, or turn notes into questions (Notes).' : 'No banked questions for this unit and no AI key to write some. Use the Prompt builder (Mock exam questions) in another AI, or add a key.'), { status: 400 });
     const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} mock`, questions });
     return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
   },
@@ -135,8 +125,6 @@ const routes = {
     return { ok: true };
   },
 };
-
-const NEW_CARD = () => ({ due: nairobiDay(), interval: 0, ease: 2.5, reps: 0, lapses: 0 });
 
 const mockResult = (mock) => ({
   id: mock.id, unit: mock.unit, name: mock.name, score: mock.score ?? null, outOf: mock.outOf ?? null, overall: mock.overall || '',
@@ -176,10 +164,10 @@ async function api(req, url) {
   if (route) return route(url.searchParams, body);
   const submit = url.pathname.match(/^\/api\/mocks\/([\w-]+)\/submit$/);
   if (req.method === 'POST' && submit) return submitMock(submit[1], body);
-  // generic lists: POST /api/cards, PATCH /api/cards/<id>, DELETE /api/cards/<id>
+  // generic lists: POST /api/topics, PATCH /api/topics/<id>, DELETE /api/topics/<id>
   const [, list, id] = url.pathname.match(/^\/api\/(\w+)(?:\/([\w-]+))?$/) || [];
   if (LISTS.includes(list)) {
-    if (req.method === 'POST' && !id) return add(list, list === 'cards' ? { ...NEW_CARD(), ...body } : body);
+    if (req.method === 'POST' && !id) return add(list, body);
     if (req.method === 'PATCH' && id) return patch(list, id, body) ?? Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
     if (req.method === 'DELETE' && id) return { removed: remove(list, id) };
   }

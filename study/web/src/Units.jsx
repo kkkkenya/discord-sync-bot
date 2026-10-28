@@ -104,7 +104,6 @@ function Unit({ u, s, refresh, go }) {
   const [topic, setTopic] = useState('');
   const [open, setOpen] = useState(false);
   const topics = s.data.topics.filter((t) => t.unit === u.code);
-  const due = s.data.cards.filter((c) => c.unit === u.code && c.due <= s.today).length;
   const cat = u.catDate || s.next?.start;
   const rated = topics.map((t) => ({ t, m: s.mastery?.[t.id] || { status: 'red', manual: false, why: '', next: '' } }));
   const green = rated.filter((x) => x.m.status === 'green').length;
@@ -155,7 +154,7 @@ function Unit({ u, s, refresh, go }) {
       )}
       {pending && <p className="muted small next">Next to turn green: <b>{pending.t.name}</b> — {pending.m.next}.</p>}
       <div className="row small">
-        <button className="link" onClick={() => go('recall', { unit: u.code })}>{due} due cards</button>
+        <button className="link" onClick={() => go('mock', { unit: u.code })}>timed mock</button>
         <button className="link" onClick={() => go('teach', { unit: u.code })}>teach a topic</button>
         <button className="link" data-tour="sync" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} server files</button>
       </div>
@@ -172,7 +171,7 @@ export default function Units(props) {
       <div className="head"><h2>Units</h2>{!picking && <button className="ghost" onClick={() => setPicking(true)}>Edit units</button>}</div>
       {picking ? <Picker {...props} close={() => setPicking(false)} /> : (
         <>
-          <p className="muted small">A topic's colour now follows the evidence (teach-back score, recall reviews, solved questions), not a tick. Hover a chip to see why, and what's missing. Click a chip to force a colour yourself — it shows "· you". ✓ means you've done a teach-back.</p>
+          <p className="muted small">A topic's colour follows the evidence (a teach-back scored 4/5+ and 2 exam questions solved at 70%+), not a tick. Hover a chip to see why, and what's missing. Click a chip to force a colour yourself — it shows "· you". ✓ means you've done a teach-back.</p>
           {s.data.units.map((u) => <Unit key={u.code} u={u} {...props} />)}
         </>
       )}

@@ -8,6 +8,7 @@ export default function Hero({ s }) {
   const days = next ? daysUntil(s.today, next.start) : null;
   const exams = daysUntil(s.today, s.calendar.exams.start);
   const minutes = Object.values(s.stats.minutesWeek).reduce((a, b) => a + b, 0);
+  const green = s.data.topics.filter((t) => s.mastery?.[t.id]?.status === 'green').length;
 
   const dm = async () => {
     setSent('Sending…');
@@ -28,7 +29,7 @@ export default function Hero({ s }) {
       </div>
       <dl className="tiles">
         <div><dt>Exams</dt><dd>{exams > 0 ? `${exams}d` : 'now'}</dd></div>
-        <div><dt>Cards due</dt><dd>{s.due}</dd></div>
+        <div><dt>Mastered</dt><dd>{green}/{s.data.topics.length}</dd></div>
         <div><dt>Streak</dt><dd>{s.stats.streak}d</dd></div>
         <div><dt>This week</dt><dd>{Math.round(minutes / 6) / 10}h</dd></div>
       </dl>

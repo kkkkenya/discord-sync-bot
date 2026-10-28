@@ -169,8 +169,6 @@ input.num { width: 84px; }
 .q { font-size: 1.15rem; font-weight: 500; margin: 4px 0 8px; white-space: pre-wrap; }
 .a, .mine { white-space: pre-wrap; }
 .mine { color: var(--muted); }
-.add { margin-top: 16px; }
-.add input { width: 100%; margin-top: 4px; }
 
 .feedback { margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: var(--paper); }
 .feedback .score { font: 600 2rem var(--mono); color: var(--accent); margin: 0; }

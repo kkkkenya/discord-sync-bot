@@ -73,8 +73,6 @@ function Mastery({ s }) {
 
 export default function Progress({ s }) {
   const mins = Object.entries(s.stats.minutesWeek).sort((a, b) => b[1] - a[1]);
-  const totalCards = s.data.cards.length;
-  const dueToday = s.data.cards.filter((c) => c.due <= s.today).length;
   const mocks = s.data.mocks.filter((m) => m.score != null);
   const avgMock = mocks.length ? Math.round(mocks.reduce((n, m) => n + (m.score / m.outOf) * 100, 0) / mocks.length) : null;
   const papers = s.data.papers.length;
@@ -84,8 +82,8 @@ export default function Progress({ s }) {
       <div className="head"><h2>Progress</h2></div>
 
       <dl className="tiles">
-        <div><dt>Cards</dt><dd>{totalCards}</dd></div>
-        <div><dt>Due now</dt><dd>{dueToday}</dd></div>
+        <div><dt>Topics</dt><dd>{s.data.topics.length}</dd></div>
+        <div><dt>Questions banked</dt><dd>{s.data.questions.length}</dd></div>
         <div><dt>Teach-backs</dt><dd>{s.data.teach.length}</dd></div>
         <div><dt>Papers</dt><dd>{papers}</dd></div>
       </dl>

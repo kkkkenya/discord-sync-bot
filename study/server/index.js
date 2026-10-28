@@ -16,9 +16,11 @@ const { coach, coachReady } = await import('./coach.js');
 const { aiReady, clamp, provider } = await import('./ai.js');
 const { makeQuestions, makeStudyMaterial, markAnswers } = await import('./brain.js');
 const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
-const { ALL_UNITS, YEAR3_MECH, calendar, filesFor, nextAssessment } = await import('./library.js');
+const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
+const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
+const { TBA } = await import('./defs.js');
 const { masteryMap } = await import('./mastery.js');
-const { nairobiDay, stats, todayPlan } = await import('./plan.js');
+const { isDay, nairobiDay, stats, todayPlan } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
@@ -40,7 +42,13 @@ const state = () => {
 
 const routes = {
   'GET /api/state': () => state(),
-  'GET /api/catalog': () => ({ year3: YEAR3_MECH, all: ALL_UNITS }),
+  // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.
+  'GET /api/catalog': (q) => {
+    const saved = data.settings.cohort || { course: 'EMM', year: 3, sem: 1 };
+    const course = COURSES[q.get('course')] ? q.get('course') : saved.course;
+    const year = Number(q.get('year')) || saved.year;
+    return { courses: courses(ALL_UNITS), course, year, ...cohortUnits(ALL_UNITS, { course, year }), all: ALL_UNITS };
+  },
   // A unit's server files merged with the ingested context-library cache (sync status + extracted text).
   'GET /api/library': async (q) => {
     const unit = q.get('unit');
@@ -61,15 +69,24 @@ const routes = {
     for (const f of files) results.push(await ingestFile(f, unit));
     return { files: results };
   },
-  // body: [{ code, title }] — the units you're taking; keeps CAT dates and confidence you already set
+  // body: [{ code, title }] — the units you're taking. Keeps the dates and confidence you already set; a unit you
+  // untick is remembered in settings.unitArchive (its topics and logs are never touched), so ticking it again
+  // brings its date back.
   'PUT /api/units': (q, body) => {
-    data.units = body.map((u) => ({ ...data.units.find((x) => x.code === u.code), code: u.code, title: u.title }));
+    if (!Array.isArray(body)) throw Object.assign(new Error('expected a list of units'), { status: 400 });
+    const archive = data.settings.unitArchive ||= {};
+    const keep = new Set(body.map((u) => u.code));
+    for (const u of data.units) if (!keep.has(u.code)) { const { code, title, ...rest } = u; archive[code] = rest; }
+    data.units = body.map((u) => ({ ...archive[u.code], ...data.units.find((x) => x.code === u.code), code: u.code, title: u.title || '' }));
+    for (const code of keep) delete archive[code];
     save();
     return state();
   },
+  // catDate: 'YYYY-MM-DD', 'TBA' or null (use the KU calendar)
   'PATCH /api/units': (q, body) => {
     const u = data.units.find((x) => x.code === q.get('code'));
     if (!u) throw Object.assign(new Error('not one of your units'), { status: 404 });
+    if ('catDate' in body && !(body.catDate === null || body.catDate === TBA || isDay(body.catDate))) throw Object.assign(new Error('a date (YYYY-MM-DD), TBA, or nothing'), { status: 400 });
     Object.assign(u, body, { code: u.code });
     save();
     return state();
@@ -88,6 +105,7 @@ const routes = {
   'POST /api/settings': (q, body) => {
     for (const [k, v] of Object.entries(body || {})) {
       if (k === 'aiProvider' && !['gemini', 'deepseek', 'anthropic'].includes(v)) throw Object.assign(new Error('unknown AI provider'), { status: 400 });
+      if (k === 'cohort' && !validCohort(v)) throw Object.assign(new Error('pick a course, a year (1-5) and a semester (1 or 2)'), { status: 400 });
       data.settings[k] = v;
     }
     save();

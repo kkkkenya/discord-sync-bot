@@ -1,4 +1,5 @@
 // The daily plan and study stats. Shared by the dashboard and the DM bot so both say the same thing.
+import { TBA } from './defs.js';
 import { data } from './store.js';
 import { nextAssessment } from './library.js';
 import { topicStatus } from './mastery.js';
@@ -7,10 +8,13 @@ export const nairobiDay = (d = new Date()) => d.toLocaleDateString('en-CA', { ti
 const addDays = (day, n) => { const d = new Date(`${day}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 export const daysBetween = (a, b) => Math.round((new Date(`${b}T12:00:00Z`) - new Date(`${a}T12:00:00Z`)) / 86400000);
 
-// A unit's CAT date: the one you set, else the start of the next CAT week.
+// A unit's CAT/exam date: the one you set, else the start of the next CAT week on the KU calendar. TBA (the
+// strike) means there is no date at all, not even the calendar's.
 export function catDay(unit, today = nairobiDay()) {
+  if (unit.catDate === TBA) return null;
   return unit.catDate || nextAssessment(today)?.start || null;
 }
+export const isDay = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 // Up to 3 units for today, weakest and soonest first, each with one concrete task.
 export function todayPlan(today = nairobiDay()) {

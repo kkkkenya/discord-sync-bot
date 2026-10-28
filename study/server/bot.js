@@ -5,7 +5,7 @@ import { ChannelType, Client, Events, GatewayIntentBits, Partials } from 'discor
 import cron from 'node-cron';
 import { coach, coachReady } from './coach.js';
 import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
-import { catDay, daysBetween, nairobiDay, stats, todayPlan } from './plan.js';
+import { catDay, daysBetween, isDay, nairobiDay, stats, todayPlan } from './plan.js';
 import { add, data, save } from './store.js';
 
 const HELP = [
@@ -31,7 +31,7 @@ export function todayText(today = nairobiDay()) {
     const d = daysBetween(today, next.start);
     lines.push(d > 0 ? `**${next.name}** start in **${d} day${d === 1 ? '' : 's'}** (${next.start}).` : `**${next.name}** are on now, until ${next.end}.`);
   }
-  for (const u of data.units.filter((x) => x.catDate && x.catDate >= today).sort((a, b) => a.catDate.localeCompare(b.catDate)).slice(0, 4)) {
+  for (const u of data.units.filter((x) => isDay(x.catDate) && x.catDate >= today).sort((a, b) => a.catDate.localeCompare(b.catDate)).slice(0, 4)) {
     lines.push(`• ${u.code} CAT: ${u.catDate} (${daysBetween(today, u.catDate)}d)`);
   }
   const plan = todayPlan(today);

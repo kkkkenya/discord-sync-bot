@@ -8,7 +8,7 @@ const DIR = process.env.STUDY_DATA_DIR ? pathToFileURL(`${process.env.STUDY_DATA
 const FILE = new URL('study.json', DIR);
 mkdirSync(DIR, { recursive: true });
 
-// units: [{ code, title, catDate, confidence }]   (the ones you're taking this semester)
+// units: [{ code, title, catDate: 'YYYY-MM-DD'|'TBA'|null (null = KU calendar), confidence }]   (this semester's)
 // topics: [{ id, unit, name, status: red|amber|green, taughtAt }]
 // sessions: [{ id, unit, minutes, focus, kind, energy, endedEarly, at }]
 // papers: [{ id, unit, label, score, outOf, fileId, at }]   teach: [{ id, unit, topic, text, feedback, at }]
@@ -17,10 +17,11 @@ mkdirSync(DIR, { recursive: true });
 // subtopics, attempts, hints: filled from Phase 4 on (see PHASES.md).
 // cards, reviews: retired flashcards. Left exactly as they are in old files, never read or sent to the dashboard.
 // settings: { aiProvider: 'gemini'|'deepseek'|'anthropic', tour: { step, done, skipped }, cardsNotice: true once
-//   the "flashcards retired" note was dismissed }
+//   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
+//   unitArchive: { code: { catDate, confidence, ... } } (units you un-ticked, restored if you tick them again) }
 const EMPTY = {
   units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [],
-  settings: { aiProvider: 'gemini', tour: {} },
+  settings: { aiProvider: 'gemini', tour: {}, cohort: null, unitArchive: {} },
 };
 
 // Old files load with every list present and every setting defaulted; nothing in them is dropped.

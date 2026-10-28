@@ -112,6 +112,8 @@ input.num { width: 84px; }
 .picker ul { list-style: none; padding: 0; columns: 2 260px; margin: 12px 0; }
 .picker li { padding: 4px 0; break-inside: avoid; }
 .picker input[type='text'], .picker > input { width: 100%; }
+.picker h4 { margin: 10px 0 0; }
+.synclog { list-style: none; padding: 0; margin: 6px 0 0; width: 100%; }
 
 .unit { border-top: 1px solid var(--line); padding: 14px 0 10px; }
 .unit header { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; align-items: center; }

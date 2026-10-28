@@ -42,7 +42,7 @@ Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` 
 | `study/server/defs.js` | Shared definitions: study stages, self-audit values, sub-topic kinds, error types, weakness and hint weights, `TBA`. | exists (Phase 0) |
 | `study/server/plan.js` | Daily plan (top 3 units, one task each) and study stats. | exists |
 | `study/server/mastery.js` | Evidence-based topic colour (red/amber/green). | exists |
-| `study/server/library.js` | Unit catalogue from `lib/units.json`, the KU `CALENDAR` from `lib/config.js`, and each unit's files from the Supabase `files` table. | exists |
+| `study/server/library.js` | Unit catalogue (`cohort.js` `catalogue()`), the KU `CALENDAR` from `lib/config.js`, and each unit's files from the Supabase `files` table. | exists |
 | `study/server/ingest.js`, `extract.js` | Context library: downloads a unit's Discord files, extracts text (PDF/DOCX/PPTX) into `study/data/library.json`; `contextFor(unit, topic)` returns grounding text. | exists |
 | `study/server/bot.js` | DM-only Discord bot (`OWNER_ID` only). Commands: `today, files, teach, log, paper, help, stop`. 07:00 plan and 20:30 nudge (Nairobi). | exists |
 | `study/server/coach.js` | Marks Feynman teach-backs (score 1-5, gaps, follow-up question). | exists |
@@ -51,7 +51,7 @@ Everything lives in `study/` inside `C:\Users\grego\Downloads\discord-sync-bot` 
 | `study/server/ai.js` | Shared AI provider wrapper (`Gemini` default / `DeepSeek` / `Claude`): `structured(schema, system, content)`, `aiReady()`. | exists |
 | `study/server/insights.js` | Pure activity/performance functions (WIP, not wired into the UI; its "deeper dive" still reads retired flashcard reviews). | superseded by Phase 6 |
 | `study/web/src/*.jsx` | React frontend: `Hero, Today, Units, Notes, Teach, Mock, Papers, Prompt, Progress, Timer, CheckIn, Onboarding`. Plain CSS in `styles.css`. | exists |
-| `study/server/cohort.js` | Course / year / semester to units. | Phase 2 |
+| `study/server/cohort.js` | Course + year to units from the catalogue (`lib/units.json` plus thread-only units from `lib/threads.json`). The Hub has no semester data, so a cohort lists the whole year and the student unticks. | exists (Phase 2) |
 | `study/server/stages.js` | Per-unit study stage from the unit's own date, with overrides. | Phase 3 |
 | `study/server/analysis.js`, `web/src/Analysis.jsx` | Sub-topics, self-audit, weakspot matrix. | Phases 4 and 6 |
 | `study/server/predict.js`, `web/src/Predictions.jsx` | Past-paper question map, lecturer hints, predictions. | Phase 5 |

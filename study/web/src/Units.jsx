@@ -3,38 +3,109 @@ import { api, daysUntil } from './api.js';
 
 const CYCLE = [null, 'green', 'amber', 'red']; // manual override: auto → green → amber → red → auto
 
+const YEARS = [1, 2, 3, 4, 5];
+
+// Setup and "Edit units": Course → Year → Semester loads that cohort's units from the Study Hub catalogue. The Hub
+// doesn't record semesters, so the whole year is listed: untick what you aren't sitting. Units you already picked
+// from elsewhere (retakes, electives) stay ticked under their own heading; nothing is dropped unless you untick it.
 function Picker({ s, refresh, close }) {
+  const saved = s.settings.cohort || { course: 'EMM', year: 3, sem: 1 };
+  const [cohort, setCohort] = useState(saved);
   const [cat, setCat] = useState(null);
   const [picked, setPicked] = useState(() => new Set(s.data.units.map((u) => u.code)));
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
-  useEffect(() => { api('GET', 'catalog').then(setCat).catch((e) => setStatus(e.message)); }, []);
-  if (!cat) return <p className="muted">{status || 'Loading units…'}</p>;
-  const list = q.trim() ? cat.all.filter((u) => `${u.codes.join(' ')} ${u.title}`.toLowerCase().includes(q.toLowerCase())) : cat.year3;
+  useEffect(() => {
+    api('GET', `catalog?course=${cohort.course}&year=${cohort.year}`).then(setCat).catch((e) => setStatus(e.message));
+  }, [cohort.course, cohort.year]);
+  if (!cat) return <p className="muted small">{status || 'Loading units…'}</p>;
+
+  const titles = new Map(cat.all.flatMap((u) => u.codes.map((c) => [c, u.title])));
+  for (const u of s.data.units) if (u.title) titles.set(u.code, u.title);
+  const inCohort = new Set([...cat.core, ...cat.shared].map((u) => u.code));
+  const others = [...picked].filter((c) => !inCohort.has(c)).sort();
+  const found = q.trim() ? cat.all.filter((u) => `${u.codes.join(' ')} ${u.title}`.toLowerCase().includes(q.toLowerCase())).slice(0, 30) : [];
   const toggle = (code) => setPicked((p) => { const n = new Set(p); n.has(code) ? n.delete(code) : n.add(code); return n; });
+  const tickAll = (list, on) => setPicked((p) => { const n = new Set(p); for (const u of list) on ? n.add(u.code) : n.delete(u.code); return n; });
+  const set = (k, v) => setCohort((c) => ({ ...c, [k]: v }));
+  const courseName = cat.courses.find((c) => c.code === cohort.course)?.name || cohort.course;
+
   const saveIt = async () => {
     setStatus('Saving…');
     try {
-      await api('PUT', 'units', cat.all.filter((u) => picked.has(u.code)).map((u) => ({ code: u.code, title: u.title })));
+      await api('POST', 'settings', { cohort });
+      await api('PUT', 'units', [...picked].sort().map((code) => ({ code, title: titles.get(code) || '' })));
       await refresh();
       close();
     } catch (e) { setStatus(e.message); }
   };
+  const item = (u) => (
+    <li key={u.code}><label><input type="checkbox" checked={picked.has(u.code)} onChange={() => toggle(u.code)} /> <span className="code">{u.code}</span> {u.title || <span className="muted small">(no title in the Hub yet)</span>}</label></li>
+  );
+
   return (
     <div className="picker">
-      <p className="muted small">Tick the units you're taking in 3.1. These are the 3rd-year Mechanical units the Study Hub knows; search to add any other.</p>
-      <input placeholder="Search all units (code or title)" value={q} onChange={(e) => setQ(e.target.value)} />
-      <ul>
-        {list.map((u) => (
-          <li key={u.code}><label><input type="checkbox" checked={picked.has(u.code)} onChange={() => toggle(u.code)} /> <span className="code">{u.codes.join(' / ')}</span> {u.title}</label></li>
-        ))}
-      </ul>
+      <div className="row wrap">
+        <label className="small">Course{' '}
+          <select value={cohort.course} onChange={(e) => set('course', e.target.value)}>
+            {cat.courses.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
+          </select>
+        </label>
+        <label className="small">Year{' '}
+          <select value={cohort.year} onChange={(e) => set('year', Number(e.target.value))}>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
+        </label>
+        <label className="small">Semester{' '}
+          <select value={cohort.sem} onChange={(e) => set('sem', Number(e.target.value))}><option value={1}>1</option><option value={2}>2</option></select>
+        </label>
+      </div>
+      <p className="muted small">
+        {courseName} {cohort.year}.{cohort.sem}: {cat.core.length} unit{cat.core.length === 1 ? '' : 's'} from the Study Hub{cat.shared.length ? `, plus ${cat.shared.length} shared maths/common unit${cat.shared.length === 1 ? '' : 's'}` : ''}.
+        The Hub doesn't know which semester each unit is in yet, so the whole year is listed: tick the ones you're sitting this semester.
+      </p>
+      {cat.core.length > 0 ? (
+        <>
+          <div className="row"><h4>Your course</h4><button className="link" onClick={() => tickAll(cat.core, true)}>tick all</button><button className="link" onClick={() => tickAll(cat.core, false)}>none</button></div>
+          <ul>{cat.core.map(item)}</ul>
+        </>
+      ) : <p className="muted small">No {cohort.course} year {cohort.year} units in the Study Hub yet. Search below to add yours.</p>}
+      {cat.shared.length > 0 && <><h4>Shared units</h4><ul>{cat.shared.map(item)}</ul></>}
+      {others.length > 0 && <><h4>Retakes and electives</h4><ul>{others.map((code) => item({ code, title: titles.get(code) }))}</ul></>}
+      <input placeholder="Add a retake or elective: search all units (code or title)" aria-label="Search all units" value={q} onChange={(e) => setQ(e.target.value)} />
+      {found.length > 0 && <ul>{found.map((u) => item({ code: inCohort.has(u.code) ? u.code : (u.codes.find((c) => c.startsWith(cohort.course)) || u.code), title: u.title }))}</ul>}
       <div className="row">
         <button onClick={saveIt} disabled={status === 'Saving…'}>Save {picked.size} unit{picked.size === 1 ? '' : 's'}</button>
         {s.data.units.length > 0 && <button className="ghost" onClick={close}>Cancel</button>}
         {status && <span className={status === 'Saving…' ? 'muted small' : 'hot small'} role="status">{status}</span>}
       </div>
     </div>
+  );
+}
+
+// Pull every unit's server files into the context library in one go, one unit at a time, with a running summary.
+function SyncAll({ s }) {
+  const [busy, setBusy] = useState(false);
+  const [lines, setLines] = useState([]);
+  const run = async () => {
+    setBusy(true);
+    const out = [];
+    for (const [i, u] of s.data.units.entries()) {
+      setLines([...out, `Syncing ${u.code} (${i + 1}/${s.data.units.length})…`]);
+      try {
+        const r = await api('POST', 'library/ingest', { unit: u.code });
+        if (r.note) { out.push(`${u.code}: ${r.note}`); continue; }
+        const text = r.files.filter((f) => f.chars > 0).length;
+        const failed = r.files.filter((f) => f.error && !/scanned/.test(f.error)).length;
+        out.push(`${u.code}: ${r.files.length} file${r.files.length === 1 ? '' : 's'}, ${text} with text${r.files.length - text - failed ? `, ${r.files.length - text - failed} scanned (no text)` : ''}${failed ? `, ${failed} failed` : ''}`);
+      } catch (e) { out.push(`${u.code}: ${e.message}`); }
+    }
+    setLines(out);
+    setBusy(false);
+  };
+  return (
+    <>
+      <button className="ghost" onClick={run} disabled={busy || !s.data.units.length} data-tour="sync">{busy ? 'Syncing…' : 'Sync all files'}</button>
+      {lines.length > 0 && <ul className="synclog muted small" role="status">{lines.map((l) => <li key={l}>{l}</li>)}</ul>}
+    </>
   );
 }
 
@@ -104,7 +175,8 @@ function Unit({ u, s, refresh, go }) {
   const [topic, setTopic] = useState('');
   const [open, setOpen] = useState(false);
   const topics = s.data.topics.filter((t) => t.unit === u.code);
-  const cat = u.catDate || s.next?.start;
+  const tba = u.catDate === 'TBA';
+  const cat = tba ? null : u.catDate || s.next?.start;
   const rated = topics.map((t) => ({ t, m: s.mastery?.[t.id] || { status: 'red', manual: false, why: '', next: '' } }));
   const green = rated.filter((x) => x.m.status === 'green').length;
   const amber = rated.filter((x) => x.m.status === 'amber').length;
@@ -123,8 +195,13 @@ function Unit({ u, s, refresh, go }) {
       <header>
         <div><span className="code">{u.code}</span> <span className="title">{u.title}</span></div>
         <div className="meta">
-          <label>CAT <input type="date" value={u.catDate || ''} onChange={(e) => set({ catDate: e.target.value || null })} /></label>
-          {cat && <span className={`when ${daysUntil(s.today, cat) <= 3 ? 'hot' : ''}`}>{Math.max(0, daysUntil(s.today, cat))}d</span>}
+          <label>CAT/exam <input type="date" value={tba ? '' : u.catDate || ''} disabled={tba} onChange={(e) => set({ catDate: e.target.value || null })} /></label>
+          <label className="small"><input type="checkbox" checked={tba} onChange={(e) => set({ catDate: e.target.checked ? 'TBA' : null })} /> TBA</label>
+          {tba ? <span className="when">TBA</span> : cat && (
+            <span className={`when ${daysUntil(s.today, cat) <= 3 ? 'hot' : ''}`} title={u.catDate ? '' : 'No date set: using the KU calendar'}>
+              {Math.max(0, daysUntil(s.today, cat))}d{u.catDate ? '' : ' (KU calendar)'}
+            </span>
+          )}
           <span className="conf" title="How ready do you feel?">
             {[1, 2, 3, 4, 5].map((n) => <button key={n} aria-label={`confidence ${n}`} className={n <= (u.confidence || 0) ? 'on' : ''} onClick={() => set({ confidence: n })} />)}
           </span>
@@ -156,7 +233,7 @@ function Unit({ u, s, refresh, go }) {
       <div className="row small">
         <button className="link" onClick={() => go('mock', { unit: u.code })}>timed mock</button>
         <button className="link" onClick={() => go('teach', { unit: u.code })}>teach a topic</button>
-        <button className="link" data-tour="sync" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} server files</button>
+        <button className="link" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} server files</button>
       </div>
       {open && <Library code={u.code} go={go} />}
     </article>
@@ -166,11 +243,25 @@ function Unit({ u, s, refresh, go }) {
 export default function Units(props) {
   const { s } = props;
   const [picking, setPicking] = useState(!s.data.units.length);
+  // units still counting down to the KU calendar (no date of their own, not TBA)
+  const undated = s.data.units.filter((u) => !u.catDate);
+  const allTba = async () => {
+    for (const u of undated) await api('PATCH', `units?code=${encodeURIComponent(u.code)}`, { catDate: 'TBA' });
+    props.refresh();
+  };
   return (
     <section id="units" className="reveal" data-tour="units">
       <div className="head"><h2>Units</h2>{!picking && <button className="ghost" onClick={() => setPicking(true)}>Edit units</button>}</div>
       {picking ? <Picker {...props} close={() => setPicking(false)} /> : (
         <>
+          <div className="row wrap">
+            <SyncAll s={s} />
+            {undated.length > 0 && (
+              <button className="link small" onClick={allTba} title="CAT and exam dates are uncertain (the strike): stop counting down to the KU calendar">
+                Mark {undated.length} calendar date{undated.length === 1 ? '' : 's'} TBA
+              </button>
+            )}
+          </div>
           <p className="muted small">A topic's colour follows the evidence (a teach-back scored 4/5+ and 2 exam questions solved at 70%+), not a tick. Hover a chip to see why, and what's missing. Click a chip to force a colour yourself — it shows "· you". ✓ means you've done a teach-back.</p>
           {s.data.units.map((u) => <Unit key={u.code} u={u} {...props} />)}
         </>

@@ -92,11 +92,12 @@ input.num { width: 84px; }
 .big { font: 600 clamp(4rem, 14vw, 7rem)/1 var(--mono); color: var(--accent); letter-spacing: -0.04em; }
 .count .label { font-size: 1.1rem; color: var(--muted); }
 .count .label b { color: var(--ink); }
-.tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 0; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 0; }
 .tiles div { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 .tiles dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
 .tiles dd { margin: 0; font: 600 1.5rem var(--mono); }
-.hero-foot { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
+.hero .limitnote { margin: 0; }
+.hero-foot {display: flex; gap: 14px; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
 
 .code { font-family: var(--mono); font-weight: 600; font-size: 0.85rem; background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; white-space: nowrap; }
 .title { margin-left: 6px; }

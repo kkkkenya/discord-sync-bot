@@ -36,6 +36,8 @@ export function todayText(today = nairobiDay()) {
   if (next) {
     const d = daysBetween(today, next.start);
     lines.push(d > 0 ? `**${next.name}** start in **${d} day${d === 1 ? '' : 's'}** (${next.start}).` : `**${next.name}** are on now, until ${next.end}.`);
+    const undated = data.units.filter((u) => !u.catDate).length;
+    if (undated) lines.push(`_${undated} unit${undated === 1 ? ' counts' : 's count'} down to the KU calendar. Dates moved by the strike? Mark them TBA in Units on the dashboard._`);
   }
   for (const u of data.units.filter((x) => isDay(x.catDate) && x.catDate >= today).sort((a, b) => a.catDate.localeCompare(b.catDate)).slice(0, 4)) {
     lines.push(`• ${u.code} CAT/exam: ${u.catDate} (${daysBetween(today, u.catDate)}d)`);

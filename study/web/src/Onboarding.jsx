@@ -4,7 +4,7 @@ import { api } from './api.js';
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const STEPS = [
-  { id: 'countdown', target: '[data-tour="countdown"]', title: 'Your exam countdown', body: (s) => `Your next assessment starts ${s.next ? s.next.start : 'soon'} — everything is planned back from this.` },
+  { id: 'countdown', target: '[data-tour="countdown"]', title: 'Your exam countdown', body: (s) => `Each unit counts down to its own CAT or exam date. Until you set one, it uses the KU calendar${s.next ? ` (next CATs: ${s.next.start})` : ''}. If the strike has moved the dates, mark them TBA in Units.` },
   { id: 'units', target: '[data-tour="units"]', title: 'Pick your units', body: 'Pick your course, year and semester, then tick the units you are sitting.', done: (s) => s.data.units.length > 0 },
   { id: 'topics', target: '[data-tour="topics"]', title: 'Add topics', body: 'Copy them straight from the course outline, comma-separated.', done: (s) => s.data.topics.length >= 3 },
   { id: 'sync', target: '[data-tour="sync"]', title: 'Sync your files', body: '"Sync all files" pulls every unit\'s notes and past papers from the Study Hub, so the AI and your prompts work from your material. Optional.', done: () => false },

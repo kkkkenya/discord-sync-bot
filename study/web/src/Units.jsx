@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, daysUntil } from './api.js';
+import { api, daysUntil, markUndatedTba } from './api.js';
 
 const CYCLE = [null, 'green', 'amber', 'red']; // manual override: auto → green → amber → red → auto
 
@@ -259,10 +259,7 @@ export default function Units(props) {
   const [picking, setPicking] = useState(!s.data.units.length);
   // units still counting down to the KU calendar (no date of their own, not TBA)
   const undated = s.data.units.filter((u) => !u.catDate);
-  const allTba = async () => {
-    for (const u of undated) await api('PATCH', `units?code=${encodeURIComponent(u.code)}`, { catDate: 'TBA' });
-    props.refresh();
-  };
+  const allTba = () => markUndatedTba(s.data.units).then(props.refresh);
   return (
     <section id="units" className="reveal" data-tour="units">
       <div className="head"><h2>Units</h2>{!picking && <button className="ghost" onClick={() => setPicking(true)}>Edit units</button>}</div>

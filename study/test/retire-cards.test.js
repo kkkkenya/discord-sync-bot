@@ -51,6 +51,12 @@ test('the bot has no card commands and says so', async () => {
   assert.equal(data.cards.length, 500);
 });
 
+test('the morning DM says which units follow the KU calendar and how to stop it', async () => {
+  const text = await reply('today');
+  assert.match(text, /3 units count down to the KU calendar/);
+  assert.match(text, /TBA/);
+});
+
 test('the bot shows each unit\'s stage and counts TBA units', async () => {
   for (const u of data.units) u.catDate = 'TBA';
   const text = await reply('today');

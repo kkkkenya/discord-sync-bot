@@ -115,6 +115,33 @@ input.num { width: 84px; }
 .picker h4 { margin: 10px 0 0; }
 .synclog { list-style: none; padding: 0; margin: 6px 0 0; width: 100%; }
 
+/* Undo toast */
+.toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); z-index: 50; display: flex; gap: 12px; align-items: center; background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); max-width: calc(100vw - 32px); font-size: 0.9rem; }
+.toast button.link { color: var(--accent); }
+.toast button.x { color: var(--paper); }
+
+/* Weakspots: sub-topic tree + self-audit */
+.subtopics { list-style: none; padding: 0; margin: 8px 0; }
+.subrow { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; padding: 6px 4px; border-top: 1px dashed var(--line); border-radius: 4px; }
+.subrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.subrow .name { flex: 1 1 180px; min-width: 0; background: transparent; border-color: transparent; padding: 3px 6px; }
+.subrow .name:hover, .subrow .name:focus { border-color: var(--line); background: var(--paper); }
+.subrow select { padding: 3px 6px; font-size: 0.82rem; }
+.audit { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.audit button { background: none; color: var(--muted); border-radius: 0; padding: 3px 8px; font-size: 0.78rem; font-weight: 500; }
+.audit button + button { border-left: 1px solid var(--line); }
+.audit button.on.solid { background: var(--green-bg); color: var(--green); }
+.audit button.on.shaky { background: var(--amber-bg); color: var(--amber); }
+.audit button.on.stuck { background: var(--red-bg); color: var(--red); }
+.audit button.on.untested { background: var(--paper); color: var(--ink); }
+.topicblock { border-top: 1px solid var(--line); padding: 12px 0 6px; }
+.topicblock header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.topicblock h3 { margin: 0; font-size: 1rem; }
+.chip.solo { padding: 3px 10px; }
+.suggest { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.gaps { padding-left: 18px; }
+.topicblock form input.grow { flex: 1 1 220px; }
+
 /* Study stages: one colour per stage, latest is hottest */
 .stagemix { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 .stage { display: inline-block; font: 600 0.72rem var(--mono); padding: 2px 8px; border-radius: 999px; margin-left: 8px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }

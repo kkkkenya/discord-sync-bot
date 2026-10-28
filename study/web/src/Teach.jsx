@@ -12,6 +12,23 @@ function Feedback({ f }) {
   );
 }
 
+// Gaps that don't match a sub-topic yet: one click lists each under the topic (as shaky: you just missed it).
+function GapsToSubtopics({ topicId, gaps, refresh }) {
+  const [done, setDone] = useState([]);
+  const addOne = async (gap) => {
+    const { added } = await api('POST', 'subtopics', { topicId, name: gap.length > 70 ? `${gap.slice(0, 67)}…` : gap });
+    if (added[0]) await api('PATCH', `subtopics/${added[0].id}`, { audit: 'shaky' });
+    setDone((d) => [...d, gap]);
+    refresh();
+  };
+  return (
+    <div className="small">
+      <p className="muted">Not in your sub-topic list yet:</p>
+      <ul className="gaps">{gaps.map((g) => <li key={g}>{g} {done.includes(g) ? <span className="ok">added ✓</span> : <button className="link" onClick={() => addOne(g)}>add as a shaky sub-topic</button>}</li>)}</ul>
+    </div>
+  );
+}
+
 export default function Teach({ s, refresh, focus }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const [topic, setTopic] = useState('');
@@ -53,6 +70,8 @@ export default function Teach({ s, refresh, focus }) {
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}
       {result?.item?.feedback && <Feedback f={result.item.feedback} />}
+      {result?.flags?.flagged?.length > 0 && <p className="muted small" role="status">Marked shaky in your weakspots: <b>{result.flags.flagged.join(', ')}</b>.</p>}
+      {result?.flags?.topicId && result.flags.unmatched?.length > 0 && <GapsToSubtopics topicId={result.flags.topicId} gaps={result.flags.unmatched} refresh={refresh} />}
       {result?.item && !result.item.feedback && <p className="muted">Saved.</p>}
       {past.length > 0 && (
         <details className="past">

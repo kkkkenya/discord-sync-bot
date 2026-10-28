@@ -8,6 +8,7 @@ import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
 import { catDay, daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
+import { teachFlags } from './weakspots.js';
 
 const HELP = [
   '**Study DMs**: type any of these.',
@@ -110,12 +111,14 @@ export async function reply(text) {
     const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
     if (tp) { tp.taughtAt = new Date().toISOString(); save(); }
     if (!feedback) return `Saved your teach-back on ${topic}.${note}`;
+    const { flagged } = teachFlags(unit, topic, feedback);
     return [
       `**${topic}: ${feedback.score}/5**`,
       `✓ ${feedback.good}`,
       ...feedback.gaps.map((g) => `✗ ${g}`),
       '',
       `**Next question:** ${feedback.followUp}`,
+      ...(flagged.length ? ['', `_Marked shaky in your weakspots: ${flagged.join(', ')}._`] : []),
     ].join('\n');
   }
 

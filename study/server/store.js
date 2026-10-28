@@ -14,7 +14,8 @@ mkdirSync(DIR, { recursive: true });
 // papers: [{ id, unit, label, score, outOf, fileId, at }]   teach: [{ id, unit, topic, text, feedback, at }]
 // questions: [{ id, unit, topic, q, a, marks, from, at }]   (CAT-style practice bank for mocks)
 // mocks: [{ id, unit, name, questions: [{q,a,marks,topic}], answers: [{user,earned,note}], score, outOf, overall, finishedAt, at }]
-// subtopics, attempts, hints: filled from Phase 4 on (see PHASES.md).
+// subtopics: [{ id, unit, topicId, name, kind, audit, auditAt, auditFrom: 'you'|'teach', mistakeCount, lastTested, order, at }]
+// attempts, hints: filled from Phase 5 on (see PHASES.md).
 // cards, reviews: retired flashcards. Left exactly as they are in old files, never read or sent to the dashboard.
 // settings: { aiProvider: 'gemini'|'deepseek'|'anthropic', tour: { step, done, skipped }, cardsNotice: true once
 //   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
@@ -47,7 +48,7 @@ export function save() {
   renameSync(tmp, FILE);
 }
 
-export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks'];
+export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks', 'subtopics'];
 
 export function add(list, row) {
   const item = { id: randomUUID().slice(0, 8), at: new Date().toISOString(), ...row };

@@ -14,13 +14,15 @@ config({ path: fileURLToPath(new URL('../../community/.env', import.meta.url)), 
 const { startBot, todayText } = await import('./bot.js');
 const { coach, coachReady } = await import('./coach.js');
 const { aiReady, clamp, provider } = await import('./ai.js');
-const { makeQuestions, makeStudyMaterial, markAnswers } = await import('./brain.js');
+const { makeQuestions, makeStudyMaterial, markAnswers, suggestSubtopics } = await import('./brain.js');
 const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
 const { STAGES, TBA } = await import('./defs.js');
 const { stageMix, validStage } = await import('./stages.js');
 const { masteryMap } = await import('./mastery.js');
+const { checkSubtopic } = await import('./analysis.js');
+const { teachFlags } = await import('./weakspots.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
@@ -103,7 +105,44 @@ const routes = {
     const item = add('teach', { unit, topic, text, feedback });
     const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
     if (tp) { tp.taughtAt = item.at; save(); }
-    return { item, error };
+    return { item, error, flags: teachFlags(unit, topic, feedback) };
+  },
+  // body: { topicId, name } or { topicId, names: [...] } — add one or several sub-topics under a topic
+  'POST /api/subtopics': (q, body) => {
+    if (body.restore) return { added: [add('subtopics', checkSubtopic(body.restore, { create: true }))] }; // undo a delete
+    const tp = data.topics.find((t) => t.id === body.topicId);
+    if (!tp) throw Object.assign(new Error('pick a topic first'), { status: 400 });
+    const names = (body.names || [body.name]).map((n) => String(n || '').trim()).filter(Boolean);
+    if (!names.length) throw Object.assign(new Error('a sub-topic needs a name'), { status: 400 });
+    let order = Math.max(0, ...data.subtopics.filter((s) => s.topicId === tp.id).map((s) => s.order || 0));
+    const have = new Set(data.subtopics.filter((s) => s.topicId === tp.id).map((s) => s.name.toLowerCase()));
+    const added = [];
+    for (const name of names) {
+      if (have.has(name.toLowerCase())) continue;
+      have.add(name.toLowerCase());
+      added.push(add('subtopics', { ...checkSubtopic({ name, kind: body.kind || 'concept' }, { create: true }), unit: tp.unit, topicId: tp.id, order: ++order }));
+    }
+    return { added };
+  },
+  // The 60-second self-audit: { ratings: { <subtopicId>: 'solid'|'shaky'|'stuck'|'untested' } }
+  'POST /api/subtopics/audit': (q, { ratings = {} }) => {
+    const at = new Date().toISOString();
+    for (const [id, audit] of Object.entries(ratings)) {
+      const s = data.subtopics.find((x) => x.id === id);
+      if (!s) throw Object.assign(new Error('unknown sub-topic'), { status: 404 });
+      Object.assign(s, checkSubtopic({ audit }), { auditAt: at, auditFrom: 'you' });
+    }
+    save();
+    return state();
+  },
+  // AI suggestions from the synced notes for one topic; nothing is saved until the student adds them.
+  'POST /api/subtopics/suggest': async (q, { topicId }) => {
+    const tp = data.topics.find((t) => t.id === topicId);
+    if (!tp) throw Object.assign(new Error('pick a topic first'), { status: 400 });
+    if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Add sub-topics by hand, or use the Prompt builder to list them in another AI.'), { status: 400 });
+    const have = data.subtopics.filter((s) => s.topicId === tp.id).map((s) => s.name);
+    const { subtopics } = await suggestSubtopics({ unit: tp.unit, topic: tp.name, have, context: contextFor(tp.unit, tp.name) });
+    return { suggestions: subtopics.filter((s) => !have.some((h) => h.toLowerCase() === s.name.toLowerCase())) };
   },
   // AI provider toggle + other dashboard settings.
   'POST /api/settings': (q, body) => {
@@ -181,6 +220,15 @@ async function submitMock(id, { answers = [] }) {
   return mockResult(mock);
 }
 
+// Validation for generic list writes (undo re-POSTs a deleted row with its id, so create goes through here too).
+const CHECKS = {
+  subtopics: (b, opts) => {
+    const out = checkSubtopic(b, opts);
+    if ('audit' in b && !opts?.create) Object.assign(out, { auditAt: new Date().toISOString(), auditFrom: 'you' });
+    return out;
+  },
+};
+
 async function api(req, url) {
   const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.parse(Buffer.concat(await req.toArray()).toString() || '{}') : null;
   const route = routes[`${req.method} ${url.pathname}`];
@@ -190,8 +238,9 @@ async function api(req, url) {
   // generic lists: POST /api/topics, PATCH /api/topics/<id>, DELETE /api/topics/<id>
   const [, list, id] = url.pathname.match(/^\/api\/(\w+)(?:\/([\w-]+))?$/) || [];
   if (LISTS.includes(list)) {
-    if (req.method === 'POST' && !id) return add(list, body);
-    if (req.method === 'PATCH' && id) return patch(list, id, body) ?? Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
+    const check = CHECKS[list] || ((b) => b);
+    if (req.method === 'POST' && !id) return add(list, check(body, { create: true }));
+    if (req.method === 'PATCH' && id) return patch(list, id, check(body)) ?? Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
     if (req.method === 'DELETE' && id) return { removed: remove(list, id) };
   }
   throw Object.assign(new Error('no such endpoint'), { status: 404 });

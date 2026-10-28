@@ -3,6 +3,7 @@ import gsap from 'gsap';
 import { ReactLenis } from 'lenis/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import Analysis from './Analysis.jsx';
 import Hero from './Hero.jsx';
 import Mock from './Mock.jsx';
 import Notes from './Notes.jsx';
@@ -18,7 +19,7 @@ import Units from './Units.jsx';
 gsap.registerPlugin(useGSAP);
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const NAV = [['today', 'Today'], ['units', 'Units'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
+const NAV = [['today', 'Today'], ['units', 'Units'], ['analysis', 'Weakspots'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
 
 export default function App() {
   const [s, setS] = useState(null);
@@ -32,6 +33,14 @@ export default function App() {
   const [tourOn, setTourOn] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [checklistOff, setChecklistOff] = useState(false);
+  // one toast at a time: { text, undo } — deletes happen at once and can be undone for 8 seconds
+  const [toast, setToast] = useState(null);
+  const notify = useCallback((text, undo) => setToast({ text, undo, id: Date.now() }), []);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 8000);
+    return () => clearTimeout(t);
+  }, [toast]);
   const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(x); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
   // auto-open the tour on a brand-new (empty) store, once
@@ -71,7 +80,7 @@ export default function App() {
   if (error) return <main className="shell"><p className="banner bad">{error} <button className="link" onClick={() => { setError(''); refresh(); }}>Try again</button></p></main>;
   if (!s) return <main className="shell"><p className="muted">Loading…</p></main>;
 
-  const props = { s, refresh, go, focus };
+  const props = { s, refresh, go, focus, notify };
   return (
     <>
       {!calm && <ReactLenis root options={{ autoRaf: false, anchors: true }} ref={lenisRef} />}
@@ -119,6 +128,7 @@ export default function App() {
         {!tourOn && (s.settings.tour?.done || s.settings.tour?.skipped) && !checklistOff && <Checklist s={s} onDismiss={() => setChecklistOff(true)} />}
         <Today {...props} />
         <Units {...props} />
+        <Analysis {...props} />
         <Notes {...props} />
         <Teach {...props} />
         <Mock {...props} />
@@ -127,6 +137,13 @@ export default function App() {
         <Progress {...props} />
       </main>
       <Timer {...props} />
+      {toast && (
+        <div className="toast" role="status">
+          <span>{toast.text}</span>
+          {toast.undo && <button className="link" onClick={() => { const u = toast.undo; setToast(null); Promise.resolve(u()).then(refresh).catch((e) => setProblem(e.message)); }}>Undo</button>}
+          <button className="x" aria-label="Dismiss" onClick={() => setToast(null)}>×</button>
+        </div>
+      )}
       {tourOn && <Onboarding s={s} refresh={refresh} initialStep={tourStep} close={() => setTourOn(false)} />}
     </>
   );

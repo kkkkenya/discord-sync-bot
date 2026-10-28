@@ -34,6 +34,29 @@ export async function makeStudyMaterial({ unit, topic, text, context = '' }) {
   return structured(schema, TUTOR, content, 8000);
 }
 
+// Break a topic into the sub-topics and concepts a KU exam tests, from the student's own material when synced.
+export async function suggestSubtopics({ unit, topic, have = [], context = '' }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      subtopics: {
+        type: 'array',
+        description: '5-10 granular sub-topics for this topic, in teaching order: governing principles, derivations, assumptions, standard methods, sign conventions, boundary conditions.',
+        items: {
+          type: 'object',
+          properties: { name: { type: 'string', description: 'Short name, 2-6 words.' }, kind: { type: 'string', enum: ['concept', 'derivation', 'method', 'assumption'] } },
+          required: ['name', 'kind'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['subtopics'],
+    additionalProperties: false,
+  };
+  const content = `Unit: ${unit}\nTopic: ${topic}${have.length ? `\nAlready listed (don't repeat): ${have.join('; ')}` : ''}${context ? `\n\nThe student's course material — break the topic down the way THIS course teaches and examines it:\n${context}` : ''}`;
+  return structured(schema, TUTOR, content, 2000);
+}
+
 // Fill a mock exam when the question bank is short: generate questions from the unit's topics.
 export async function makeQuestions({ unit, topics, count, context = '' }) {
   const schema = {

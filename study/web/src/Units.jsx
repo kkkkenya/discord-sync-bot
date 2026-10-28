@@ -178,7 +178,7 @@ function Library({ code, go }) {
   );
 }
 
-function Unit({ u, s, refresh, go }) {
+function Unit({ u, s, refresh, go, notify }) {
   const [topic, setTopic] = useState('');
   const [open, setOpen] = useState(false);
   const topics = s.data.topics.filter((t) => t.unit === u.code);
@@ -226,7 +226,7 @@ function Unit({ u, s, refresh, go }) {
             <button onClick={() => api('PATCH', `topics/${t.id}`, { manual: nextManual(t, m) }).then(refresh)} title={`${m.why}\nNext: ${m.next}`}>
               {t.name}{t.taughtAt ? ' ✓' : ''}{m.manual ? ' · you' : ''}
             </button>
-            <button className="x" aria-label={`remove ${t.name}`} onClick={() => api('DELETE', `topics/${t.id}`).then(refresh)}>×</button>
+            <button className="x" aria-label={`remove ${t.name}`} onClick={() => api('DELETE', `topics/${t.id}`).then(() => { notify(`Removed "${t.name}"`, () => api('POST', 'topics', t)); refresh(); })}>×</button>
           </span>
         ))}
         <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>

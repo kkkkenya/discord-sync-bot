@@ -5,15 +5,13 @@ import LimitNote from './LimitNote.jsx';
 
 // Paste lecture notes / a textbook section / slide text. The AI turns it into CAT-style questions that land in
 // your mock-exam bank.
-export default function Notes({ s, refresh, focus, go }) {
-  const [unit, setUnit] = useState(s.data.units[0]?.code || '');
+export default function Notes({ s, unit, setUnit, refresh, focus, go }) {
   const [topic, setTopic] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
 
   useEffect(() => {
-    if (focus?.section === 'notes' && focus.unit) setUnit(focus.unit);
     if (focus?.section === 'notes' && focus.topic) setTopic(focus.topic);
   }, [focus]);
 

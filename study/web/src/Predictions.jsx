@@ -49,14 +49,12 @@ function Paste({ unit, reload }) {
 }
 
 // Predictions: past-paper questions mapped to topics + lecturer hints → topics ranked by exam weight.
-export default function Predictions({ s, focus, go, notify }) {
-  const [unit, setUnit] = useState(s.data.units[0]?.code || '');
+export default function Predictions({ s, unit, setUnit, focus, go, notify }) {
   const [p, setP] = useState(null);
   const [hint, setHint] = useState('');
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
   const [open, setOpen] = useState(null);
-  useEffect(() => { if (focus?.section === 'predictions' && focus.unit) setUnit(focus.unit); }, [focus]);
   const reload = useCallback(() => (unit ? api('GET', `predict?unit=${encodeURIComponent(unit)}`).then(setP).catch((e) => setMsg(e.message)) : null), [unit]);
   // reload on unit change, and whenever the store changes elsewhere (topics added, a hint from the bot…)
   useEffect(() => { reload(); }, [reload, s]);

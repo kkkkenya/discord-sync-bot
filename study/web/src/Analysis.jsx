@@ -149,11 +149,8 @@ function Matrix({ unit, s, go }) {
 }
 
 // Weakspots: break each topic into sub-topics and concepts, then audit them in a minute.
-export default function Analysis({ s, refresh, focus, notify, go }) {
-  const [unit, setUnit] = useState(s.data.units[0]?.code || '');
+export default function Analysis({ s, unit, setUnit, refresh, focus, notify, go }) {
   const ref = useRef(null);
-  useEffect(() => { if (focus?.section === 'analysis' && focus.unit) setUnit(focus.unit); }, [focus]);
-  useEffect(() => { if (!s.data.units.some((u) => u.code === unit)) setUnit(s.data.units[0]?.code || ''); }, [s.data.units, unit]);
   const topics = s.data.topics.filter((t) => t.unit === unit);
   const subsOf = (t) => s.data.subtopics.filter((x) => x.topicId === t.id).sort(byOrder);
   const all = topics.flatMap(subsOf);

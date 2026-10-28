@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 import { api, pct } from './api.js';
 
-export default function Papers({ s, refresh, focus, notify }) {
-  const blank = { unit: s.data.units[0]?.code || '', label: '', score: '', outOf: '', fileId: null };
+export default function Papers({ s, refresh, focus, notify, unit, setUnit }) {
+  const blank = { label: '', score: '', outOf: '', fileId: null };
   const [f, setF] = useState(blank);
   useEffect(() => {
-    if (focus?.section === 'papers') setF((x) => ({ ...x, unit: focus.unit || x.unit, label: focus.label || '', fileId: focus.fileId || null }));
+    if (focus?.section === 'papers') setF((x) => ({ ...x, label: focus.label || '', fileId: focus.fileId || null }));
   }, [focus]);
 
   const save = async (e) => {
     e.preventDefault();
-    await api('POST', 'papers', { ...f, score: Number(f.score), outOf: Number(f.outOf) });
-    setF({ ...blank, unit: f.unit });
+    await api('POST', 'papers', { ...f, unit, score: Number(f.score), outOf: Number(f.outOf) });
+    setF(blank);
     refresh();
   };
 
@@ -26,14 +26,14 @@ export default function Papers({ s, refresh, focus, notify }) {
       <h2>Past papers</h2>
       <p className="muted small">Do them timed, closed book, then mark honestly. Redo every question you lost marks on, closed book, then teach back the topic behind it. Open papers from a unit's "server files".</p>
       <form className="row wrap" onSubmit={save}>
-        <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} aria-label="Unit">
+        <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unit">
           {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code}</option>)}
         </select>
         <input className="grow" placeholder="Which paper (e.g. 2023 CAT 1)" aria-label="Which paper" value={f.label} onChange={(e) => setF({ ...f, label: e.target.value })} required />
         <input className="num" type="number" min="0" step="0.5" placeholder="Score" aria-label="Score" value={f.score} onChange={(e) => setF({ ...f, score: e.target.value })} required />
         <span>/</span>
         <input className="num" type="number" min="1" placeholder="Out of" aria-label="Out of" value={f.outOf} onChange={(e) => setF({ ...f, outOf: e.target.value })} required />
-        <button disabled={!f.unit}>Log</button>
+        <button disabled={!unit}>Log</button>
       </form>
 
       {byUnit.length > 0 && (

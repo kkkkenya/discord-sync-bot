@@ -5,8 +5,7 @@ import LimitNote from './LimitNote.jsx';
 // Checkpoint feedback: type your final answer (and, if you like, the operations you used). A right answer is
 // accepted in any unit. A wrong one shows numbered checkpoints; tap "Broke here" on the step where your paper
 // diverged and it goes into your weakspots. Nothing is held against you until you do.
-export default function Practice({ s, refresh, go, focus, notify }) {
-  const [unit, setUnit] = useState(s.data.units[0]?.code || '');
+export default function Practice({ s, unit, setUnit, refresh, go, focus, notify }) {
   const [questions, setQuestions] = useState([]);
   const [questionId, setQuestionId] = useState('');
   const [pasted, setPasted] = useState('');
@@ -26,7 +25,7 @@ export default function Practice({ s, refresh, go, focus, notify }) {
   // arriving from a past-paper question, a Today task or a weakspot
   useEffect(() => {
     if (focus?.section !== 'practice' || !focus.unit) return;
-    setUnit(focus.unit); setQuestionId(focus.questionId || ''); clear();
+    setQuestionId(focus.questionId || ''); clear();
     setWant(!focus.questionId && focus.topicId ? { topicId: focus.topicId, subtopicId: focus.subtopicId } : null);
   }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {

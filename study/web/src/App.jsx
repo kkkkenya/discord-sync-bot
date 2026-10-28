@@ -43,6 +43,10 @@ export default function App() {
     const t = setTimeout(() => setToast(null), 8000);
     return () => clearTimeout(t);
   }, [toast]);
+  // one current unit for every section: any unit picker changes it, opening a task or a unit's link sets it, and
+  // this browser remembers it between visits
+  const [unitPick, setUnitPick] = useState(() => { try { return localStorage.getItem('study-unit') || ''; } catch { return ''; } });
+  const setUnit = useCallback((code) => { setUnitPick(code); try { localStorage.setItem('study-unit', code); } catch { /* private window */ } }, []);
   const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(x); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
   // auto-open the tour on a brand-new (empty) store, once
@@ -73,6 +77,7 @@ export default function App() {
   }, { scope: root, dependencies: [Boolean(s)] });
 
   const go = (section, extra = {}) => {
+    if (extra.unit) setUnit(extra.unit);
     setFocus({ section, ...extra, at: Date.now() });
     const el = document.getElementById(section);
     const offset = -((document.querySelector('.top')?.offsetHeight || 54) + 12); // clear the sticky header
@@ -83,7 +88,9 @@ export default function App() {
   if (error) return <main className="shell"><p className="banner bad">{error} <button className="link" onClick={() => { setError(''); refresh(); }}>Try again</button></p></main>;
   if (!s) return <main className="shell"><p className="muted">Loading…</p></main>;
 
-  const props = { s, refresh, go, focus, notify };
+  // a remembered unit you've since dropped falls back to today's first unit
+  const unit = s.data.units.some((u) => u.code === unitPick) ? unitPick : s.plan[0]?.code || s.data.units[0]?.code || '';
+  const props = { s, refresh, go, focus, notify, unit, setUnit };
   return (
     <>
       {!calm && <ReactLenis root options={{ autoRaf: false, anchors: true }} ref={lenisRef} />}

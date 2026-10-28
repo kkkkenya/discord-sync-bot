@@ -26,8 +26,7 @@ const download = (name, text) => {
 
 // Deep Context Pack: a Master Prompt to copy + a <UNIT>-<TOPIC>-context.md to attach in Claude, DeepSeek R1 or
 // ChatGPT, built from your hints, weakspots, past papers and synced notes. No AI key needed.
-export default function Prompt({ s, focus }) {
-  const [unit, setUnit] = useState(s.data.units[0]?.code || '');
+export default function Prompt({ s, focus, unit, setUnit }) {
   const [topicId, setTopicId] = useState('');
   const [questionId, setQuestionId] = useState('');
   const [goal, setGoal] = useState('');
@@ -51,7 +50,7 @@ export default function Prompt({ s, focus }) {
     if (focus?.section !== 'prompt' || !focus.unit) return;
     const t = s.data.topics.find((x) => x.unit === focus.unit && (x.id === focus.topicId || x.name.toLowerCase() === String(focus.topic || '').toLowerCase()));
     const g = focus.goal || FROM_KIND[focus.kind] || '';
-    setUnit(focus.unit); setTopicId(t?.id || ''); setQuestionId(focus.questionId || ''); setGoal(g);
+    setTopicId(t?.id || ''); setQuestionId(focus.questionId || ''); setGoal(g);
     build({ unit: focus.unit, topicId: t?.id, questionId: focus.questionId, goal: g || undefined });
   }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -101,15 +100,15 @@ export default function Prompt({ s, focus }) {
           <details><summary>See the pack</summary><textarea readOnly rows={12} value={out.md} aria-label="Context pack" /></details>
         </div>
       )}
-      <QuickPrompt s={s} />
+      <QuickPrompt s={s} current={unit} />
     </section>
   );
 }
 
 // Quick prompts: short, templated, with a capped slice of the synced material.
-function QuickPrompt({ s }) {
+function QuickPrompt({ s, current }) {
   const [kind, setKind] = useState('mock');
-  const [unit, setUnit] = useState(s.data.units[0]?.code || '');
+  const [unit, setUnit] = useState(current); // its own pick: it also offers "All units"
   const [topic, setTopic] = useState('');
   const [count, setCount] = useState(5);
   const [notes, setNotes] = useState('');

@@ -31,8 +31,7 @@ function GapsToSubtopics({ topicId, gaps, refresh }) {
   );
 }
 
-export default function Teach({ s, refresh, focus, go }) {
-  const [unit, setUnit] = useState(s.data.units[0]?.code || '');
+export default function Teach({ s, unit, setUnit, refresh, focus, go }) {
   const [topic, setTopic] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,7 +39,6 @@ export default function Teach({ s, refresh, focus, go }) {
 
   useEffect(() => {
     if (focus?.section !== 'teach') return;
-    if (focus.unit) setUnit(focus.unit);
     if (focus.topic) setTopic(focus.topic);
   }, [focus]);
 

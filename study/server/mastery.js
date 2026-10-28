@@ -1,7 +1,10 @@
-// Evidence-based topic status: a topic is green only when the evidence says so — a teach-back scored 4/5+ and
-// >=2 exam questions solved with >=70% marks. One of the two is amber, neither is red. (Sub-topic audits and
-// checkpoint failures join the evidence in Phase 6.) A manual override wins but is shown separately. Date helpers
-// are copied from plan.js to avoid an import cycle (plan.js imports this file).
+// Evidence-based topic status (GUIDE.md "How Topic & Sub-Topic Mastery Colours Work"):
+//   green: every sub-topic audited solid (or none listed) + a teach-back scored 4/5+, and >=2 exam questions
+//          solved with >=70% marks (or checkpoint attempts all passed), and no checkpoint failure in 7 days
+//   red:   nothing tried yet, any sub-topic stuck, or 2+ checkpoint failures in 7 days
+//   amber: everything in between (partly tested, or a shaky sub-topic)
+// A manual override wins but is shown separately. Date helpers are copied from plan.js to avoid an import cycle
+// (plan.js imports this file).
 import { data } from './store.js';
 
 export const nairobiDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
@@ -28,21 +31,41 @@ export function topicMastery(topic, today = nairobiDay()) {
       if (a && a.earned != null && q.marks && a.earned / q.marks >= NEED.qPct) solved++;
     });
   }
+  // 3. Checkpoint attempts on the topic (Phase 8): a right one counts as a solved question.
+  const since = Date.parse(`${addDays(today, -6)}T00:00:00+03:00`);
+  const subs = data.subtopics.filter((s) => s.topicId === topic.id);
+  const subIds = new Set(subs.map((s) => s.id));
+  const tries = data.attempts.filter((a) => a.topicId === topic.id || subIds.has(a.subtopicId));
+  solved += tries.filter((a) => a.verdict === 'right').length;
+  const failures = tries.filter((a) => a.verdict === 'wrong' && Date.parse(a.at) >= since).length;
   const questionsOk = solved >= NEED.questions;
 
-  const evidence = teachOk && questionsOk ? 'green' : (teachOk || questionsOk ? 'amber' : 'red');
+  // 4. The sub-topic self-audit.
+  const audited = subs.filter((s) => s.audit && s.audit !== 'untested');
+  const solid = subs.filter((s) => s.audit === 'solid').length;
+  const stuck = subs.filter((s) => s.audit === 'stuck');
+  const subsOk = solid === subs.length;
+
+  const tried = teachOk || best > 0 || solved > 0 || audited.length > 0 || tries.length > 0;
+  const evidence = teachOk && questionsOk && subsOk && !failures ? 'green'
+    : !tried || stuck.length || failures >= 2 ? 'red'
+      : 'amber';
   const manual = topic.manual || null;
   const why = [
     teachOk ? `teach-back ${best}/5 ✓` : (best ? `teach-back ${best}/5 (need ${NEED.teach}/5)` : 'no teach-back yet'),
     questionsOk ? `${solved}/${NEED.questions} questions ✓` : `${solved}/${NEED.questions} questions solved`,
-  ].join(' · ');
-  const next = manual ? 'marked by you' : !teachOk ? `Teach it back (score ${NEED.teach}/5)` : !questionsOk ? `Solve ${NEED.questions - solved} more question${NEED.questions - solved === 1 ? '' : 's'}` : 'Mastered';
+    subs.length ? `${solid}/${subs.length} sub-topics solid${stuck.length ? `, ${stuck.length} stuck` : ''}` : null,
+    failures ? `${failures} broken checkpoint${failures === 1 ? '' : 's'} this week` : null,
+  ].filter(Boolean).join(' · ');
+  const next = manual ? 'marked by you' : stuck.length ? `Get unstuck on ${stuck[0].name}` : failures ? 'Redo the questions you broke this week' : !teachOk ? `Teach it back (score ${NEED.teach}/5)` : !questionsOk ? `Solve ${NEED.questions - solved} more question${NEED.questions - solved === 1 ? '' : 's'}` : !subsOk ? `Make ${subs.find((s) => s.audit !== 'solid').name} solid` : 'Mastered';
 
   return {
     status: manual || evidence,
     manual: Boolean(manual),
     teach: { best, ok: teachOk },
     questions: { solved, ok: questionsOk },
+    subtopics: { total: subs.length, solid, stuck: stuck.length },
+    failures,
     why,
     next,
   };

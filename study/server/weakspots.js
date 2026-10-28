@@ -2,8 +2,7 @@
 // stays pure in analysis.js.
 import { applyTeachGaps } from './analysis.js';
 import { library } from './ingest.js';
-import { unitStage } from './plan.js';
-import { mapQuestion, paperInfo, parseQuestions, predictions, readHint } from './predict.js';
+import { mapQuestion, paperInfo, parseQuestions, readHint } from './predict.js';
 import { data, save } from './store.js';
 
 const topicOf = (unit, name) => data.topics.find((t) => t.unit === unit && t.name.trim().toLowerCase() === String(name || '').trim().toLowerCase());
@@ -66,11 +65,7 @@ export function hintFields(unit, text, given = {}) {
   return { unit, text: String(text).trim(), kind: given.kind || read.kind, topicIds: given.topicIds || read.topicIds };
 }
 
-// The unit's ranked topics, with its stage deciding whether exclude hints mute.
-export function predictFor(unit, today) {
-  const u = data.units.find((x) => x.code === unit);
-  const late = u ? unitStage(u, today).stage.id !== 'adequate' : false;
-  return predictions({ topics: data.topics.filter((t) => t.unit === unit), questions: data.paperq.filter((q) => q.unit === unit), hints: data.hints.filter((h) => h.unit === unit), late });
-}
-
 export const scannedPapers = scannedOf;
+
+// Predictions and the weakspot matrix live in plan.js (Today needs them, and plan.js can't import this file).
+export { predictFor, weakspotsFor } from './plan.js';

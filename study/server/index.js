@@ -22,7 +22,7 @@ const { STAGES, TBA } = await import('./defs.js');
 const { stageMix, validStage } = await import('./stages.js');
 const { masteryMap } = await import('./mastery.js');
 const { checkSubtopic } = await import('./analysis.js');
-const { hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags } = await import('./weakspots.js');
+const { hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } = await import('./weakspots.js');
 const { predictedMock } = await import('./predict.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
@@ -135,6 +135,12 @@ const routes = {
     }
     save();
     return state();
+  },
+  // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
+  'GET /api/weakspots': (q) => {
+    const unit = q.get('unit');
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    return weakspotsFor(unit, nairobiDay());
   },
   // Predictions for one unit: ranked topics, its parsed past-paper questions, hints and scanned papers.
   'GET /api/predict': (q) => {

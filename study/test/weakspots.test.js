@@ -58,3 +58,39 @@ test('the bot saves a hint and predicts with it', async () => {
   assert.equal(predictFor('ECU 300', '2026-10-28')[0].name, 'Beta functions');
   assert.match(await reply('predict XYZ 999'), /Like this/);
 });
+
+const { topicMastery } = await import('../server/mastery.js');
+const { todayPlan } = await import('../server/plan.js');
+const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
+const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+
+test('mastery colours follow the guide: stuck or repeated failures are red, all solid + evidence is green', () => {
+  const thick = data.topics.find((t) => t.id === 't2'); // teach-back 4/5 + 2 solved mock questions
+  assert.equal(topicMastery(thick, today()).status, 'green', 'no sub-topics listed');
+  data.subtopics.splice(0, data.subtopics.length,
+    { id: 'k1', unit: 'EMM 302', topicId: 't2', name: 'Lame equations', audit: 'solid', at: 'x' },
+    { id: 'k2', unit: 'EMM 302', topicId: 't2', name: 'Compound cylinders', audit: 'shaky', at: 'x' });
+  assert.equal(topicMastery(thick, today()).status, 'amber', 'a shaky sub-topic');
+  data.subtopics[1].audit = 'stuck';
+  const m = topicMastery(thick, today());
+  assert.equal(m.status, 'red');
+  assert.match(m.next, /unstuck on Compound cylinders/);
+  data.subtopics[1].audit = 'solid';
+  assert.equal(topicMastery(thick, today()).status, 'green');
+  data.attempts.push({ id: 'a1', unit: 'EMM 302', subtopicId: 'k2', verdict: 'wrong', errorType: 'units', at: iso(1) });
+  assert.equal(topicMastery(thick, today()).status, 'amber', 'one failure this week');
+  data.attempts.push({ id: 'a2', unit: 'EMM 302', subtopicId: 'k2', verdict: 'wrong', errorType: 'units', at: iso(2) });
+  assert.equal(topicMastery(thick, today()).status, 'red', 'repeated failures');
+  assert.match(topicMastery(thick, today()).why, /2 broken checkpoints this week/);
+});
+
+test('Today and the bot point at the critical weakspot', async () => {
+  for (const u of data.units) { u.catDate = 'TBA'; u.stage = null; }
+  data.settings.stage = null;
+  const p = todayPlan(today()).find((x) => x.code === 'EMM 302');
+  assert.equal(p.weak.name, 'Compound cylinders');
+  const text = await reply('weakspots EMM 302');
+  assert.match(text, /1\. \*\*Compound cylinders\*\* \(Thick cylinders\) · solid · 2 broken checkpoints in 14 days \(mostly units \/ conversion\)/);
+  assert.match(text, /tracking every unit/);
+  assert.match(await reply('weakspots EMM 305'), /No weakspots on record/);
+});

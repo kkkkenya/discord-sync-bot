@@ -8,7 +8,7 @@ import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
 import { catDay, daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
-import { hintFields, predictFor, teachFlags } from './weakspots.js';
+import { hintFields, predictFor, teachFlags, weakspotsFor } from './weakspots.js';
 
 const HELP = [
   '**Study DMs**: type any of these.',
@@ -17,6 +17,7 @@ const HELP = [
   '`teach EMM 302 Mohr\'s circle`: explain a topic like you\'re teaching a classmate, get it marked',
   '`predict EMM 302`: the topics most likely to come, from past papers and lecturer hints',
   '`hint EMM 302 exam will mainly focus on beta functions`: save what the lecturer said',
+  '`weakspots EMM 302`: your highest-risk sub-topics and the mistakes you keep making',
   '`log 45 EMM 302`: log 45 minutes of study',
   '`paper EMM 302 34/60 2023 CAT 1`: log a past paper score',
   '`stop`: end a teach-back',
@@ -51,7 +52,7 @@ export function todayText(today = nairobiDay()) {
   return lines.join('\n');
 }
 
-const COMMANDS = ['today', 'files', 'teach', 'log', 'paper', 'predict', 'hint'];
+const COMMANDS = ['today', 'files', 'teach', 'log', 'paper', 'predict', 'hint', 'weakspots'];
 
 // Links to a unit's files in the server's forum posts. Papers and CATs by default, or notes/slides/books.
 async function filesText(unit, notes) {
@@ -160,6 +161,17 @@ export async function reply(text) {
     return [
       `**${unit}: most likely topics**${parsed ? '' : ' _(no past papers read yet: open Predictions on the dashboard and read them)_'}`,
       ...ranked.slice(0, 6).map((r, n) => `${n + 1}. **${r.name}**${r.pinned ? ' 📌 pinned by lecturer' : r.muted ? ' (muted by lecturer)' : ''} · weight ${r.weight} · ${r.evidence}`),
+    ].join('\n');
+  }
+  if (word === 'weakspots' || word === 'weakspot') {
+    const unit = unitOf(t);
+    if (!unit || !known(unit)) return 'Like this: `weakspots EMM 302` (one of your units)';
+    const { critical, errors } = weakspotsFor(unit, nairobiDay());
+    if (!critical.length) return `No weakspots on record for ${unit}. Break its topics into sub-topics and rate them on the dashboard (Weakspots).`;
+    return [
+      `**${unit}: fix these first**`,
+      ...critical.slice(0, 5).map((c, n) => `${n + 1}. **${c.name}** (${c.topic}) · ${c.reason}\n   → ${c.next}`),
+      ...(errors.takeaway ? ['', `_${errors.takeaway}_`] : []),
     ].join('\n');
   }
   if (word === 'hint') {

@@ -48,3 +48,12 @@ test('a teach-back without AI is saved and flags nothing', async () => {
   assert.equal(r.status, 200);
   assert.deepEqual(r.body.flags.flagged, []);
 });
+
+test('the weakspots endpoint ranks the unit\'s sub-topics', async () => {
+  assert.equal((await srv.call('GET', 'weakspots?unit=XYZ%20999')).status, 400);
+  const w = (await srv.call('GET', 'weakspots?unit=EMM%20302')).body;
+  assert.equal(w.critical[0].name, 'Principal stresses', 'stuck beats untested');
+  assert.equal(w.critical[0].audit, 'stuck');
+  assert.ok(!w.critical.some((c) => c.audit === 'solid'));
+  assert.deepEqual(w.errors, { total: 0, counts: [], takeaway: '' });
+});

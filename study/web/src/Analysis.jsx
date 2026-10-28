@@ -30,7 +30,7 @@ function SubRow({ sub, prev, next, refresh, notify }) {
     else if (e.key === 'ArrowUp') { e.preventDefault(); rows[i - 1]?.focus(); }
   };
   return (
-    <li className="subrow" tabIndex={0} onKeyDown={onKey} aria-label={`${sub.name}: ${sub.audit}. Press 1 solid, 2 shaky, 3 stuck, 4 untested`}>
+    <li className="subrow" id={`sub-${sub.id}`} tabIndex={0} onKeyDown={onKey} aria-label={`${sub.name}: ${sub.audit}. Press 1 solid, 2 shaky, 3 stuck, 4 untested`}>
       <input
         className="name" value={name} aria-label="Sub-topic name"
         onChange={(e) => setName(e.target.value)}
@@ -102,8 +102,49 @@ function TopicBlock({ topic, subs, s, refresh, notify }) {
   );
 }
 
+// The matrix for the unit: what to fix first (exam weight × weakness) and how marks are being lost.
+function Matrix({ unit, s, go }) {
+  const [w, setW] = useState(null);
+  useEffect(() => { if (unit) api('GET', `weakspots?unit=${encodeURIComponent(unit)}`).then(setW).catch(() => setW(null)); }, [unit, s]);
+  if (!w) return null;
+  const act = (c) => (c.action === 'teach' ? go('teach', { unit, topic: c.topic }) : c.action === 'audit' ? document.getElementById(`sub-${c.subtopicId}`)?.focus() : go('mock', { unit }));
+  const max = Math.max(1, ...w.errors.counts.map((e) => e.n));
+  return (
+    <div className="matrix">
+      <h3>Critical weakspots: fix first</h3>
+      {!w.critical.length ? <p className="muted small">Nothing flagged yet. List sub-topics under each topic below and rate them; checkpoint mistakes and teach-back gaps add to this.</p> : (
+        <ol className="crit">
+          {w.critical.map((c) => (
+            <li key={c.subtopicId}>
+              <div className="row wrap">
+                <b>{c.name}</b> <span className="muted small">{c.topic}</span>
+                <span className={`chip solo ${c.audit === 'stuck' ? 'red' : c.audit === 'shaky' ? 'amber' : ''}`}>{c.audit}</span>
+                <span className="muted small" title="exam weight × weakness">priority {c.priority} = {c.weight} × {c.weakness}</span>
+              </div>
+              <p className="small muted">{c.reason}</p>
+              <button className="link small" onClick={() => act(c)}>{c.next} →</button>
+            </li>
+          ))}
+        </ol>
+      )}
+      <h3>How you lose marks</h3>
+      {!w.errors.total ? <p className="muted small">No checkpoint mistakes logged yet. When you check an answer step by step (Practice), each broken step is tagged here: sign conventions, units, algebra slips…</p> : (
+        <>
+          {w.errors.takeaway && <p><b>{w.errors.takeaway}</b></p>}
+          <div className="ebars" role="img" aria-label={w.errors.counts.map((e) => `${e.label}: ${e.n}`).join(', ')}>
+            {w.errors.counts.map((e) => (
+              <div key={e.id} className="ebar"><span className="small">{e.label}</span><span className="etrack"><i style={{ width: `${(e.n / max) * 100}%` }} /></span><span className="small muted">{e.n}</span></div>
+            ))}
+          </div>
+          <p className="muted small">Last 30 days, {w.errors.total} broken step{w.errors.total === 1 ? '' : 's'}.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Weakspots: break each topic into sub-topics and concepts, then audit them in a minute.
-export default function Analysis({ s, refresh, focus, notify }) {
+export default function Analysis({ s, refresh, focus, notify, go }) {
   const [unit, setUnit] = useState(s.data.units[0]?.code || '');
   const ref = useRef(null);
   useEffect(() => { if (focus?.section === 'analysis' && focus.unit) setUnit(focus.unit); }, [focus]);
@@ -117,7 +158,7 @@ export default function Analysis({ s, refresh, focus, notify }) {
   return (
     <section id="analysis" className="reveal" ref={ref}>
       <div className="head"><h2>Weakspots</h2></div>
-      <p className="muted small">Break each topic into the sub-topics, derivations, methods and assumptions an exam tests, then rate each one honestly. Teach-back gaps mark the matching sub-topic shaky for you.</p>
+      <p className="muted small">Break each topic into the sub-topics, derivations, methods and assumptions an exam tests, then rate each one honestly. Teach-back gaps mark the matching sub-topic shaky for you. What to fix first = exam weight (Predictions) × how weak you are.</p>
       {!s.data.units.length ? <p className="muted">Pick your units first.</p> : (
         <>
           <div className="row wrap">
@@ -129,6 +170,7 @@ export default function Analysis({ s, refresh, focus, notify }) {
               <span className="muted small">{count('solid')} solid · {count('shaky')} shaky · {count('stuck')} stuck · {count('untested')} untested</span>
             )}
           </div>
+          <Matrix unit={unit} s={s} go={go} />
           {all.length > 0 && <p className="muted small">Audit with the keyboard: focus a row, then <kbd>1</kbd> solid · <kbd>2</kbd> shaky · <kbd>3</kbd> stuck · <kbd>4</kbd> untested; it moves to the next row.</p>}
           {!topics.length && <p className="muted small">No topics for {unit} yet. Add them in Units first.</p>}
           {topics.map((t) => <TopicBlock key={t.id} topic={t} subs={subsOf(t)} s={s} refresh={refresh} notify={notify} />)}

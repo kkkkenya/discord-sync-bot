@@ -4,6 +4,8 @@ import { data } from './store.js';
 import { nextAssessment } from './library.js';
 import { topicStatus } from './mastery.js';
 import { stageFor } from './stages.js';
+import { predictions } from './predict.js';
+import { weakspotReport } from './analysis.js';
 
 export const nairobiDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
 const addDays = (day, n) => { const d = new Date(`${day}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -24,29 +26,52 @@ export function unitStage(u, today = nairobiDay()) {
   return { cat, days, stage: stageFor(u, days, data.settings.stage) };
 }
 
+// The unit's topics ranked by exam weight (Phase 5), its stage deciding whether exclude hints mute.
+export function predictFor(unit, today = nairobiDay()) {
+  const u = data.units.find((x) => x.code === unit);
+  const late = u ? unitStage(u, today).stage.id !== 'adequate' : false;
+  return predictions({ topics: data.topics.filter((t) => t.unit === unit), questions: data.paperq.filter((q) => q.unit === unit), hints: data.hints.filter((h) => h.unit === unit), late });
+}
+
+// The unit's weakspot matrix (Phase 6): critical sub-topics by exam weight × weakness, and recurring errors.
+export function weakspotsFor(unit, today = nairobiDay()) {
+  const subs = data.subtopics.filter((s) => s.unit === unit);
+  const ids = new Set(subs.map((s) => s.id));
+  return weakspotReport({
+    topics: data.topics.filter((t) => t.unit === unit), subtopics: subs, ranked: predictFor(unit, today),
+    attempts: data.attempts.filter((a) => a.unit === unit || ids.has(a.subtopicId)), now: Date.now(),
+  });
+}
+
 // One concrete task for a unit, shaped by its stage. kind picks the dashboard section (teach, papers, units,
 // mock, prompt); `prompt` tasks also name the Prompt builder template.
-function taskFor(stage, { topics, red, amber, papers }) {
+// `weak` is the unit's top critical weakspot (a sub-topic), when there is one: it sharpens the task.
+function taskFor(stage, { topics, red, amber, papers, weak }) {
   const untaught = [...red, ...amber].find((t) => !t.taughtAt);
-  const shaky = red[0] || amber[0];
+  const weakTopic = weak && topics.find((t) => t.id === weak.topicId);
+  const shaky = weakTopic || red[0] || amber[0];
   const teach = (t, how) => ({ kind: 'teach', text: `Teach back ${t.name}${how}`, topic: t.name });
   const mock = (n, t) => ({ kind: 'mock', text: t ? `Solve ${n} exam questions on ${t.name}, timed` : `Timed ${n}-question mock, closed book`, topic: t?.name });
   const prompt = (promptKind, text, t) => ({ kind: 'prompt', promptKind, text, topic: t?.name });
   if (stage === 'exam-eve') {
+    if (weak) return prompt('teach', `Walk through ${weak.name} (${weak.topic}): one worked example, then its formulas`, weakTopic);
     return shaky ? prompt('teach', `Walk through ${shaky.name}: one worked example, then its formulas`, shaky) : prompt('formula', '1-page survival sheet: formulas, units, traps');
   }
   if (stage === 'last-minute') {
     if (!topics.length || !shaky) return prompt('formula', 'Formula & trap sheet: symbols, units, when each formula does NOT apply');
+    if (weak) return { ...mock(2, shaky), text: `Solve 2 exam questions on ${weak.topic}, watching ${weak.name}` };
     return mock(2, shaky);
   }
   if (stage === 'one-week') {
     if (!topics.length) return { kind: 'topics', text: 'List the CAT topics, then mark what past papers keep asking' };
+    if (weak) return { ...mock(3, shaky), text: `Solve 3 timed exam questions on ${weak.topic} (weakspot: ${weak.name})` };
     if (!papers) return { kind: 'paper', text: 'Do the most recent past paper or CAT, timed' };
     if (shaky) return mock(3, shaky);
     return untaught ? teach(untaught, ': the standard method, step by step') : mock(3);
   }
   // adequate: fundamentals first
   if (!topics.length) return { kind: 'topics', text: 'List the topics from the course outline and rate each one' };
+  if (weak?.audit === 'stuck' || weak?.action === 'teach') return { kind: 'teach', text: `Teach back ${weak.name} (${weak.topic}): derivation, assumptions, when it fails`, topic: weak.topic };
   if (untaught) return teach(untaught, ': derivation, assumptions, when it fails');
   if (!papers) return { kind: 'paper', text: 'Do one past paper or CAT, timed' };
   return shaky ? mock(3, shaky) : mock(3);
@@ -63,11 +88,12 @@ export function todayPlan(today = nairobiDay()) {
     const red = topics.filter((t) => topicStatus(t, today) === 'red');
     const amber = topics.filter((t) => topicStatus(t, today) === 'amber');
     const papers = data.papers.filter((p) => p.unit === u.code).length;
-    const weakness = red.length * 2 + amber.length + (5 - (u.confidence || 3)) + (papers ? 0 : 1.5);
+    const weak = weakspotsFor(u.code, today).critical[0] || null;
+    const weakness = red.length * 2 + amber.length + (5 - (u.confidence || 3)) + (papers ? 0 : 1.5) + Math.min(4, (weak?.priority || 0) / 5);
     let near = days == null || days < 0 ? 60 : days;
     if (stage.source === 'unit' || stage.source === 'all') near = Math.min(near, OVERRIDE_DAYS[stage.id]);
     const urgency = 14 / (near + 2);
-    return { code: u.code, title: u.title, cat, days, stage, score: weakness * urgency, task: taskFor(stage.id, { topics, red, amber, papers }) };
+    return { code: u.code, title: u.title, cat, days, stage, score: weakness * urgency, weak, task: taskFor(stage.id, { topics, red, amber, papers, weak }) };
   });
   return scored.sort((a, b) => b.score - a.score).slice(0, 3);
 }

@@ -5,7 +5,7 @@ import { useStore } from './helpers.js';
 useStore('legacy-study.json');
 const { data } = await import('../server/store.js');
 const { weakness } = await import('../server/analysis.js');
-const { checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke, schemeFor } = await import('../server/practice.js');
+const { breakOf, checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke, schemeFor } = await import('../server/practice.js');
 
 data.subtopics.push(
   { id: 's1', unit: 'EMM 302', topicId: 't1', name: 'Sign convention', audit: 'solid', at: 'x' },
@@ -71,6 +71,10 @@ test('Broke here counts as a failure on that sub-topic; marking again replaces t
   assert.deepEqual([s1.mistakeCount, s2.mistakeCount], [1, 0]);
   assert.equal(weakness(s2, data.attempts), 0.6);
   assert.equal(weakness(s1, data.attempts), 0.2, 'solid 0.1 + 0.1');
+  // the context pack's "where my working broke" needs the question and the step, not just ids
+  const f = breakOf(data.attempts.find((x) => x.id === id));
+  assert.match(f.question, /^EMM 302 CAT 1 2023\.pdf Q1: A plane stress element/);
+  assert.equal(f.checkpoint, 'State the sign convention');
 });
 
 test('Broke here refuses a step that is not a checkpoint, an unknown mistake type, and a right answer', async () => {

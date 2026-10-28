@@ -149,7 +149,7 @@ export function predictedMock(ranked, questions, { share = 0.65, max = 6 } = {})
   for (const r of live) {
     if (picked.length >= max || (total && covered >= total * share)) break;
     const q = questions.filter((x) => x.topicId === r.topicId).sort((a, b) => (b.year || 0) - (a.year || 0))[0];
-    picked.push({ q: q.text, marks: q.marks || DEFAULT_MARKS, topic: r.name, year: q.year, source: q.source });
+    picked.push({ q: q.text, marks: q.marks || DEFAULT_MARKS, topic: r.name, year: q.year, source: q.source, key: q.key ? { answer: q.key.answer, source: q.key.source } : null });
     covered += r.weight;
   }
   return picked;

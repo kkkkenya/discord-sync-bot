@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from './api.js';
+import { api, useElapsed } from './api.js';
 import LimitNote from './LimitNote.jsx';
 
 // Checkpoint feedback: type your final answer (and, if you like, the operations you used). A right answer is
@@ -21,12 +21,23 @@ export default function Practice({ s, refresh, go, focus, notify }) {
   const [done, setDone] = useState({}); // step -> 'broke' | 'flagged'
   const [err, setErr] = useState('');
 
+  const [want, setWant] = useState(null); // { topicId, subtopicId } from a weakspot: pick its newest question
   useEffect(() => { if (unit) api('GET', `predict?unit=${encodeURIComponent(unit)}`).then((p) => setQuestions(p.questions)).catch(() => setQuestions([])); }, [unit]);
-  // arriving from a past-paper question
+  // arriving from a past-paper question, a Today task or a weakspot
   useEffect(() => {
     if (focus?.section !== 'practice' || !focus.unit) return;
     setUnit(focus.unit); setQuestionId(focus.questionId || ''); clear();
+    setWant(!focus.questionId && focus.topicId ? { topicId: focus.topicId, subtopicId: focus.subtopicId } : null);
   }, [focus]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!want) return;
+    const on = questions.filter((q) => q.unit === unit && q.topicId === want.topicId);
+    if (!on.length) return;
+    const best = (on.some((q) => q.subtopicIds?.includes(want.subtopicId)) ? on.filter((q) => q.subtopicIds?.includes(want.subtopicId)) : on)
+      .sort((a, b) => (b.year || 0) - (a.year || 0))[0];
+    setQuestionId(best.id); setWant(null);
+  }, [want, questions, unit]);
+  const waited = useElapsed(busy);
 
   const clear = () => { setRes(null); setSteps({ list: [], note: '' }); setOpen(null); setDone({}); setErr(''); };
   const question = questions.find((q) => q.id === questionId);
@@ -108,7 +119,8 @@ export default function Practice({ s, refresh, go, focus, notify }) {
             <span className="muted"> Without one the AI solves it and the key is labelled “AI-solved: verify”.</span>
           </details>
           <div className="row">
-            <button disabled={busy || !answer.trim() || (!questionId && pasted.trim().length < 10)}>{busy ? 'Checking…' : 'Check'}</button>
+            <button disabled={busy || !answer.trim() || (!questionId && pasted.trim().length < 10)}>{busy ? `Checking… ${waited}s` : 'Check'}</button>
+            {busy && <span className="muted small" role="status">The AI may solve it first: this can take a minute.</span>}
           </div>
         </form>
       )}

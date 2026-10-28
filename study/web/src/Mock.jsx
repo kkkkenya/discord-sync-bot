@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import Busy from './Busy.jsx';
 import LimitNote from './LimitNote.jsx';
 
 const MINUTE = 60000;
@@ -98,7 +99,7 @@ export default function Mock({ s, refresh, focus, go, notify }) {
             </label>
             <input className="grow" placeholder="Name (optional, e.g. CAT 1 revision)" aria-label="Mock name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
             <label className="small"><input type="checkbox" checked={predicted} onChange={(e) => setPredicted(e.target.checked)} /> Predicted (from past papers)</label>
-            <button disabled={busy || !unit}>{busy ? 'Building…' : 'Start mock'}</button>
+            <button disabled={busy || !unit}><Busy on={busy} label="Building…" idle="Start mock" /></button>
           </form>
         </>
       )}
@@ -116,7 +117,7 @@ export default function Mock({ s, refresh, focus, go, notify }) {
               <textarea rows={3} placeholder="Write your answer…" value={answers[i]} onChange={(e) => setAnswers(answers.map((a, j) => (j === i ? e.target.value : a)))} />
             </div>
           ))}
-          <button onClick={submit} disabled={busy}>{busy ? 'Marking…' : 'Submit'}</button>
+          <button onClick={submit} disabled={busy}><Busy on={busy} label="Marking…" idle="Submit" /></button>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, daysUntil, markUndatedTba } from './api.js';
+import Busy from './Busy.jsx';
 
 const CYCLE = [null, 'green', 'amber', 'red']; // manual override: auto → green → amber → red → auto
 
@@ -250,7 +251,7 @@ function Unit({ u, s, refresh, go, notify }) {
           </span>
         ))}
         <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} aria-label={`Add topics to ${u.code}, comma separated`} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
-        {s.ai && <button className="ghost small" onClick={suggest} disabled={busy}>{busy ? 'Reading your outline and papers…' : 'Suggest topics'}</button>}
+        {s.ai && <button className="ghost small" onClick={suggest} disabled={busy}><Busy on={busy} label="Reading your outline and papers…" idle="Suggest topics" /></button>}
       </div>
       {error && <p className="hot small" role="alert">{error}</p>}
       {ideas && (

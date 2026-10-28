@@ -61,6 +61,14 @@ test('a passed date counts as adequate, not as forever-urgent', async () => {
   assert.equal(s.units['EMM 305'].stage.id, 'adequate');
 });
 
+test('with past-paper questions, a practice task opens Check answer on a real question', async () => {
+  await srv.call('PATCH', 'units?code=ECU%20300', { catDate: day(6), stage: null });
+  const { added } = (await srv.call('POST', 'predict/paste', { unit: 'ECU 300', label: '2024 CAT 1', text: 'QUESTION ONE (10 MARKS) Show that Gamma(n+1) = n Gamma(n) for n > 0. QUESTION TWO (10 MARKS) Express the integral of sin^5 x cos^3 x as a beta function.' })).body;
+  const p = planOf((await srv.call('GET', 'state')).body, 'ECU 300');
+  assert.equal(p.task.kind, 'practice', p.task.text);
+  assert.ok(added.some((q) => q.id === p.task.questionId));
+});
+
 test('an empty store has no stages and no plan', async () => {
   const empty = await startServer();
   try {

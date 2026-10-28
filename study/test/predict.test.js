@@ -83,6 +83,9 @@ test('a predicted mock covers ~65% of the weight with one recent question per to
   const ranked = predictions({ topics: TOPICS, questions: Q });
   const mock = predictedMock(ranked, Q);
   assert.deepEqual(mock.map((m) => [m.topic, m.year]), [['Fourier series', 2023], ['Heat equation', 2022]]);
+  // a key saved by "Check my answer" travels with the question, so the mock can be marked against it
+  const keyed = Q.map((q) => (q.topicId === 'fourier' && q.year === 2023 ? { ...q, key: { answer: '4/pi', source: 'you' } } : q));
+  assert.deepEqual(predictedMock(ranked, keyed).map((m) => m.key), [{ answer: '4/pi', source: 'you' }, null]);
   const muted = predictions({ topics: TOPICS, questions: Q, hints: [{ kind: 'exclude', topicIds: ['fourier'], at: 'x' }], late: true });
   assert.ok(!predictedMock(muted, Q).some((m) => m.topic === 'Fourier series'));
 });

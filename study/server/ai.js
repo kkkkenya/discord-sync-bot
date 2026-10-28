@@ -80,9 +80,10 @@ async function geminiCall(schema, system, content, maxTokens) {
     if (!text) throw new Error(`Gemini gave no answer (${d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || 'empty'})`);
     return JSON.parse(text);
   };
-  // Busy/hung servers are common and short-lived: retry the primary, then fall back to the lighter model.
+  // Busy/hung servers are common and short-lived: one go on the primary, then straight to the lighter model, so a
+  // failure shows in about a minute rather than two.
   let last;
-  for (const [n, m] of [model(), model(), GEMINI_FALLBACK].entries()) {
+  for (const [n, m] of [model(), GEMINI_FALLBACK].entries()) {
     if (n) await sleep(4000 * n);
     try { return await run(m); } catch (e) { last = e; if (!e.retryable) throw e; }
   }

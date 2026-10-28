@@ -137,6 +137,15 @@ export function markBroke({ id, step, subtopicId = null, errorType }) {
   return patch('attempts', id, { verdict: 'wrong', brokeAt: step, errorType, subtopicId: sub?.id || null, markedAt: new Date().toISOString() });
 }
 
+// A marked attempt as the context pack shows it: the question (paper and number, or the pasted text) and the
+// checkpoint step where the working broke.
+export function breakOf(a) {
+  const row = data.paperq.find((q) => q.id === a.questionId);
+  const text = String(row?.text || a.question || '').replace(/\s+/g, ' ').trim();
+  const question = text ? `${row ? `${row.source} Q${row.number}: ` : ''}${text.length > 160 ? `${text.slice(0, 160)}…` : text}` : '';
+  return { ...a, question, checkpoint: a.brokeAt ? a.checkpoints?.[a.brokeAt - 1]?.step || '' : '' };
+}
+
 // "This checkpoint looks wrong": saves the flag and holds nothing against the student. The key or the AI may be the
 // one that is wrong. Only an attempt that hasn't been marked broken can be flagged.
 export function flagCheckpoint({ id, step = null, note = '' }) {

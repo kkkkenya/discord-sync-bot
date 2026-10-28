@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 // Shown when the server can't be reached: the page stays open in the browser after the server window is closed.
 export const OFFLINE = "The study server isn't running, so nothing was saved. Click the Study Desk shortcut to start it.";
 
@@ -10,6 +12,19 @@ export async function api(method, path, body) {
   const out = await r.json();
   if (!r.ok) throw new Error(out.error || r.statusText);
   return out;
+}
+
+// Seconds since `busy` turned on, ticking once a second: long AI waits show they are still going.
+export function useElapsed(busy) {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    setN(0);
+    if (!busy) return;
+    const t0 = Date.now();
+    const t = setInterval(() => setN(Math.round((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
+  return n;
 }
 
 // Units with no date of their own count down to the KU calendar. This marks them all TBA (dates moved by the strike).

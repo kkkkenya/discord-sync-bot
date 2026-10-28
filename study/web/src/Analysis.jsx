@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
+import Busy from './Busy.jsx';
 
 const AUDIT = [['solid', 'Solid', 'can solve it blind'], ['shaky', 'Shaky', 'need the formula / slow'], ['stuck', 'Stuck', "don't get the concept or steps"], ['untested', 'Untested', 'not tried yet']];
 const KINDS = ['concept', 'derivation', 'method', 'assumption'];
@@ -78,7 +79,7 @@ function TopicBlock({ topic, subs, s, refresh, notify, go }) {
         <h3><span className={`chip solo ${m?.status || 'red'}`} title={m ? `${m.why}\nNext: ${m.next}` : ''}>{topic.name}</span></h3>
         <button className="link small" onClick={() => go('prompt', { unit: topic.unit, topicId: topic.id })}>Open in Prompt Builder</button>
         {s.ai
-          ? <button className="ghost small" onClick={suggest} disabled={busy}>{busy ? 'Reading your notes…' : 'Suggest sub-topics'}</button>
+          ? <button className="ghost small" onClick={suggest} disabled={busy}><Busy on={busy} label="Reading your notes…" idle="Suggest sub-topics" /></button>
           : <span className="muted small">No AI key: add sub-topics by hand</span>}
       </header>
       {ideas && (
@@ -108,7 +109,7 @@ function Matrix({ unit, s, go }) {
   const [w, setW] = useState(null);
   useEffect(() => { if (unit) api('GET', `weakspots?unit=${encodeURIComponent(unit)}`).then(setW).catch(() => setW(null)); }, [unit, s]);
   if (!w) return null;
-  const act = (c) => (c.action === 'teach' ? go('teach', { unit, topic: c.topic }) : c.action === 'audit' ? document.getElementById(`sub-${c.subtopicId}`)?.focus() : go('mock', { unit }));
+  const act = (c) => (c.action === 'teach' ? go('teach', { unit, topic: c.topic }) : c.action === 'audit' ? document.getElementById(`sub-${c.subtopicId}`)?.focus() : go('practice', { unit, topicId: c.topicId, subtopicId: c.subtopicId }));
   const max = Math.max(1, ...w.errors.counts.map((e) => e.n));
   return (
     <div className="matrix">

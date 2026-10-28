@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
+import Busy from './Busy.jsx';
 
 const KIND = { focus: 'Focus', exclude: 'Skip', note: 'Note' };
 
@@ -111,7 +112,7 @@ export default function Predictions({ s, focus, go, notify }) {
           <h4>Past papers</h4>
           <div className="row wrap">
             <button className="ghost" onClick={parse} disabled={!!busy}>{busy === 'parse' ? 'Reading…' : 'Read synced past papers'}</button>
-            {s.ai && p?.questions.length > 0 && <button className="ghost" onClick={map} disabled={!!busy}>{busy === 'map' ? 'Mapping…' : 'Map topics with AI'}</button>}
+            {s.ai && p?.questions.length > 0 && <button className="ghost" onClick={map} disabled={!!busy}><Busy on={busy === 'map'} label="Mapping…" idle="Map topics with AI" /></button>}
             {p && <span className="muted small">{p.questions.length} question{p.questions.length === 1 ? '' : 's'} from {new Set(p.questions.map((q) => q.fileId)).size} paper{new Set(p.questions.map((q) => q.fileId)).size === 1 ? '' : 's'}</span>}
           </div>
           {msg && <p className="muted small" role="status">{msg}</p>}

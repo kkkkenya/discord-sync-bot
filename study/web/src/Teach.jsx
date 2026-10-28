@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import Busy from './Busy.jsx';
 import LimitNote from './LimitNote.jsx';
 
 function Feedback({ f }) {
@@ -67,7 +68,7 @@ export default function Teach({ s, refresh, focus, go }) {
           <datalist id="topics">{topics.map((t) => <option key={t.id} value={t.name} />)}</datalist>
         </div>
         <textarea rows={8} placeholder="Start with: 'Imagine you have…'" aria-label="Your explanation" value={text} onChange={(e) => setText(e.target.value)} />
-        <button disabled={busy || !unit || !topic.trim() || text.trim().length < 40}>{busy ? 'Marking…' : s.coach ? 'Get it marked' : 'Save teach-back'}</button>
+        <button disabled={busy || !unit || !topic.trim() || text.trim().length < 40}><Busy on={busy} label="Marking…" idle={s.coach ? 'Get it marked' : 'Save teach-back'} /></button>
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}
       {result?.item && <LimitNote s={s} unit={unit} topic={topic} go={go} what="marking a derivation" />}

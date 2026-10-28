@@ -27,7 +27,7 @@ const { predictedMock } = await import('./predict.js');
 const { GOALS, buildPack } = await import('./context-pack.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
-const { checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke } = await import('./practice.js');
+const { KEY_LABEL, breakOf, checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke } = await import('./practice.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
 const PORT = Number(process.env.PORT) || 5190;
@@ -172,7 +172,7 @@ const routes = {
       hints: data.hints.filter((h) => h.unit === unit.code && (!topic || !h.topicIds?.length || h.topicIds.includes(topic.id))),
       questions: data.paperq.filter((x) => x.unit === unit.code && (topic ? x.topicId === topic.id : true)).slice(0, 40),
       question,
-      failures: data.attempts.filter((a) => a.verdict === 'wrong' && Date.parse(a.at) >= since && (ids.has(a.subtopicId) || (topic && a.topicId === topic.id))),
+      failures: data.attempts.filter((a) => a.verdict === 'wrong' && Date.parse(a.at) >= since && (ids.has(a.subtopicId) || (topic && a.topicId === topic.id))).map(breakOf),
       files: Object.values(library.files).filter((e) => e.unit === unit.code).map((e) => ({ name: e.name, paper: e.paper, text: e.text || '' })),
       today: nairobiDay(),
     });
@@ -272,7 +272,10 @@ const routes = {
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     if (body.predicted) {
       const questions = predictedMock(predictFor(unit, nairobiDay()), data.paperq.filter((x) => x.unit === unit))
-        .map((x) => ({ q: x.q, a: `No model answer in your library: mark it against the ${x.source || 'paper'} marking scheme, or get a worked solution from the Prompt Builder.`, marks: x.marks, topic: x.topic }));
+        // the answer key saved by "Check my answer" when there is one; without, the mock is self-marked (see submitMock)
+        .map((x) => (x.key
+          ? { q: x.q, a: `Final answer (${KEY_LABEL[x.key.source]}): ${x.key.answer}`, marks: x.marks, topic: x.topic }
+          : { q: x.q, a: `No answer key yet: mark it against the ${x.source || 'paper'} marking scheme, or check it in Check answer first.`, marks: x.marks, topic: x.topic, noKey: true }));
       if (!questions.length) throw Object.assign(new Error('No past-paper questions mapped to topics yet. In Predictions, read the past papers and check their topics.'), { status: 400 });
       const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} predicted mock`, questions, predicted: true });
       return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
@@ -311,7 +314,7 @@ async function submitMock(id, { answers = [] }) {
   mock.answers = items.map((it) => ({ user: it.user }));
   mock.finishedAt = new Date().toISOString();
   save();
-  if (!aiReady()) {
+  if (!aiReady() || mock.questions.some((qq) => qq.noKey)) { // an AI can't mark against a key that isn't there
     return { selfMark: true, ...mockResult(mock) };
   }
   const out = await markAnswers(items);

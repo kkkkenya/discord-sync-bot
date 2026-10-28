@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import Busy from './Busy.jsx';
 import LimitNote from './LimitNote.jsx';
 
 // Paste lecture notes / a textbook section / slide text. The AI turns it into CAT-style questions that land in
@@ -46,7 +47,7 @@ export default function Notes({ s, refresh, focus, go }) {
           <input className="grow" placeholder="Topic (e.g. Mohr's circle, beam deflection)" aria-label="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} />
         </div>
         <textarea rows={12} placeholder="Paste notes here: definitions, derivations, worked examples…" aria-label="Notes" value={text} onChange={(e) => setText(e.target.value)} />
-        <button disabled={busy || !s.ai || !unit || !topic.trim() || text.trim().length < 60}>{busy ? 'Writing questions…' : 'Generate questions'}</button>
+        <button disabled={busy || !s.ai || !unit || !topic.trim() || text.trim().length < 60}><Busy on={busy} label="Writing questions…" idle="Generate questions" /></button>
       </form>
       <LimitNote s={s} unit={unit} topic={topic} go={go} what="model answers with long working" />
       {result?.error && <p className="banner bad">{result.error}</p>}

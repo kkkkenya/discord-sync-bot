@@ -24,6 +24,7 @@ const { masteryMap } = await import('./mastery.js');
 const { checkSubtopic } = await import('./analysis.js');
 const { hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } = await import('./weakspots.js');
 const { predictedMock } = await import('./predict.js');
+const { GOALS, buildPack } = await import('./context-pack.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
@@ -135,6 +136,30 @@ const routes = {
     }
     save();
     return state();
+  },
+  // Deep Context Pack: { unit, topicId? | topic? (name), questionId?, goal? } → { prompt, md, filename, checklist,
+  // tokens, cut }. Works without an AI key.
+  'POST /api/pack': (q, body) => {
+    const unit = data.units.find((u) => u.code === body.unit);
+    if (!unit) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (body.goal && !GOALS[body.goal]) throw Object.assign(new Error('unknown goal'), { status: 400 });
+    const question = body.questionId ? data.paperq.find((x) => x.id === body.questionId && x.unit === unit.code) : null;
+    const topic = data.topics.find((t) => t.unit === unit.code && (t.id === (body.topicId || question?.topicId) || (body.topic && t.name.toLowerCase() === String(body.topic).toLowerCase()))) || null;
+    const subs = data.subtopics.filter((s) => s.unit === unit.code && (!topic || s.topicId === topic.id));
+    const ids = new Set(subs.map((s) => s.id));
+    const { critical, errors } = weakspotsFor(unit.code, nairobiDay());
+    const since = Date.now() - 30 * 86400000;
+    const cohort = data.settings.cohort ? { ...data.settings.cohort, name: COURSES[data.settings.cohort.course] } : null;
+    return buildPack({
+      unit, cohort, stage: unitStage(unit).stage.id, topic, subtopics: subs, goal: body.goal,
+      weak: critical.filter((c) => !topic || c.topicId === topic.id), errors: errors.counts,
+      hints: data.hints.filter((h) => h.unit === unit.code && (!topic || !h.topicIds?.length || h.topicIds.includes(topic.id))),
+      questions: data.paperq.filter((x) => x.unit === unit.code && (topic ? x.topicId === topic.id : true)).slice(0, 40),
+      question,
+      failures: data.attempts.filter((a) => a.verdict === 'wrong' && Date.parse(a.at) >= since && (ids.has(a.subtopicId) || (topic && a.topicId === topic.id))),
+      files: Object.values(library.files).filter((e) => e.unit === unit.code).map((e) => ({ name: e.name, paper: e.paper, text: e.text || '' })),
+      today: nairobiDay(),
+    });
   },
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
   'GET /api/weakspots': (q) => {

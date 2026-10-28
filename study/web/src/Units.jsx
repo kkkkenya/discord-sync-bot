@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { api, daysUntil, markUndatedTba } from './api.js';
 import Busy from './Busy.jsx';
 
-const CYCLE = [null, 'green', 'amber', 'red']; // manual override: auto → green → amber → red → auto
 
 const YEARS = [1, 2, 3, 4, 5];
 const FROM = { outline: 'outline', papers: 'past papers', both: 'outline and papers', general: 'general' }; // where a suggested topic came from
@@ -188,7 +187,8 @@ function Unit({ u, s, refresh, go, notify }) {
   const [ideas, setIdeas] = useState(null); // { suggestions, sources } from "Suggest topics"
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const topics =s.data.topics.filter((t) => t.unit === u.code);
+  const [chip, setChip] = useState(null); // the topic whose why-panel is open
+  const topics = s.data.topics.filter((t) => t.unit === u.code);
   const tba = u.catDate === 'TBA';
   const st = s.units[u.code]?.stage;
   const auto = st && st.source !== 'unit' ? st.name : s.stages.find((x) => x.id === (s.settings.stage || 'adequate'))?.name;
@@ -219,7 +219,7 @@ function Unit({ u, s, refresh, go, notify }) {
     await addTopics(list.map((i) => i.name));
     setIdeas((x) => ({ ...x, suggestions: x.suggestions.filter((i) => !list.includes(i)) }));
   };
-  const nextManual = (t, m) => CYCLE[(CYCLE.indexOf(t.manual ?? null) + 1) % CYCLE.length];
+  const shown = rated.find((x) => x.t.id === chip);
   return (
     <article className="unit">
       <header>
@@ -244,7 +244,7 @@ function Unit({ u, s, refresh, go, notify }) {
       <div className="topics">
         {rated.map(({ t, m }) => (
           <span key={t.id} className={`chip ${m.status}`}>
-            <button onClick={() => api('PATCH', `topics/${t.id}`, { manual: nextManual(t, m) }).then(refresh)} title={`${m.why}\nNext: ${m.next}`}>
+            <button onClick={() => setChip(chip === t.id ? null : t.id)} aria-expanded={chip === t.id}>
               {t.name}{t.taughtAt ? ' ✓' : ''}{m.manual ? ' · you' : ''}
             </button>
             <button className="x" aria-label={`remove ${t.name}`} onClick={() => api('DELETE', `topics/${t.id}`).then(() => { notify(`Removed "${t.name}"`, () => api('POST', 'topics', t)); refresh(); })}>×</button>
@@ -253,6 +253,24 @@ function Unit({ u, s, refresh, go, notify }) {
         <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} aria-label={`Add topics to ${u.code}, comma separated`} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
         {s.ai && <button className="ghost small" onClick={suggest} disabled={busy}><Busy on={busy} label="Reading your outline and papers…" idle="Suggest topics" /></button>}
       </div>
+      {shown && (
+        <div className="chippanel small" role="region" aria-label={`Why ${shown.t.name} is ${shown.m.status}`}>
+          <p><b>{shown.t.name}</b> is <span className={shown.m.status === 'green' ? 'ok' : shown.m.status === 'amber' ? 'warm' : 'hot'}>{shown.m.status}</span>{shown.m.why ? `: ${shown.m.why}` : ''}.</p>
+          {!shown.m.manual && shown.m.next && shown.m.next !== 'Mastered' && <p>Next: {shown.m.next}.</p>}
+          <div className="row wrap">
+            <label>Colour{' '}
+              <select value={shown.t.manual || ''} onChange={(e) => api('PATCH', `topics/${shown.t.id}`, { manual: e.target.value || null }).then(refresh)}>
+                <option value="">From the evidence (recommended)</option>
+                <option value="green">Green: I can teach it</option>
+                <option value="amber">Amber: getting there</option>
+                <option value="red">Red: not yet</option>
+              </select>
+            </label>
+            <button className="link small" onClick={() => go('teach', { unit: u.code, topic: shown.t.name })}>teach it back</button>
+            <button className="link small" onClick={() => setChip(null)}>close</button>
+          </div>
+        </div>
+      )}
       {error && <p className="hot small" role="alert">{error}</p>}
       {ideas && (
         <div className="suggest" aria-label={`Suggested topics for ${u.code}`}>
@@ -308,8 +326,8 @@ export default function Units(props) {
               </button>
             )}
           </div>
-          <p className="muted small">A topic's colour follows the evidence (a teach-back scored 4/5+ and 2 exam questions solved at 70%+), not a tick. Hover a chip to see why, and what's missing. Click a chip to force a colour yourself: it shows "· you". ✓ means you've done a teach-back.</p>
-          {s.data.units.map((u) => <Unit key={u.code} u={u} {...props} />)}
+          <p className="muted small">A topic's colour follows the evidence (a teach-back scored 4/5+ and 2 exam questions solved at 70%+), not a tick. Click a chip to see why it has its colour and what's missing; you can override the colour there (it then shows "· you"). ✓ means you've done a teach-back.</p>
+          <div className="unitgrid">{s.data.units.map((u) => <Unit key={u.code} u={u} {...props} />)}</div>
         </>
       )}
     </section>

@@ -1,6 +1,20 @@
-import { useState } from 'react';
+import { useGSAP } from '@gsap/react';
+import gsap from 'gsap';
+import { useRef, useState } from 'react';
 import { api, daysUntil, markUndatedTba } from './api.js';
-import CountUp from './components/CountUp.jsx';
+
+// The day count rolls up from 0 once (straight to the number with reduced motion).
+function Count({ to }) {
+  const el = useRef(null);
+  useGSAP(() => {
+    const n = { v: 0 };
+    gsap.matchMedia().add({ calm: '(prefers-reduced-motion: reduce)' }, ({ conditions }) => {
+      if (conditions.calm) { el.current.textContent = to; return; }
+      gsap.to(n, { v: to, duration: 1.2, ease: 'power2.out', onUpdate: () => { el.current.textContent = Math.round(n.v); } });
+    });
+  }, { dependencies: [to] });
+  return <span ref={el}>{to}</span>;
+}
 
 // The countdown is to the nearest real date: a unit's own CAT/exam date, or the KU calendar for units that have
 // no date of their own. TBA units (the strike) count down to nothing.
@@ -28,11 +42,11 @@ export default function Hero({ s, refresh, go }) {
   };
 
   return (
-    <section className="hero reveal" data-tour="countdown">
+    <section id="overview" className="hero reveal" data-tour="countdown">
       <div className="count">
         {next && days > 0 ? (
           <>
-            <span className="big"><CountUp to={days} duration={1.2} /></span>
+            <span className="big"><Count to={days} /></span>
             <span className="label">days to <b>{next.name}</b><br />{next.start === next.end ? next.start : `${next.start} to ${next.end}`}</span>
           </>
         ) : next ? (

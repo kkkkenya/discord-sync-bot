@@ -10,9 +10,12 @@ export default function Notes({ s, unit, setUnit, refresh, focus, go }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (focus?.section === 'notes' && focus.topic) setTopic(focus.topic);
+    if (focus?.section !== 'notes') return;
+    setOpen(true);
+    if (focus.topic) setTopic(focus.topic);
   }, [focus]);
 
   const send = async (e) => {
@@ -28,9 +31,10 @@ export default function Notes({ s, unit, setUnit, refresh, focus, go }) {
   };
 
   return (
-    <section id="notes" className="reveal">
-      <div className="head"><h2>Notes → questions</h2></div>
-      <p className="muted small">Paste your own notes, a textbook section or slide text. The AI turns it into CAT-style questions (derivations, numericals, explain-why) with model answers, for your mock-exam bank.</p>
+    // part of Mock exam (it fills the mock bank), folded away until you need it
+    <details id="notes" className="fromnotes" open={open} onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>Add questions from your own notes</summary>
+      <p className="muted small">Paste your notes, a textbook section or slide text. The AI turns it into CAT-style questions (derivations, numericals, explain-why) with model answers, for the mock bank above.</p>
       <p className="muted small">
         {Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length
           ? `${Object.values(s.library || {}).filter((e) => e.unit === unit && e.chars > 0).length} file(s) synced for ${unit}. The questions will be grounded in them.`
@@ -52,6 +56,6 @@ export default function Notes({ s, unit, setUnit, refresh, focus, go }) {
       {result?.questions != null && (
         <p className="banner good" role="status">Added <b>{result.questions}</b> CAT question{result.questions === 1 ? '' : 's'} to your mock bank. Try a timed mock on them.</p>
       )}
-    </section>
+    </details>
   );
 }

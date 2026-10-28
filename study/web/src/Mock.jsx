@@ -9,7 +9,7 @@ const PER_MARK = 1.5; // minutes per mark, as in a CAT: 30 marks in about 45 min
 // Timed, closed-book mock exam. Questions come from your bank (built by Notes) and, if there aren't enough,
 // are generated fresh from the unit's topics. With an AI key it's marked in one go; without,
 // you see the model answers and self-mark.
-export default function Mock({ s, unit, setUnit, refresh, focus, go, notify }) {
+export default function Mock({ s, unit, setUnit, refresh, focus, go, notify, children }) {
   const [count, setCount] = useState(5);
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -168,6 +168,7 @@ export default function Mock({ s, unit, setUnit, refresh, focus, go, notify }) {
           ))}
         </details>
       )}
+      {children}
     </section>
   );
 }

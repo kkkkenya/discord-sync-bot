@@ -66,7 +66,7 @@ function Mastery({ s }) {
           )}
         </div>
       ))}
-      <p className="muted small"><span className="ok">green</span> can teach it · <span className="warm">amber</span> getting there · <span className="hot">red</span> not yet. Add and rate topics in Units.</p>
+      <p className="muted small"><span className="ok">green</span> can teach it · <span className="warm">amber</span> getting there · <span className="hot">red</span> not yet. Topics turn green from teach-backs and solved questions; rate their sub-topics in Weakspots.</p>
     </div>
   );
 }

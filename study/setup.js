@@ -1,12 +1,13 @@
-// Sets up study/.env: your Discord user ID (who the bot DMs), the dashboard port, and optionally an Anthropic
-// key for teach-back marking (hidden as you type). The bot token and Supabase keys stay in pc/.env.
-// Press Enter to keep what's saved. Run: double-click setup.bat, or `npm run setup`.
+// Sets up study/.env: your Discord user ID (who the bot DMs), the dashboard port, and the AI provider with its key
+// (hidden as you type, checked once). The bot token and Supabase keys stay in pc/.env; a Gemini key already in
+// community/.env is used as it is. Press Enter to keep what's saved. Run: double-click setup.bat, or `npm run setup`.
 import { config } from 'dotenv';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const ENV = new URL('./.env', import.meta.url);
 const pc = config({ path: fileURLToPath(new URL('../pc/.env', import.meta.url)), quiet: true, processEnv: {} }).parsed || {};
+const community = config({ path: fileURLToPath(new URL('../community/.env', import.meta.url)), quiet: true, processEnv: {} }).parsed || {};
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
 const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
@@ -61,6 +62,12 @@ async function checkAnthropic(key) {
   return red(r.status === 401 ? 'Anthropic rejected that key. Check you copied all of it (it starts with sk-ant-).' : `Anthropic answered ${r.status}. The key is saved; try again later.`);
 }
 
+async function checkGemini(key) {
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', { headers: { 'x-goog-api-key': key } });
+  if (r.ok) return green('✓ Gemini key works.');
+  return red([400, 401, 403].includes(r.status) ? 'Google rejected that Gemini key. Make a new one at aistudio.google.com → Get API key.' : `Gemini answered ${r.status}. The key is saved; try again later.`);
+}
+
 async function checkDeepSeek(key) {
   const r = await fetch('https://api.deepseek.com/models', { headers: { Authorization: `Bearer ${key}` } });
   if (r.ok) return green('✓ DeepSeek key works.');
@@ -75,21 +82,36 @@ if (OWNER_ID) console.log(await checkOwner(OWNER_ID));
 
 const PORT = await ask('Dashboard port:', { current: saved.PORT || '5190' });
 
-let ANTHROPIC_API_KEY = saved.ANTHROPIC_API_KEY || '';
-if (pc.ANTHROPIC_API_KEY && !ANTHROPIC_API_KEY) console.log(dim('\nTeach-back marking will use the Anthropic key in pc/.env.'));
-else {
-  ANTHROPIC_API_KEY = await ask('Anthropic API key for teach-back marking (optional, Enter to skip; console.anthropic.com → API keys):', { secret: true, current: ANTHROPIC_API_KEY });
-  if (ANTHROPIC_API_KEY) console.log(await checkAnthropic(ANTHROPIC_API_KEY));
+// The AI that suggests topics, solves checkpoints, marks teach-backs and mocks. Only the chosen provider's key is asked
+// for; keys you saved earlier for the others are kept. The top bar's settings can switch provider at any time.
+let AI_PROVIDER = '';
+while (!['gemini', 'deepseek', 'anthropic'].includes(AI_PROVIDER)) {
+  AI_PROVIDER = (await ask('AI provider (gemini, deepseek or anthropic):', { current: saved.AI_PROVIDER || 'gemini' })).toLowerCase();
+  if (!['gemini', 'deepseek', 'anthropic'].includes(AI_PROVIDER)) console.log(red('Type gemini, deepseek or anthropic.'));
 }
-
-const AI_PROVIDER = await ask('AI provider for Notes/Mock/Teach marking (gemini, deepseek or anthropic):', { current: saved.AI_PROVIDER || 'gemini' });
-if (AI_PROVIDER === 'gemini') console.log(dim('Gemini will use the GEMINI_API_KEY already in community/.env.'));
-let DEEPSEEK_API_KEY = saved.DEEPSEEK_API_KEY || '';
+let { GEMINI_API_KEY = '', DEEPSEEK_API_KEY = '', ANTHROPIC_API_KEY = '' } = saved;
+if (AI_PROVIDER === 'gemini') {
+  if (community.GEMINI_API_KEY && !GEMINI_API_KEY) {
+    console.log(dim('Using the Gemini key in community/.env.'));
+    console.log(await checkGemini(community.GEMINI_API_KEY));
+  } else {
+    GEMINI_API_KEY = await ask('Gemini API key (aistudio.google.com → Get API key):', { secret: true, current: GEMINI_API_KEY });
+    if (GEMINI_API_KEY) console.log(await checkGemini(GEMINI_API_KEY));
+  }
+}
 if (AI_PROVIDER === 'deepseek') {
   DEEPSEEK_API_KEY = await ask('DeepSeek API key (platform.deepseek.com → API keys):', { secret: true, current: DEEPSEEK_API_KEY });
   if (DEEPSEEK_API_KEY) console.log(await checkDeepSeek(DEEPSEEK_API_KEY));
 }
+if (AI_PROVIDER === 'anthropic') {
+  if (pc.ANTHROPIC_API_KEY && !ANTHROPIC_API_KEY) console.log(dim('Using the Anthropic key in pc/.env.'));
+  else {
+    ANTHROPIC_API_KEY = await ask('Anthropic API key (console.anthropic.com → API keys):', { secret: true, current: ANTHROPIC_API_KEY });
+    if (ANTHROPIC_API_KEY) console.log(await checkAnthropic(ANTHROPIC_API_KEY));
+  }
+}
 
-const lines = [`OWNER_ID=${OWNER_ID}`, `PORT=${PORT}`, `AI_PROVIDER=${AI_PROVIDER}`, ...(ANTHROPIC_API_KEY ? [`ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}`] : []), ...(DEEPSEEK_API_KEY ? [`DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}`] : [])];
+const keys = { GEMINI_API_KEY, DEEPSEEK_API_KEY, ANTHROPIC_API_KEY };
+const lines = [`OWNER_ID=${OWNER_ID}`, `PORT=${PORT}`, `AI_PROVIDER=${AI_PROVIDER}`, ...Object.entries(keys).filter(([, v]) => v).map(([k, v]) => `${k}=${v}`)];
 writeFileSync(ENV, `${lines.join('\n')}\n`);
 console.log(green('\nSaved study/.env. Start the dashboard with start.bat.'));

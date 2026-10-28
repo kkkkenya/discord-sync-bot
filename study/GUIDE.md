@@ -86,13 +86,21 @@ Slow AI calls show a seconds counter. Checking can take a minute when the AI has
 
 ## 7. How the topic colours work
 
-A topic's colour is computed from evidence:
+A topic's colour comes from the **Breakpoint model** (the full method is in `UNDERSTANDING.md`). It treats understanding as a chain with three links: **why it works**, **setting it up** and **carrying it through**. Every teach-back, checked answer, mock answer and self-rating counts as evidence on those links:
 
-- **Green**: a teach-back scored **4/5 or better**, **2 or more** exam questions solved (a mock answer at 70%+ or a right answer in Check answer), every listed sub-topic rated **solid**, and no broken checkpoint in the last 7 days.
-- **Red**: nothing tried yet, a sub-topic rated **stuck**, or 2+ broken checkpoints in the last 7 days.
-- **Amber**: anything in between.
+- **Where your working broke matters.** If you mark a break at step 3, steps 1 and 2 count for you, step 3 counts against the one link your mistake belongs to (a units slip is "carrying it through"; a wrong governing equation is "why it works"), and the steps you never reached count neither way.
+- **New questions count more than repeats.** Solving the same question again proves less than solving a new one. Breaking on it again is never discounted.
+- **Hard questions count more when you get them right; easy ones count more when you get them wrong.**
+- **It fades.** Evidence you don't refresh fades, and more slowly the more spaced practice you've done.
+- **Your own ratings count as far as they've proved accurate.**
 
-Click a chip to see the breakdown and the next step. You can override the colour there; it then shows **"· you"**.
+The colour is the weakest link, judged on the level the model is 90% sure you're above:
+
+- **Green**: that floor is 60 or more. A teach-back and about 4 different past-paper questions solved over two weeks gets there; one lucky answer doesn't.
+- **Red**: nothing tried yet, or understanding under 40.
+- **Amber**: in between.
+
+Click a chip to see the three links as bars, the weakest one in red, how long it lasts without practice, and the next step. You can override the colour there; it then shows **"· you"**.
 
 ---
 

@@ -4,6 +4,8 @@ import Busy from './Busy.jsx';
 
 
 const YEARS = [1, 2, 3, 4, 5];
+// the Breakpoint model's three links (server/understanding.js)
+const LAYER = [['why', 'Why it works'], ['how', 'Setting it up'], ['do', 'Carrying it through']];
 const FROM = { outline: 'outline', papers: 'past papers', both: 'outline and papers', general: 'general' }; // where a suggested topic came from
 
 // Setup and "Edit units": Course → Year → Semester loads that cohort's units from the Study Hub catalogue. The Hub
@@ -256,7 +258,19 @@ function Unit({ u, s, refresh, go, notify }) {
       {shown && (
         <div className="chippanel small" role="region" aria-label={`Why ${shown.t.name} is ${shown.m.status}`}>
           <p><b>{shown.t.name}</b> is <span className={shown.m.status === 'green' ? 'ok' : shown.m.status === 'amber' ? 'warm' : 'hot'}>{shown.m.status}</span>{shown.m.why ? `: ${shown.m.why}` : ''}.</p>
-          {!shown.m.manual && shown.m.next && shown.m.next !== 'Mastered' && <p>Next: {shown.m.next}.</p>}
+          {shown.m.layers && (
+            <div className="layers" role="img" aria-label={LAYER.map(([l, name]) => `${name} ${Math.round(shown.m.layers[l].p * 100)}`).join(', ')}>
+              {LAYER.map(([l, name]) => (
+                <div key={l} className={`layer${shown.m.bottleneck === l && shown.m.status !== 'green' ? ' weak' : ''}`}>
+                  <span>{name}</span>
+                  <span className="lbar" title="bar: best estimate · line: what it is surely above"><i style={{ width: `${shown.m.layers[l].p * 100}%` }} /><b style={{ left: `${shown.m.layers[l].lo * 100}%` }} /></span>
+                  <span className="num">{Math.round(shown.m.layers[l].p * 100)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {shown.m.lastsDays && <p className="muted">Lasts about {shown.m.lastsDays} days without practice.</p>}
+          {!shown.m.manual && shown.m.next && <p>Next: {shown.m.next}.</p>}
           <div className="row wrap">
             <label>Colour{' '}
               <select value={shown.t.manual || ''} onChange={(e) => api('PATCH', `topics/${shown.t.id}`, { manual: e.target.value || null }).then(refresh)}>

@@ -87,16 +87,17 @@ const NEXT_FOR_ERROR = {
 const label = (id) => ERROR_TYPES.find((e) => e.id === id)?.label.toLowerCase() || id;
 
 // The weakspot matrix for one unit. `ranked` is predictions() for the unit (exam weight per topic).
-// critical: up to 10 sub-topics by priority = exam weight × weakness, each with why and one next step.
+// critical: up to 10 sub-topics by priority = exam weight × weakness, each with why and one next step. weaknessOf
+// (sub → 0..1) replaces the audit-based weakness; the app passes 1 - the sub-topic's understanding floor (understanding.js).
 // errors: error-type counts over the last 30 days with a one-line takeaway.
-export function weakspotReport({ topics, subtopics, attempts = [], ranked = [], now = Date.now(), limit = 10 }) {
+export function weakspotReport({ topics, subtopics, attempts = [], ranked = [], now = Date.now(), limit = 10, weaknessOf = null }) {
   const weightOf = new Map(ranked.map((r) => [r.topicId, r]));
   const rows = [];
   for (const sub of subtopics) {
     const topic = topics.find((t) => t.id === sub.topicId);
     if (!topic) continue;
     const pred = weightOf.get(topic.id);
-    const w = weakness(sub, attempts, now);
+    const w = weaknessOf ? Math.round(weaknessOf(sub) * 100) / 100 : weakness(sub, attempts, now);
     const on = attemptsOn(sub.id, attempts, now);
     if (sub.audit === 'solid' && !on.failures) continue;
     if (pred?.muted && pred.weight === 0) continue;

@@ -2,7 +2,7 @@
 import { TBA } from './defs.js';
 import { data } from './store.js';
 import { nextAssessment } from './library.js';
-import { topicStatus } from './mastery.js';
+import { topicMastery, topicStatus } from './mastery.js';
 import { stageFor } from './stages.js';
 import { predictions } from './predict.js';
 import { weakspotReport } from './analysis.js';
@@ -37,8 +37,10 @@ export function predictFor(unit, today = nairobiDay()) {
 export function weakspotsFor(unit, today = nairobiDay()) {
   const subs = data.subtopics.filter((s) => s.unit === unit);
   const ids = new Set(subs.map((s) => s.id));
+  const topics = data.topics.filter((t) => t.unit === unit);
+  const floor = Object.fromEntries(topics.map((t) => [t.id, topicMastery(t, today).subs])); // the Breakpoint model, per sub-topic
   return weakspotReport({
-    topics: data.topics.filter((t) => t.unit === unit), subtopics: subs, ranked: predictFor(unit, today),
+    topics, subtopics: subs, ranked: predictFor(unit, today), weaknessOf: (s) => 1 - (floor[s.topicId]?.[s.id]?.lo ?? 0.13),
     attempts: data.attempts.filter((a) => a.unit === unit || ids.has(a.subtopicId)), now: Date.now(),
   });
 }

@@ -64,24 +64,23 @@ const { todayPlan } = await import('../server/plan.js');
 const iso = (daysAgo) => new Date(Date.now() - daysAgo * 86400000).toISOString();
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
 
-test('mastery colours follow the guide: stuck or repeated failures are red, all solid + evidence is green', () => {
+test('colours come from the Breakpoint model: a stuck rating and new breaks pull a topic down', () => {
   const thick = data.topics.find((t) => t.id === 't2'); // teach-back 4/5 + 2 solved mock questions
-  assert.equal(topicMastery(thick, today()).status, 'green', 'no sub-topics listed');
+  const before = topicMastery(thick, today());
+  assert.equal(before.status, 'amber', 'one teach-back and two marked answers is not yet "understood"');
+  assert.match(before.why, /understanding \d+, sure of at least \d+/);
   data.subtopics.splice(0, data.subtopics.length,
-    { id: 'k1', unit: 'EMM 302', topicId: 't2', name: 'Lame equations', audit: 'solid', at: 'x' },
-    { id: 'k2', unit: 'EMM 302', topicId: 't2', name: 'Compound cylinders', audit: 'shaky', at: 'x' });
-  assert.equal(topicMastery(thick, today()).status, 'amber', 'a shaky sub-topic');
-  data.subtopics[1].audit = 'stuck';
-  const m = topicMastery(thick, today());
-  assert.equal(m.status, 'red');
-  assert.match(m.next, /unstuck on Compound cylinders/);
+    { id: 'k1', unit: 'EMM 302', topicId: 't2', name: 'Lame equations', kind: 'derivation', audit: 'solid', auditAt: iso(1), auditFrom: 'you', at: 'x' },
+    { id: 'k2', unit: 'EMM 302', topicId: 't2', name: 'Compound cylinders', kind: 'method', audit: 'stuck', auditAt: iso(1), auditFrom: 'you', at: 'x' });
+  const stuck = topicMastery(thick, today());
   data.subtopics[1].audit = 'solid';
-  assert.equal(topicMastery(thick, today()).status, 'green');
-  data.attempts.push({ id: 'a1', unit: 'EMM 302', subtopicId: 'k2', verdict: 'wrong', errorType: 'units', at: iso(1) });
-  assert.equal(topicMastery(thick, today()).status, 'amber', 'one failure this week');
-  data.attempts.push({ id: 'a2', unit: 'EMM 302', subtopicId: 'k2', verdict: 'wrong', errorType: 'units', at: iso(2) });
-  assert.equal(topicMastery(thick, today()).status, 'red', 'repeated failures');
-  assert.match(topicMastery(thick, today()).why, /2 broken checkpoints this week/);
+  const solid = topicMastery(thick, today());
+  assert.ok(stuck.U < solid.U, `stuck ${stuck.U} < solid ${solid.U}`);
+  data.attempts.push({ id: 'a1', unit: 'EMM 302', subtopicId: 'k2', verdict: 'wrong', brokeAt: 1, errorType: 'units', checkpoints: [{}], at: iso(1) });
+  data.attempts.push({ id: 'a2', unit: 'EMM 302', subtopicId: 'k2', verdict: 'wrong', brokeAt: 1, errorType: 'units', checkpoints: [{}], at: iso(2) });
+  const broke = topicMastery(thick, today());
+  assert.ok(broke.U < solid.U, 'two new breaks lower it');
+  assert.equal(broke.subs.k2.bottleneck, 'do', 'unit slips are an execution problem');
 });
 
 test('Today and the bot point at the critical weakspot', async () => {

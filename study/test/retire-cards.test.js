@@ -18,9 +18,9 @@ test('a store with 500 old cards plans without any card or recall task', () => {
   assert.doesNotMatch(JSON.stringify(plan), /card|recall/i);
 });
 
-test('mastery no longer reads recall: teach-back 4/5 + 2 solved questions is green', () => {
+test('mastery no longer reads recall: evidence counts, card reviews do not', () => {
   const m = topicMastery(data.topics.find((t) => t.name === 'Thick cylinders'), TODAY);
-  assert.equal(m.status, 'green');
+  assert.notEqual(m.status, 'red', 'a teach-back 4/5 and 2 solved questions is evidence');
   assert.equal(m.recall, undefined);
   assert.doesNotMatch(m.why, /recall/);
   // Mohr's circle had cards and reviews but no teach-back or solved questions: red

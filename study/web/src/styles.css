@@ -444,3 +444,12 @@ th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
 @keyframes quest-pulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent); } 50% { box-shadow: 0 0 0 10px transparent; } }
 @media (prefers-reduced-motion: reduce) { .quest-ring { animation: none; transition: none; } .quest-bar i { transition: none; } }
 @media (max-width: 640px) { .quest { bottom: 84px; } }
+
+/* Breakpoint model: the three links of a topic (bar = estimate, line = confidence floor) */
+.layers { display: grid; gap: 4px; margin: 8px 0; max-width: 460px; }
+.layer { display: grid; grid-template-columns: 140px 1fr 28px; gap: 8px; align-items: center; }
+.layer.weak span:first-child { color: var(--red); font-weight: 600; }
+.lbar { position: relative; height: 8px; border-radius: 4px; background: var(--line); }
+.lbar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--accent); }
+.layer.weak .lbar i { background: var(--red); }
+.lbar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }

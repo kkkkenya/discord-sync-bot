@@ -12,6 +12,7 @@ import { transcribe } from './brain.js';
 import { paperInfo } from './predict.js';
 import { KEY_LABEL, checkAnswer, checkPhoto, flagCheckpoint, markBroke } from './practice.js';
 import { checkMedia, saveUpload } from './uploads.js';
+import { learnFor, topicNamed } from './learn-store.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
 import { hintFields, predictFor, teachFlags, weakspotsFor } from './weakspots.js';
@@ -25,6 +26,7 @@ const HELP = [
   '`hint EMM 302 exam will mainly focus on beta functions`: save what the lecturer said',
   '`weakspots EMM 302`: your highest-risk sub-topics and the mistakes you keep making',
   '`mark EMM 302`: a past-paper question to try. Then `mark 142.5 MPa` (or a photo of your working with `mark`) checks it, and `mark broke 3` logs the checkpoint where your working broke',
+  '`learn EMM 302 torsion`: what to read in your own notes (file and pages), worked examples, then questions to try',
   'Voice: after `teach EMM 302 <topic>`, send a voice message instead of typing',
   '`log 45 EMM 302`: log 45 minutes of study',
   '`paper EMM 302 34/60 2023 CAT 1`: log a past paper score',
@@ -62,7 +64,7 @@ export function todayText(today = nairobiDay()) {
   return lines.join('\n');
 }
 
-const COMMANDS = ['today', 'files', 'teach', 'log', 'paper', 'predict', 'hint', 'weakspots', 'mark'];
+const COMMANDS = ['today', 'files', 'teach', 'log', 'paper', 'predict', 'hint', 'weakspots', 'mark', 'learn'];
 
 // Links to a unit's files in the server's forum posts. Papers and CATs by default, or notes/slides/books.
 async function filesText(unit, notes) {
@@ -323,6 +325,23 @@ export async function reply(text, { photo = false, attachment = null } = {}) {
     return `Saved as a **${h.kind}** hint for ${unit}${names.length ? ` on ${names.join(', ')}` : ' (no topic matched: tag it on the dashboard)'}.`;
   }
   // a refusal from Check answer (already marked, not a checkpoint…) is an answer to you, not a crash
+  if (word === 'learn' || word === 'study') {
+    const unit = unitOf(t);
+    const named = t.replace(/^(learn|study)\s*/i, '').replace(/\b[A-Za-z]{3}\s?\d{3}\b/, '').trim();
+    if (!unit || !known(unit)) return 'Like this: `learn EMM 302 torsion` (one of your units and a topic)';
+    const topic = topicNamed(unit, named);
+    if (!topic) return `No topic like "${named}" in ${unit}. Its topics: ${data.topics.filter((x) => x.unit === unit).map((x) => x.name).join(', ') || 'none yet (Units → Suggest topics)'}.`;
+    const p = await learnFor(unit, topic.id);
+    const where = (r) => `${r.name}${r.pages ? ` · ${r.pages[0] === r.pages[1] ? `page ${r.pages[0]}` : `pages ${r.pages[0]}–${r.pages[1]}`}` : r.find ? ` · look for "${r.find}…"` : ''}`;
+    const first = p.attempt[0];
+    return [
+      `**Study ${topic.name}** (${unit})`,
+      '', '**1. Read**', ...(p.read.length ? p.read.map((r, i) => `${i + 1}. ${where(r)}`) : ['Your notes don’t cover it yet: sync the unit’s files, or add your notes on the dashboard.']),
+      '', '**2. Worked examples**', ...(p.examples.length ? p.examples.map((r, i) => `${i + 1}. ${where(r)}`) : ['None in your files: a Study kit ladder on the dashboard makes one.']),
+      '', `**3. Explain it:** \`teach ${unit} ${topic.name}\``,
+      ...(first ? ['', `**4. When you're ready:** ${p.attempt.length} question${p.attempt.length === 1 ? '' : 's'} to try, starting with ${first.source} Q${first.number}${first.hasKey ? ' (answer on file)' : ''}: \`mark ${unit}\``] : []),
+    ].join('\n');
+  }
   if (word === 'mark') return markText(t, { photo, attachment }).catch((e) => (e.status ? e.message : Promise.reject(e)));
   if (word === 'quiz' || word === 'card') return 'Flashcards are retired in Study Desk. Try `teach EMM 302 <topic>`, or a timed mock on the dashboard.';
   return mode ? 'Type `stop` to end this first.' : HELP;

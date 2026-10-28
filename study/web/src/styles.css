@@ -459,3 +459,12 @@ label.button.ghost { border: 1px solid var(--line); color: var(--ink); }
 label.button.ghost:hover { border-color: var(--accent); color: var(--accent); }
 label.button.disabled { opacity: 0.45; pointer-events: none; }
 .recdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--red); margin-right: 6px; animation: quest-pulse 1.2s infinite; }
+
+/* Study this topic */
+.learn h4 { font-family: var(--display); font-size: 1rem; margin: 16px 0 4px; }
+.refs { padding-left: 20px; margin: 4px 0; display: grid; gap: 8px; }
+.refs p { margin: 2px 0; }
+.refs .badge { margin-left: 8px; }
+.badge.ok { color: var(--green); border-color: var(--green); }
+.excerpt { white-space: pre-wrap; max-height: 260px; overflow-y: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.thenlist { padding-left: 18px; margin: 4px 0; }

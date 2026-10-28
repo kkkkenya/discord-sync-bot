@@ -112,7 +112,7 @@ export default function Kit({ s, unit, setUnit, refresh, go, focus, notify }) {
   const [openId, setOpenId] = useState(null);
   const [edit, setEdit] = useState(false);
   const [reveal, setReveal] = useState(false);
-  useEffect(() => { if (focus?.section === 'kit') setKind(focus.kit || ''); }, [focus]);
+  useEffect(() => { if (focus?.section === 'kit') { setKind(focus.kit || ''); setTopicId(focus.topicId || ''); } }, [focus]);
   useEffect(() => { setTopicId(''); setNeed(null); setErr(''); }, [unit]);
 
   const k = kind || own;

@@ -7,6 +7,7 @@ import { api } from './api.js';
 import Analysis from './Analysis.jsx';
 import Hero from './Hero.jsx';
 import Kit from './Kit.jsx';
+import Learn from './Learn.jsx';
 import Mock from './Mock.jsx';
 import Nav from './Nav.jsx';
 import Notes from './Notes.jsx';
@@ -123,6 +124,7 @@ export default function App() {
           <div className="cols"><Predictions {...props} /><Analysis {...props} /></div>
         </Band>
         <Band n="03" label="Practise" note="closed book first, then check where it broke">
+          <Learn {...props} />
           <Kit {...props} />
           <div className="cols"><Practice {...props} /><Teach {...props} /></div>
           <div className="cols"><Mock {...props}><Notes {...props} /></Mock><Papers {...props} /></div>

@@ -56,3 +56,11 @@ test('help lists mark, and the evening nudge speaks to the most urgent unit\'s s
   data.units.find((u) => u.code === 'EMM 302').catDate = 'TBA';
   assert.doesNotMatch(eveningText(TODAY), /tomorrow/);
 });
+
+test('learn: study a topic from Discord, read and examples first, questions last', async () => {
+  const t = await reply("learn EMM 302 mohr");
+  assert.match(t, /\*\*Study Mohr's circle\*\* \(EMM 302\)/);
+  assert.ok(t.indexOf('1. Read') < t.indexOf('2. Worked examples') && t.indexOf('2. Worked examples') < t.indexOf('3. Explain it'));
+  assert.match(await reply('learn EMM 302 knitting'), /No topic like "knitting"/);
+  assert.match(await reply('help'), /`learn EMM 302 torsion`/);
+});

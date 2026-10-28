@@ -29,6 +29,7 @@ const { GOALS, buildPack } = await import('./context-pack.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { KITS, KIT_FOR, makeKitFor } = await import('./kit.js');
+const { learnFor } = await import('./learn-store.js');
 const { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, flagCheckpoint, markBroke } = await import('./practice.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
@@ -198,6 +199,8 @@ const routes = {
   // Checkpoint feedback: { unit, questionId? | question?, topicId?, answer, operations?, key?, showCheckpoints? } →
   // the verdict, the answer key and its source, and numbered checkpoints. Nothing is held against you until you
   // mark the step where your working broke.
+  // Learn a topic: { unit, topicId } → pages to read in your own files, questions to try, then what next. No AI.
+  'GET /api/learn': async (q) => learnFor(q.get('unit'), q.get('topicId')),
   // Study kit (Phase 10): { unit, kind?, topicId? } → the saved material, or { needKey, goal } with no AI key.
   'POST /api/materials/make': async (q, body) => makeKitFor(body || {}),
   'POST /api/attempts/check': async (q, body) => checkAnswer(body || {}),

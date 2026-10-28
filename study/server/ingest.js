@@ -77,9 +77,9 @@ export async function addLocalFile(unit, name, buf) {
   const id = `local-${createHash('sha1').update(buf).digest('hex').slice(0, 12)}`;
   const had = library.files[id];
   if (had) return { id, name: had.name, chars: had.chars, paper: had.paper, duplicate: true };
-  const { pages, text } = await extract(buf, name);
+  const { pages, text, pageStarts } = await extract(buf, name);
   const paper = PAPER_NAME.test(name) && !OUTLINE.test(name);
-  library.files[id] = { unit, name, kind: 'local', paper, pages, at: new Date().toISOString(), chars: text.length, text, local: true };
+  library.files[id] = { unit, name, kind: 'local', paper, pages, at: new Date().toISOString(), chars: text.length, text, local: true, ...(pageStarts && { pageStarts }) };
   saveLibrary();
   return { id, name, chars: text.length, paper };
 }
@@ -109,7 +109,9 @@ export const attachmentOf = (msg) => msg.attachments?.[0] || msg.message_snapsho
 // A file with no extractable text (a scanned paper) is still recorded, so it isn't re-downloaded every sync.
 export async function ingestFile(f, unitCode) {
   const existing = library.files[f.id];
-  if (existing) return { id: f.id, name: f.name, chars: existing.text?.length || 0, cached: true };
+  // synced before page numbers were kept: read a PDF or slide deck again once, so "Learn a topic" can cite pages
+  const needsPages = existing?.text && !existing.pageStarts && /\.(pdf|pptx)$/i.test(f.name);
+  if (existing && !needsPages) return { id: f.id, name: f.name, chars: existing.text?.length || 0, cached: true };
   let att;
   try {
     const msg = await messageFor(f.channel_id, f.message_id);
@@ -121,8 +123,8 @@ export async function ingestFile(f, unitCode) {
   const dl = await fetch(att.url);
   if (!dl.ok) return { id: f.id, name: f.name, error: `download ${dl.status}` };
   const buf = Buffer.from(await dl.arrayBuffer());
-  const { pages, text } = await extract(buf, att.filename);
-  library.files[f.id] = { unit: unitCode, name: f.name, kind: f.kind, paper: f.paper, pages, at: new Date().toISOString(), chars: text.length, text };
+  const { pages, text, pageStarts } = await extract(buf, att.filename);
+  library.files[f.id] = { unit: unitCode, name: f.name, kind: f.kind, paper: f.paper, pages, at: new Date().toISOString(), chars: text.length, text, ...(pageStarts && { pageStarts }) };
   saveLibrary();
   return { id: f.id, name: f.name, chars: text.length, error: text.length ? null : 'no text (scanned?)' };
 }

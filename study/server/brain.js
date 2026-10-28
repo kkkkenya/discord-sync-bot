@@ -65,7 +65,7 @@ export async function suggestTopics({ unit, title = '', have = [], context = '' 
     properties: {
       topics: {
         type: 'array',
-        description: '6-14 topics in teaching order, each one a chunk a CAT or exam question is set on.',
+        description: '6-14 topics, each one a chunk a CAT or exam question is set on, IN THE ORDER THE COURSE OUTLINE LISTS THEM (its numbering: 1, 1.1, 2 ...). Topics found only in past papers go after the outline topics, in the order they would be taught.',
         items: {
           type: 'object',
           properties: {
@@ -81,7 +81,7 @@ export async function suggestTopics({ unit, title = '', have = [], context = '' 
     additionalProperties: false,
   };
   const content = `Unit: ${unit} ${title}${have.length ? `\nAlready listed (don't repeat): ${have.join('; ')}` : ''}${context
-    ? `\n\nThe student's course material. List the topics THIS course teaches and examines, named the way its outline names them:\n${context}`
+    ? `\n\nThe student's course material. List the topics THIS course teaches and examines, named the way its outline names them, and in the outline's own order (that is the order the student will learn them):\n${context}`
     : '\n\nNo course material is synced. List the standard topics for this unit at KU 3rd-year level, and mark each one general.'}`;
   return structured(schema, TUTOR, content, 2000);
 }

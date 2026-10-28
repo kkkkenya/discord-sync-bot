@@ -305,6 +305,7 @@ function Unit({ u, s, refresh, go, notify }) {
                 <option value="red">Red: not yet</option>
               </select>
             </label>
+            <button className="link small" onClick={() => go('learn', { unit: u.code, topicId: shown.t.id })}>study this topic</button>
             <button className="link small" onClick={() => go('teach', { unit: u.code, topic: shown.t.name })}>teach it back</button>
             <button className="link small" onClick={() => setChip(null)}>close</button>
           </div>
@@ -314,9 +315,9 @@ function Unit({ u, s, refresh, go, notify }) {
       {ideas && (
         <div className="suggest" aria-label={`Suggested topics for ${u.code}`}>
           {ideas.suggestions.length
-            ? ideas.suggestions.map((i) => <button key={i.name} className="ghost small" onClick={() => addIdeas([i])}>+ {i.name} <span className="muted">({FROM[i.from] || i.from})</span></button>)
+            ? ideas.suggestions.map((i, n) => <button key={i.name} className="ghost small" onClick={() => addIdeas([i])}><span className="muted">{n + 1}.</span> + {i.name} <span className="muted">({FROM[i.from] || i.from})</span></button>)
             : <span className="muted small">Nothing new to suggest.</span>}
-          {ideas.suggestions.length > 1 && <button className="link small" onClick={() => addIdeas(ideas.suggestions)}>add all</button>}
+          {ideas.suggestions.length > 1 && <button className="link small" onClick={() => addIdeas(ideas.suggestions)}>add all, in this order</button>}
           <p className="muted small">
             {ideas.sources.length ? `Read: ${ideas.sources.join(', ')}.` : 'Nothing is synced for this unit, so these are general guesses from its title. Sync its files for topics from your own outline.'}
             {' '}AI suggestions can be off: keep only what your course actually covers.

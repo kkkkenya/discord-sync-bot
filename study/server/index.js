@@ -18,7 +18,7 @@ const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubt
 const { contextFor, ingestFile, library, libraryMeta } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
-const { STAGES, TBA } = await import('./defs.js');
+const { ERROR_TYPES, STAGES, TBA } = await import('./defs.js');
 const { stageMix, validStage } = await import('./stages.js');
 const { masteryMap } = await import('./mastery.js');
 const { checkSubtopic } = await import('./analysis.js');
@@ -27,6 +27,7 @@ const { predictedMock } = await import('./predict.js');
 const { GOALS, buildPack } = await import('./context-pack.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
+const { checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke } = await import('./practice.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
 const PORT = Number(process.env.PORT) || 5190;
@@ -41,6 +42,7 @@ const state = () => {
   const units = Object.fromEntries(data.units.map((u) => [u.code, unitStage(u, today)]));
   return {
     units, stageMix: stageMix(Object.values(units).map((x) => x.stage)), stages: STAGES.map(({ maxDays, ...s }) => s),
+    errorTypes: ERROR_TYPES,
     goals: Object.entries(GOALS).map(([id, g]) => ({ id, name: g.name })),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
@@ -162,6 +164,13 @@ const routes = {
       today: nairobiDay(),
     });
   },
+  // Checkpoint feedback: { unit, questionId? | question?, topicId?, answer, operations?, key?, showCheckpoints? } →
+  // the verdict, the answer key and its source, and numbered checkpoints. Nothing is held against you until you
+  // mark the step where your working broke.
+  'POST /api/attempts/check': async (q, body) => checkAnswer(body || {}),
+  'POST /api/attempts/checkpoints': async (q, body) => ensureCheckpoints(body || {}),
+  'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
+  'POST /api/attempts/flag': (q, body) => flagCheckpoint(body || {}),
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
   'GET /api/weakspots': (q) => {
     const unit = q.get('unit');

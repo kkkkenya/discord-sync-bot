@@ -36,7 +36,7 @@ export function parsePapers(unit) {
     for (const q of parseQuestions(e.text)) {
       const prev = old.get(`${fileId}#${q.number}`);
       const kept = prev && prev.topicFrom !== 'auto' ? { topicId: prev.topicId, subtopicIds: prev.subtopicIds || [], topicFrom: prev.topicFrom } : { ...mapQuestion(q.text, topics, subs), topicFrom: 'auto' };
-      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, at: prev?.at || new Date().toISOString() });
+      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, ...(prev?.key && { key: prev.key }), at: prev?.at || new Date().toISOString() });
       n++;
     }
   }

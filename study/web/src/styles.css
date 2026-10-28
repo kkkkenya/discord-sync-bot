@@ -245,6 +245,13 @@ input.num { width: 84px; }
 .feedback { margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: var(--paper); }
 .feedback .score { font: 600 2rem var(--mono); color: var(--accent); margin: 0; }
 .feedback ul { padding-left: 4px; list-style: none; }
+.verdict { font-weight: 600; margin: 0 0 6px; }
+.verdict.good { color: var(--green); }
+.verdict.bad, .bad-text { color: var(--red); }
+.cps { list-style: none; padding: 0; margin: 12px 0 0; }
+.cps li { border-top: 1px dashed var(--line); padding: 10px 6px; }
+.cps li.broke { background: var(--red-bg); border-radius: 6px; }
+.cps .eq { font-family: var(--mono); font-size: 0.9rem; overflow-wrap: anywhere; }
 .past { margin-top: 14px; }
 .past > div { border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 8px; }
 .past p { white-space: pre-wrap; margin: 4px 0; }

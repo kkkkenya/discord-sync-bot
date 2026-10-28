@@ -9,6 +9,7 @@ import Mock from './Mock.jsx';
 import Notes from './Notes.jsx';
 import Onboarding, { Checklist } from './Onboarding.jsx';
 import Papers from './Papers.jsx';
+import Practice from './Practice.jsx';
 import Predictions from './Predictions.jsx';
 import Progress from './Progress.jsx';
 import Prompt from './Prompt.jsx';
@@ -20,7 +21,7 @@ import Units from './Units.jsx';
 gsap.registerPlugin(useGSAP);
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const NAV = [['today', 'Today'], ['units', 'Units'], ['predictions', 'Predict'], ['analysis', 'Weakspots'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
+const NAV = [['today', 'Today'], ['units', 'Units'], ['predictions', 'Predict'], ['analysis', 'Weakspots'], ['practice', 'Practice'], ['notes', 'Notes'], ['teach', 'Teach'], ['mock', 'Mock'], ['papers', 'Papers'], ['prompt', 'Prompt'], ['progress', 'Progress']];
 
 export default function App() {
   const [s, setS] = useState(null);
@@ -131,6 +132,7 @@ export default function App() {
         <Units {...props} />
         <Predictions {...props} />
         <Analysis {...props} />
+        <Practice {...props} />
         <Notes {...props} />
         <Teach {...props} />
         <Mock {...props} />

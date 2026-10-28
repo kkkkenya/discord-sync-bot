@@ -1,6 +1,7 @@
 // Turns study material into CAT-style questions, and marks mock-exam answers.
 // All three calls go through the shared structured() helper so they match coach.js behaviour.
 import { structured } from './ai.js';
+import { ERROR_TYPES } from './defs.js';
 
 const TUTOR = `You are a tough but fair Mechanical Engineering tutor at Kenyatta University, coaching a 3rd-year student
 for CATs and exams. Be specific and technically correct at KU CAT level: name the exact equation, sign convention,
@@ -111,4 +112,43 @@ export async function markAnswers(items) {
   };
   const block = items.map((it, i) => `Q${i + 1} [${it.marks} marks]: ${it.q}\nModel answer: ${it.a}\nStudent's answer: ${it.user || '(blank)'}`).join('\n\n');
   return structured(schema, `${TUTOR} You are marking a timed mock. Award marks for correct method and result; give partial credit for a right approach with a small slip.`, block, 8000);
+}
+
+// One question solved as 3-6 numbered checkpoints plus a final answer, for the checkpoint feedback. `expected` is
+// an answer key the student typed (the checkpoints must reach it); `scheme` is marking-scheme text to follow;
+// `subtopics` are the names a checkpoint may be tagged with.
+export async function solveWithCheckpoints({ unit, topic = '', question, subtopics = [], expected = '', scheme = '' }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      answer: { type: 'string', description: 'The final answer: the number then its unit, for example "142.5 MPa". Nothing else.' },
+      checkpoints: {
+        type: 'array',
+        description: '3 to 6 numbered intermediate steps, in order, ending at the final answer.',
+        items: {
+          type: 'object',
+          properties: {
+            step: { type: 'string', description: 'What is done in this step, one short sentence.' },
+            equation: { type: 'string', description: 'The equation used, with the numbers substituted.' },
+            value: { type: 'string', description: 'The value this step produces, with its unit.' },
+            subtopic: { type: 'string', description: 'Exactly one of the listed sub-topic names this step tests, or an empty string.' },
+            errorType: { type: 'string', enum: ERROR_TYPES.map((e) => e.id), description: 'The mistake students most often make at this step.' },
+          },
+          required: ['step', 'equation', 'value', 'subtopic', 'errorType'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['answer', 'checkpoints'],
+    additionalProperties: false,
+  };
+  const content = [
+    `Unit: ${unit}${topic ? `\nTopic: ${topic}` : ''}`,
+    subtopics.length ? `Sub-topics (use these names exactly):\n${subtopics.map((n) => `- ${n}`).join('\n')}` : '',
+    scheme ? `Marking scheme material. Follow it, and do not contradict its answers:\n${scheme}` : '',
+    expected ? `The answer key says the final answer is ${expected}. Make the checkpoints lead to it.` : '',
+    `Question:\n${question}`,
+    'Solve it in 3 to 6 numbered checkpoints, SI units carried through every step, assumptions and sign convention stated in the first checkpoint. If you are not sure of the final answer, still give your best working.',
+  ].filter(Boolean).join('\n\n');
+  return structured(schema, TUTOR, content, 4000);
 }

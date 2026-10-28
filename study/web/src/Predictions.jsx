@@ -83,6 +83,7 @@ export default function Predictions({ s, focus, go, notify }) {
         </select>
       </label>
       {q.topicFrom && q.topicId && <span className="muted small"> {q.topicFrom === 'you' ? 'set by you' : q.topicFrom === 'ai' ? 'AI guess' : 'matched by name'}</span>}
+      {' '}<button className="link small" onClick={() => go('practice', { unit, questionId: q.id })}>Check my answer</button>
       {' '}<button className="link small" onClick={() => go('prompt', { unit, questionId: q.id })}>Solve in Prompt Builder</button>
     </li>
   );

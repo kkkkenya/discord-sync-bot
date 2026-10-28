@@ -21,7 +21,7 @@ export function topicMastery(topic, today = nairobiDay(), kappa) {
   return {
     status: manual || r.status,
     manual: Boolean(manual),
-    U: r.U, lo: r.lo, bottleneck: r.bottleneck, lastsDays: r.lastsDays, kappa: k,
+    tried: r.tried, U: r.U, lo: r.lo, bottleneck: r.bottleneck, lastsDays: r.lastsDays, kappa: k,
     layers: Object.fromEntries(LAYERS.map((l) => [l, { p: r.layers[l].p, lo: r.layers[l].lo }])),
     subs: Object.fromEntries(r.subs.map((x) => [x.id, { U: x.U, lo: x.lo, bottleneck: x.bottleneck, tried: x.tried }])),
     why,

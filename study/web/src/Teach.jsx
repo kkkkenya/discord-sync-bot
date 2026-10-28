@@ -1,7 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from './api.js';
 import Busy from './Busy.jsx';
 import LimitNote from './LimitNote.jsx';
+import { wavData } from './media.js';
+
+const MAX_SECS = 240; // 4 minutes of voice is about 7.7 MB as WAV, under the upload limit
 
 function Feedback({ f }) {
   return (
@@ -53,6 +56,38 @@ export default function Teach({ s, unit, setUnit, refresh, focus, go }) {
     setBusy(false);
   };
 
+  // Phase 9: say it instead of typing it. Recorded in the browser, sent as WAV, transcribed and marked the same way.
+  const [rec, setRec] = useState(null); // the MediaRecorder while recording
+  const [secs, setSecs] = useState(0);
+  const chunks = useRef([]);
+  useEffect(() => {
+    if (!rec) return;
+    setSecs(0);
+    const t = setInterval(() => setSecs((n) => { if (n + 1 >= MAX_SECS) rec.stop(); return n + 1; }), 1000);
+    return () => clearInterval(t);
+  }, [rec]);
+  const speak = async (blob) => {
+    setBusy(true);
+    try {
+      const out = await api('POST', 'teach/audio', { unit, topic, audio: await wavData(blob) });
+      if (out.unclear) setResult({ error: out.message, transcript: out.transcript });
+      else { setResult(out); refresh(); }
+    } catch (err) { setResult({ error: err.message }); }
+    setBusy(false);
+  };
+  const record = async () => {
+    setResult(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const r = new MediaRecorder(stream);
+      chunks.current = [];
+      r.ondataavailable = (e) => chunks.current.push(e.data);
+      r.onstop = () => { stream.getTracks().forEach((t) => t.stop()); setRec(null); speak(new Blob(chunks.current, { type: r.mimeType })); };
+      r.start();
+      setRec(r);
+    } catch { setResult({ error: 'The microphone isn’t available. Allow it for this page in the browser, or type instead.' }); }
+  };
+
   return (
     <section id="teach" className="reveal">
       <h2>Teach it back</h2>
@@ -66,9 +101,18 @@ export default function Teach({ s, unit, setUnit, refresh, focus, go }) {
           <datalist id="topics">{topics.map((t) => <option key={t.id} value={t.name} />)}</datalist>
         </div>
         <textarea rows={8} placeholder="Start with: 'Imagine you have…'" aria-label="Your explanation" value={text} onChange={(e) => setText(e.target.value)} />
-        <button disabled={busy || !unit || !topic.trim() || text.trim().length < 40}><Busy on={busy} label="Marking…" idle={s.coach ? 'Get it marked' : 'Save teach-back'} /></button>
+        <div className="row wrap">
+          <button disabled={busy || rec || !unit || !topic.trim() || text.trim().length < 40}><Busy on={busy} label="Marking…" idle={s.coach ? 'Get it marked' : 'Save teach-back'} /></button>
+          <span className="muted small">or</span>
+          {rec
+            ? <button type="button" className="ghost" onClick={() => rec.stop()}><span className="recdot" />Stop and mark ({Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')} of 4:00)</button>
+            : <button type="button" className="ghost" onClick={record} disabled={busy || !s.media?.audio || !unit || !topic.trim()}>Say it out loud instead</button>}
+        </div>
+        {!s.media?.audio && <p className="muted small">Speaking needs an AI that can listen (Gemini, in Settings). Typing works with any.</p>}
+        {rec && <p className="muted small" role="status">Recording. Explain it as if to a classmate, then press Stop.</p>}
       </form>
       {result?.error && <p className="banner bad">{result.error}</p>}
+      {result?.transcript && <details className="past" open><summary>What you said</summary><p className="small">{result.transcript}</p></details>}
       {result?.item && <LimitNote s={s} unit={unit} topic={topic} go={go} what="marking a derivation" />}
       {result?.item?.feedback && <Feedback f={result.item.feedback} />}
       {result?.flags?.flagged?.length > 0 && <p className="muted small" role="status">Marked shaky in your weakspots: <b>{result.flags.flagged.join(', ')}</b>.</p>}

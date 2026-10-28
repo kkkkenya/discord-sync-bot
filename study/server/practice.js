@@ -5,12 +5,13 @@
 // 'wrong' (the student marked the checkpoint where their paper diverged: the only thing that counts as a weakspot
 // failure) or 'disputed' (the student says the checkpoints are wrong: nothing is held against them).
 import { compareAnswers } from './answer.js';
-import { aiReady } from './ai.js';
-import { solveWithCheckpoints } from './brain.js';
+import { aiReady, canRead, provider } from './ai.js';
+import { compareWorking, readWorking, solveWithCheckpoints } from './brain.js';
 import { ERROR_TYPES } from './defs.js';
 import { library } from './ingest.js';
 import { paperInfo } from './predict.js';
 import { add, data, patch, save } from './store.js';
+import { checkMedia, saveUpload } from './uploads.js';
 
 const bad = (message, status = 400) => Object.assign(new Error(message), { status });
 const SCHEME_WORDS = /mark(?:ing)?[\s_-]*scheme|solutions?|memo|answers?/i;
@@ -99,6 +100,37 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
     guess: { errorType: cmp.errorType || null, subtopicId: fallbackSub },
     subtopics: subs.map((s) => ({ id: s.id, name: s.name })),
   };
+}
+
+// Phase 9: a photo of handwritten working. The AI reads the final answer and the steps off it (transcribing, not
+// correcting); that answer is checked exactly like a typed one; for a wrong answer, the written steps are compared with
+// the checkpoints and the first broken one is suggested. A suggestion holds nothing against you: you confirm it with
+// "Broke here" like any other. body: { unit, questionId? | question?, image: { mime, data }, key? }.
+export async function checkPhoto(body, { read = readWorking, compare = compareWorking, solve = solveWithCheckpoints, ready = aiReady, canSee = () => canRead('image') } = {}) {
+  const image = checkMedia(body.image, 'photo');
+  if (!canSee()) return { needVision: true, message: `${provider()} can't read photos. Switch to Gemini or Claude in Settings, or type your final answer.` };
+  const unit = data.units.find((u) => u.code === body.unit);
+  if (!unit) throw bad('Pick one of your units first.');
+  const row = body.questionId ? data.paperq.find((x) => x.id === body.questionId && x.unit === unit.code) : null;
+  const question = String(row?.text || body.question || '').trim();
+  if (question.length < 10) throw bad('Pick a past-paper question, or paste the question text.');
+  const seen = await read({ unit: unit.code, question, image });
+  const steps = (seen.steps || []).map((s) => String(s).trim()).filter(Boolean).slice(0, 30);
+  if (!seen.readable || !String(seen.finalAnswer || '').trim()) {
+    return { unreadablePhoto: true, note: `${seen.note ? `${seen.note}. ` : ''}Couldn't read a final answer. Retake it flat, in good light, with the whole page in frame, or type your answer.`, read: { finalAnswer: '', steps } };
+  }
+  const out = await checkAnswer({ ...body, answer: String(seen.finalAnswer).trim(), operations: steps.join(' | ') }, { solve, ready });
+  const result = { ...out, read: { finalAnswer: String(seen.finalAnswer).trim(), steps } };
+  if (out.attempt) result.attempt = patch('attempts', out.attempt.id, { photo: saveUpload(image, 'photo'), steps });
+  if (out.verdict === 'wrong' && out.checkpoints?.length && steps.length) {
+    try {
+      const s = await compare({ question, steps, checkpoints: out.checkpoints, expected: out.key.answer });
+      if (Number.isInteger(s.brokeAt) && s.brokeAt >= 1 && s.brokeAt <= out.checkpoints.length) {
+        result.suggest = { brokeAt: s.brokeAt, errorType: ERROR_IDS.includes(s.errorType) ? s.errorType : null, why: String(s.why || '').trim() };
+      }
+    } catch { /* no suggestion: you pick the step yourself */ }
+  }
+  return result;
 }
 
 // "Show checkpoints" on an attempt that has none (a right answer): writes them for the key, once. { checkpoints, note }.

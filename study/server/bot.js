@@ -7,7 +7,11 @@ import { coach, coachReady } from './coach.js';
 import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
 import { daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { ERROR_TYPES } from './defs.js';
-import { KEY_LABEL, checkAnswer, flagCheckpoint, markBroke } from './practice.js';
+import { canRead, provider } from './ai.js';
+import { transcribe } from './brain.js';
+import { paperInfo } from './predict.js';
+import { KEY_LABEL, checkAnswer, checkPhoto, flagCheckpoint, markBroke } from './practice.js';
+import { checkMedia, saveUpload } from './uploads.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
 import { hintFields, predictFor, teachFlags, weakspotsFor } from './weakspots.js';
@@ -20,7 +24,8 @@ const HELP = [
   '`predict EMM 302`: the topics most likely to come, from past papers and lecturer hints',
   '`hint EMM 302 exam will mainly focus on beta functions`: save what the lecturer said',
   '`weakspots EMM 302`: your highest-risk sub-topics and the mistakes you keep making',
-  '`mark EMM 302`: a past-paper question to try. Then `mark 142.5 MPa` checks your final answer, and `mark broke 3` logs the checkpoint where your working broke',
+  '`mark EMM 302`: a past-paper question to try. Then `mark 142.5 MPa` (or a photo of your working with `mark`) checks it, and `mark broke 3` logs the checkpoint where your working broke',
+  'Voice: after `teach EMM 302 <topic>`, send a voice message instead of typing',
   '`log 45 EMM 302`: log 45 minutes of study',
   '`paper EMM 302 34/60 2023 CAT 1`: log a past paper score',
   '`stop`: end a teach-back',
@@ -118,9 +123,53 @@ const errorTypeOf = (words) => {
   return w ? ERROR_TYPES.find((e) => e.id.startsWith(w) || e.id.split('-').some((p) => w.startsWith(p)) || e.label.toLowerCase().includes(w))?.id || null : null;
 };
 
-async function markText(t, { photo }) {
+// `EMM 302 2023 Exam Q3` → that past-paper question, or null
+function paperRef(text) {
+  const unit = unitOf(text);
+  const n = Number(text.match(/\bq\.?\s*(\d{1,2})\b/i)?.[1]);
+  if (!unit || !n) return null;
+  const year = Number(text.match(/(?<!\d)(19|20)\d{2}(?!\d)/)?.[0]) || null;
+  const type = /cat|exam/i.test(text) ? paperInfo(text).type : null;
+  return data.paperq.find((q) => q.unit === unit && q.number === n && (!year || q.year === year) && (!type || q.type === type || (type === 'CAT' && q.type.startsWith('CAT')))) || null;
+}
+
+// Downloads a Discord attachment as { mime, data } (base64).
+async function fetchMedia(att) {
+  const r = await fetch(att.url);
+  if (!r.ok) throw Object.assign(new Error(`Couldn't download that file from Discord (${r.status}).`), { status: 400 });
+  return { mime: att.contentType || '', data: Buffer.from(await r.arrayBuffer()).toString('base64') };
+}
+
+// The reply to a checked answer, typed or photographed.
+function checkedText(out, unit) {
+  const key = `Key: **${out.key.answer}** (${KEY_LABEL[out.key.source]})`;
+  const read = out.read ? `_From your photo: final answer **${out.read.finalAnswer}**, ${out.read.steps.length} step${out.read.steps.length === 1 ? '' : 's'} read._\n` : '';
+  if (out.verdict === 'right') return [`${read}✓ **Matches the key.** ${key}`, out.assumedUnit ? '_One of the two had no unit, so the numbers were compared as they are._' : '', `Another one: \`mark ${unit}\`.`].filter(Boolean).join('\n');
+  return [
+    `${read}✗ **Doesn't match.** ${key}${out.note ? `\n_${out.note}_` : ''}`,
+    ...(out.checkpoints.length ? ['', ...out.checkpoints.map((c) => `${c.n}. ${c.step}${c.equation ? `: \`${c.equation}\`` : ''}${c.value ? ` = ${c.value}` : ''}`), '',
+      out.suggest ? `Your working seems to break at **checkpoint ${out.suggest.brokeAt}**${out.suggest.why ? `: ${out.suggest.why}` : ''}. Reply \`mark broke ${out.suggest.brokeAt}\` if that's right, or another number. If a checkpoint looks wrong, reply \`mark dispute\`.`
+        : 'Find the first step your paper disagrees with and reply `mark broke <number>` (add the kind of mistake if you know it: `mark broke 2 units`). If a checkpoint looks wrong, reply `mark dispute`.']
+      : [out.checkpointNote || 'No checkpoints for this one. Open it in Check answer on the dashboard.']),
+  ].join('\n');
+}
+
+async function markText(t, { photo, attachment }) {
   const rest = t.replace(/^mark\s*/i, '').trim();
-  if (photo) return 'Photos of your working aren\'t read yet (that comes later). For now, type your final answer: `mark 142.5 MPa`.';
+  if (photo || attachment?.contentType?.startsWith('image/')) {
+    if (!canRead('image')) return `${provider()} can't read photos. Switch to Gemini or Claude on the dashboard (Settings), or type your final answer: \`mark 142.5 MPa\`.`;
+    const named = paperRef(rest);
+    if (named) marking = { questionId: named.id, unit: named.unit, attempt: null, guess: null };
+    if (!marking.questionId) return 'Which question is it? Send the photo with `mark EMM 302 2023 Exam Q3`, or get one first with `mark EMM 302`.';
+    if (!attachment) return 'Attach the photo of your working to the `mark` message.';
+    const out = await checkPhoto({ unit: marking.unit, questionId: marking.questionId, image: await fetchMedia(attachment) });
+    if (out.needVision || out.unreadablePhoto) return out.message || out.note;
+    if (out.needKey) return `${out.message} On the dashboard, Check answer lets you type the key from your marking scheme.`;
+    if (out.verdict === 'unreadable') return out.note;
+    marking.attempt = out.attempt.id;
+    marking.guess = out.suggest ? { errorType: out.suggest.errorType, subtopicId: out.guess?.subtopicId } : out.guess;
+    return checkedText(out, marking.unit);
+  }
   const unit = /^[A-Za-z]{3}\s?\d{3}$/.test(rest) ? unitOf(rest) : null;
   if (unit) {
     if (!known(unit)) return `${unit} isn't one of your units. Add it on the dashboard first.`;
@@ -154,12 +203,7 @@ async function markText(t, { photo }) {
   if (out.verdict === 'unreadable') return out.note;
   marking.attempt = out.attempt.id;
   marking.guess = out.guess;
-  const key = `Key: **${out.key.answer}** (${KEY_LABEL[out.key.source]})`;
-  if (out.verdict === 'right') return [`✓ **Matches the key.** ${key}`, out.assumedUnit ? '_One of the two had no unit, so the numbers were compared as they are._' : '', `Another one: \`mark ${marking.unit}\`.`].filter(Boolean).join('\n');
-  return [
-    `✗ **Doesn't match.** ${key}${out.note ? `\n_${out.note}_` : ''}`,
-    ...(out.checkpoints.length ? ['', ...out.checkpoints.map((c) => `${c.n}. ${c.step}${c.equation ? `: \`${c.equation}\`` : ''}${c.value ? ` = ${c.value}` : ''}`), '', 'Find the first step your paper disagrees with and reply `mark broke <number>` (add the kind of mistake if you know it: `mark broke 2 units`). If a checkpoint looks wrong, reply `mark dispute`.'] : [out.checkpointNote || 'No checkpoints for this one. Open it in Check answer on the dashboard.']),
-  ].join('\n');
+  return checkedText(out, marking.unit);
 }
 
 // The 20:30 nudge when nothing was logged today, shaped by the most urgent unit's stage. null when you studied.
@@ -175,34 +219,49 @@ export function eveningText(today = nairobiDay()) {
   return `Nothing logged today. 15 minutes counts: one past-paper question (\`mark ${p.code}\`) or teach back a topic (\`teach ${p.code} <topic>\`).`;
 }
 
-export async function reply(text, { photo = false } = {}) {
+// A teach-back from Discord, typed or transcribed from a voice message: saved, marked, gaps flagged.
+async function teachReply(unit, topic, text, extra = {}) {
+  let feedback = null;
+  let note = '';
+  if (coachReady()) {
+    try { feedback = await coach({ unit, topic, text }); } catch (e) { note = `\n(Couldn't get feedback: ${e.message})`; }
+  }
+  add('teach', { unit, topic, text, feedback, ...extra });
+  const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
+  if (tp) { tp.taughtAt = new Date().toISOString(); save(); }
+  if (!feedback) return `Saved your teach-back on ${topic}.${note}`;
+  const { flagged } = teachFlags(unit, topic, feedback);
+  return [
+    `**${topic}: ${feedback.score}/5**`,
+    `✓ ${feedback.good}`,
+    ...feedback.gaps.map((g) => `✗ ${g}`),
+    '',
+    `**Next question:** ${feedback.followUp}`,
+    ...(flagged.length ? ['', `_Marked shaky in your weakspots: ${flagged.join(', ')}._`] : []),
+  ].join('\n');
+}
+
+// A voice message for a teach-back: transcribed (Gemini listens), then marked like a typed one.
+async function voiceTeach(unit, topic, attachment) {
+  if (!canRead('audio')) return `${provider()} can't listen to voice messages. Switch to Gemini on the dashboard (Settings), or type your explanation.`;
+  const clip = checkMedia(await fetchMedia(attachment), 'audio');
+  const { transcript, clear } = await transcribe({ topic, audio: clip });
+  if (!clear || String(transcript || '').trim().length < 20) { mode = { kind: 'teach', unit, topic }; return 'That voice message was too quiet, too short or off the topic. Send another one, or type it.'; }
+  return `_What you said:_ ${transcript.trim().slice(0, 600)}${transcript.length > 600 ? '…' : ''}\n\n${await teachReply(unit, topic, transcript.trim(), { audio: saveUpload(clip, 'voice'), spoken: true })}`;
+}
+
+export async function reply(text, { photo = false, attachment = null } = {}) {
   const t = text.trim();
   const word = t.split(/\s+/)[0].toLowerCase();
 
   if (word === 'stop') { mode = null; return 'Stopped.'; }
   if (word === 'help') return HELP;
 
+  const voice = attachment?.contentType?.startsWith('audio/');
   if (mode?.kind === 'teach' && !COMMANDS.includes(word)) {
     const { unit, topic } = mode;
     mode = null;
-    let feedback = null;
-    let note = '';
-    if (coachReady()) {
-      try { feedback = await coach({ unit, topic, text: t }); } catch (e) { note = `\n(Couldn't get feedback: ${e.message})`; }
-    }
-    add('teach', { unit, topic, text: t, feedback });
-    const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
-    if (tp) { tp.taughtAt = new Date().toISOString(); save(); }
-    if (!feedback) return `Saved your teach-back on ${topic}.${note}`;
-    const { flagged } = teachFlags(unit, topic, feedback);
-    return [
-      `**${topic}: ${feedback.score}/5**`,
-      `✓ ${feedback.good}`,
-      ...feedback.gaps.map((g) => `✗ ${g}`),
-      '',
-      `**Next question:** ${feedback.followUp}`,
-      ...(flagged.length ? ['', `_Marked shaky in your weakspots: ${flagged.join(', ')}._`] : []),
-    ].join('\n');
+    return voice ? voiceTeach(unit, topic, attachment) : teachReply(unit, topic, t);
   }
 
   if (word === 'today') return todayText();
@@ -214,8 +273,9 @@ export async function reply(text, { photo = false } = {}) {
     const unit = unitOf(t);
     const topic = t.replace(/^teach\s*/i, '').replace(/\b[A-Za-z]{3}\s?\d{3}\b/, '').trim();
     if (!unit || !topic) return 'Like this: `teach EMM 302 Mohr\'s circle`';
+    if (voice) return voiceTeach(unit, topic, attachment);
     mode = { kind: 'teach', unit, topic };
-    return `Teach me **${topic}** (${unit}) like I'm a classmate who missed the lecture. Definitions, the key equation, when it applies, one worked example. Send it as one message.`;
+    return `Teach me **${topic}** (${unit}) like I'm a classmate who missed the lecture. Definitions, the key equation, when it applies, one worked example. Send it as one message, or as a voice message.`;
   }
   if (word === 'log') {
     const unit = unitOf(t);
@@ -263,7 +323,7 @@ export async function reply(text, { photo = false } = {}) {
     return `Saved as a **${h.kind}** hint for ${unit}${names.length ? ` on ${names.join(', ')}` : ' (no topic matched: tag it on the dashboard)'}.`;
   }
   // a refusal from Check answer (already marked, not a checkpoint…) is an answer to you, not a crash
-  if (word === 'mark') return markText(t, { photo }).catch((e) => (e.status ? e.message : Promise.reject(e)));
+  if (word === 'mark') return markText(t, { photo, attachment }).catch((e) => (e.status ? e.message : Promise.reject(e)));
   if (word === 'quiz' || word === 'card') return 'Flashcards are retired in Study Desk. Try `teach EMM 302 <topic>`, or a timed mock on the dashboard.';
   return mode ? 'Type `stop` to end this first.' : HELP;
 }
@@ -285,7 +345,8 @@ export function startBot() {
     if (msg.author.bot || msg.channel.type !== ChannelType.DM || msg.author.id !== owner) return;
     try {
       await msg.channel.sendTyping();
-      const text = await reply(msg.content, { photo: msg.attachments.size > 0 });
+      const att = msg.attachments.first();
+      const text = await reply(msg.content || (att?.contentType?.startsWith('audio/') ? '(voice message)' : ''), { attachment: att ? { url: att.url, contentType: att.contentType, size: att.size } : null });
       for (const part of chunks(text)) await msg.channel.send(part);
     } catch (e) {
       console.error('DM reply failed:', e);

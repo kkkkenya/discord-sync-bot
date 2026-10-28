@@ -13,8 +13,9 @@ config({ path: fileURLToPath(new URL('../../community/.env', import.meta.url)), 
 
 const { startBot, todayText } = await import('./bot.js');
 const { coach, coachReady } = await import('./coach.js');
-const { aiReady, clamp, provider } = await import('./ai.js');
-const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics, suggestTopics } = await import('./brain.js');
+const { aiReady, canRead, clamp, provider } = await import('./ai.js');
+const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics, suggestTopics, transcribe } = await import('./brain.js');
+const { checkMedia, saveUpload } = await import('./uploads.js');
 const { contextFor, ingestFile, library, libraryMeta, outlineContext } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
@@ -28,7 +29,7 @@ const { GOALS, buildPack } = await import('./context-pack.js');
 const { isDay, nairobiDay, stats, todayPlan, unitStage } = await import('./plan.js');
 const { buildPrompt } = await import('./prompt.js');
 const { KITS, KIT_FOR, makeKitFor } = await import('./kit.js');
-const { KEY_LABEL, breakOf, checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke } = await import('./practice.js');
+const { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, flagCheckpoint, markBroke } = await import('./practice.js');
 const { LISTS, add, data, patch, remove, save } = await import('./store.js');
 
 const PORT = Number(process.env.PORT) || 5190;
@@ -46,7 +47,7 @@ const state = () => {
     errorTypes: ERROR_TYPES, kits: { names: KITS, forStage: KIT_FOR },
     goals: Object.entries(GOALS).map(([id, g]) => ({ id, name: g.name })),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
-    retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), provider: provider(), settings: data.settings,
+    retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), media: { image: canRead('image'), audio: canRead('audio') }, provider: provider(), settings: data.settings,
     mastery: masteryMap(today), library: libraryMeta(), discord: Boolean(bot),
   };
 };
@@ -116,15 +117,15 @@ const routes = {
     save();
     return state();
   },
-  'POST /api/teach': async (q, { unit, topic, text }) => {
-    if (!unit || !topic || !text?.trim()) throw Object.assign(new Error('unit, topic and text are needed'), { status: 400 });
-    let feedback = null;
-    let error = null;
-    if (coachReady()) { try { feedback = await coach({ unit, topic, text }); } catch (e) { error = e.message; } }
-    const item = add('teach', { unit, topic, text, feedback });
-    const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
-    if (tp) { tp.taughtAt = item.at; save(); }
-    return { item, error, flags: teachFlags(unit, topic, feedback) };
+  'POST /api/teach': async (q, { unit, topic, text }) => teachBack({ unit, topic, text }),
+  // A spoken teach-back (Phase 9): { unit, topic, audio: { mime, data } } → transcribed, then marked like a typed one.
+  'POST /api/teach/audio': async (q, { unit, topic, audio }) => {
+    if (!unit || !topic) throw Object.assign(new Error('Pick the unit and the topic first.'), { status: 400 });
+    const clip = checkMedia(audio, 'audio');
+    if (!canRead('audio')) throw Object.assign(new Error(`${provider()} can't listen to recordings. Switch to Gemini in Settings, or type your explanation.`), { status: 400 });
+    const { transcript, clear } = await transcribe({ topic, audio: clip });
+    if (!clear || String(transcript || '').trim().length < 20) return { unclear: true, transcript: transcript || '', message: 'That recording was too quiet, too short or off the topic. Record again somewhere quieter, or type it.' };
+    return { ...(await teachBack({ unit, topic, text: transcript.trim(), audio: saveUpload(clip, 'voice') })), transcript: transcript.trim() };
   },
   // body: { topicId, name } or { topicId, names: [...] } — add one or several sub-topics under a topic
   'POST /api/subtopics': (q, body) => {
@@ -184,6 +185,9 @@ const routes = {
   // Study kit (Phase 10): { unit, kind?, topicId? } → the saved material, or { needKey, goal } with no AI key.
   'POST /api/materials/make': async (q, body) => makeKitFor(body || {}),
   'POST /api/attempts/check': async (q, body) => checkAnswer(body || {}),
+  // A photo of your working (Phase 9): { unit, questionId? | question?, image: { mime, data } } → read, checked, and
+  // the broken checkpoint suggested.
+  'POST /api/attempts/photo': async (q, body) => checkPhoto(body || {}),
   'POST /api/attempts/checkpoints': async (q, body) => ensureCheckpoints(body || {}),
   'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
   'POST /api/attempts/flag': (q, body) => flagCheckpoint(body || {}),
@@ -303,6 +307,19 @@ const routes = {
   },
 };
 
+// A teach-back, typed or spoken: marked by the coach when there's an AI key, saved either way, and its gaps flag
+// the matching sub-topics shaky.
+async function teachBack({ unit, topic, text, audio }) {
+  if (!unit || !topic || !text?.trim()) throw Object.assign(new Error('unit, topic and text are needed'), { status: 400 });
+  let feedback = null;
+  let error = null;
+  if (coachReady()) { try { feedback = await coach({ unit, topic, text }); } catch (e) { error = e.message; } }
+  const item = add('teach', { unit, topic, text, feedback, ...(audio && { audio, spoken: true }) });
+  const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
+  if (tp) { tp.taughtAt = item.at; save(); }
+  return { item, error, flags: teachFlags(unit, topic, feedback) };
+}
+
 const mockResult = (mock) => ({
   id: mock.id, unit: mock.unit, name: mock.name, score: mock.score ?? null, outOf: mock.outOf ?? null, overall: mock.overall || '',
   items: mock.questions.map((qq, i) => ({ q: qq.q, a: qq.a, marks: qq.marks, user: mock.answers?.[i]?.user || '', earned: mock.answers?.[i]?.earned ?? null, note: mock.answers?.[i]?.note || '' })),
@@ -354,7 +371,9 @@ const CHECKS = {
 };
 
 async function api(req, url) {
-  const body = ['POST', 'PUT', 'PATCH'].includes(req.method) ? JSON.parse(Buffer.concat(await req.toArray()).toString() || '{}') : null;
+  const raw = ['POST', 'PUT', 'PATCH'].includes(req.method) ? Buffer.concat(await req.toArray()) : null;
+  if (raw && raw.length > 14 * 1024 * 1024) throw Object.assign(new Error('That upload is too big.'), { status: 413 });
+  const body = raw ? JSON.parse(raw.toString() || '{}') : null;
   const route = routes[`${req.method} ${url.pathname}`];
   if (route) return route(url.searchParams, body);
   const submit = url.pathname.match(/^\/api\/mocks\/([\w-]+)\/submit$/);

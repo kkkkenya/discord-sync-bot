@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 const DIR = process.env.STUDY_DATA_DIR ? pathToFileURL(`${process.env.STUDY_DATA_DIR.replace(/[\\/]$/, '')}/`) : new URL('../data/', import.meta.url);
 const FILE = new URL('study.json', DIR);
+export const DATA_DIR = DIR; // uploads (photos of working, voice teach-backs) live in DATA_DIR/uploads/
 mkdirSync(DIR, { recursive: true });
 
 // units: [{ code, title, catDate: 'YYYY-MM-DD'|'TBA'|null (null = KU calendar), confidence }]   (this semester's)

@@ -61,3 +61,14 @@ test('the weakspots endpoint ranks the unit\'s sub-topics', async () => {
   assert.ok(!w.critical.some((c) => c.audit === 'solid'));
   assert.deepEqual(w.errors, { total: 0, counts: [], takeaway: '' });
 });
+
+test('photos and recordings explain themselves without an AI that can read them', async () => {
+  const wav = { mime: 'audio/wav', data: Buffer.from('RIFF....WAVE').toString('base64') };
+  const v = await srv.call('POST', 'teach/audio', { unit: 'EMM 302', topic: "Mohr's circle", audio: wav });
+  assert.equal(v.status, 400);
+  assert.match(v.body.error, /can't listen.*type your explanation/);
+  assert.equal((await srv.call('POST', 'teach/audio', { unit: 'EMM 302', topic: "Mohr's circle", audio: { mime: 'video/mp4', data: 'x' } })).status, 400);
+  const p = await srv.call('POST', 'attempts/photo', { unit: 'EMM 302', question: 'Find the maximum principal stress for this element.', image: { mime: 'image/jpeg', data: 'aGk=' } });
+  assert.equal(p.body.needVision, true);
+  assert.deepEqual((await srv.call('GET', 'state')).body.media, { image: false, audio: false });
+});

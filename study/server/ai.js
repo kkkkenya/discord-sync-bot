@@ -13,13 +13,17 @@ const MODELS = { gemini: 'gemini-3.8-flash', deepseek: 'deepseek-flash', anthrop
 const KEYS = { gemini: 'GEMINI_API_KEY', deepseek: 'DEEPSEEK_API_KEY', anthropic: 'ANTHROPIC_API_KEY' };
 
 export const aiReady = () => Boolean(process.env[KEYS[provider()]]);
+// What each provider can read besides text (Phase 9): photos of working, and voice teach-backs.
+export const CAN = { gemini: { image: true, audio: true }, anthropic: { image: true, audio: false }, deepseek: { image: false, audio: false } };
+export const canRead = (kind) => aiReady() && Boolean(CAN[provider()]?.[kind]);
 const model = () => process.env.AI_MODEL || MODELS[provider()];
 
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || lo)));
 
 // Never let a hung provider request freeze the dashboard: abort after 30s, or longer for a long answer (about 12ms per
 // token asked for, so an 8000-token study kit gets ~96s). A timeout is retryable, not fatal.
-const waitFor = (maxTokens) => Math.max(30000, (maxTokens || 0) * 12);
+// Reading a photo or a recording takes longer whatever the answer's size: at least 90s then.
+const waitFor = (maxTokens, media = []) => Math.max(media.length ? 90000 : 30000, (maxTokens || 0) * 12);
 const fetchWithTimeout = (url, options, ms = 30000) => {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -33,7 +37,7 @@ const fetchWithTimeout = (url, options, ms = 30000) => {
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
 // ---- Anthropic (structured output enforced server-side) ----
-async function anthropicCall(schema, system, content, maxTokens) {
+async function anthropicCall(schema, system, content, maxTokens, media = []) {
   anthropic ||= new Anthropic();
   const response = await anthropic.beta.messages.create({
     model: model(),
@@ -42,7 +46,7 @@ async function anthropicCall(schema, system, content, maxTokens) {
     fallbacks: 'default',
     output_config: { effort: 'low', format: { type: 'json_schema', schema } },
     system,
-    messages: [{ role: 'user', content }],
+    messages: [{ role: 'user', content: media.length ? [...media.map((m) => ({ type: 'image', source: { type: 'base64', media_type: m.mime, data: m.data } })), { type: 'text', text: content }] : content }],
   });
   if (response.stop_reason === 'refusal') throw new Error('Claude declined this one.');
   if (response.stop_reason === 'max_tokens') throw new Error('The output was cut off — try a shorter input.');
@@ -63,11 +67,11 @@ function toGeminiSchema(s) {
   return s;
 }
 
-async function geminiCall(schema, system, content, maxTokens) {
+async function geminiCall(schema, system, content, maxTokens, media = []) {
   const key = process.env.GEMINI_API_KEY;
   const body = (m) => JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
-    contents: [{ role: 'user', parts: [{ text: content }] }],
+    contents: [{ role: 'user', parts: [...media.map((m) => ({ inlineData: { mimeType: m.mime, data: m.data } })), { text: content }] }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(schema), temperature: 0.2, maxOutputTokens: maxTokens },
   });
   const run = async (m) => {
@@ -75,7 +79,7 @@ async function geminiCall(schema, system, content, maxTokens) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: body(m),
-    }, waitFor(maxTokens));
+    }, waitFor(maxTokens, media));
     const d = await r.json().catch(() => ({}));
     if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`), { retryable: [429, 500, 502, 503, 504].includes(r.status) });
     const text = d.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
@@ -156,10 +160,15 @@ async function deepseekCall(schema, system, content, maxTokens) {
   throw new Error(`DeepSeek returned invalid JSON after retries: ${last}`);
 }
 
-export async function structured(schema, system, content, maxTokens = 4000) {
+// media: [{ mime, data (base64) }], images or audio, for the providers that can read them (CAN).
+export async function structured(schema, system, content, maxTokens = 4000, media = []) {
   const p = provider();
   if (!aiReady()) throw new Error(`No ${KEYS[p]} for provider "${p}". Pick another provider in the top bar, or add the key.`);
-  if (p === 'anthropic') return anthropicCall(schema, system, content, maxTokens);
-  if (p === 'gemini') return geminiCall(schema, system, content, maxTokens);
+  for (const m of media) {
+    const kind = m.mime.startsWith('audio/') ? 'audio' : 'image';
+    if (!CAN[p]?.[kind]) throw Object.assign(new Error(`${p} can't read ${kind === 'audio' ? 'recordings' : 'photos'}. Switch to ${kind === 'audio' ? 'Gemini' : 'Gemini or Claude'} in Settings, or type it.`), { status: 400 });
+  }
+  if (p === 'anthropic') return anthropicCall(schema, system, content, maxTokens, media);
+  if (p === 'gemini') return geminiCall(schema, system, content, maxTokens, media);
   return deepseekCall(schema, system, content, maxTokens);
 }

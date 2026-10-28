@@ -149,3 +149,39 @@ test('"Show checkpoints" on a right answer writes them once, without a second at
   assert.equal(data.paperq[0].key.checkpoints.length, 4);
   await assert.rejects(ensureCheckpoints({ id: 'nope' }, ai), /not found/);
 });
+
+// Phase 9: a photo of working is read into a final answer and steps, checked like a typed answer, and the first
+// broken checkpoint is suggested (not marked: you confirm it)
+const { checkPhoto } = await import('../server/practice.js');
+const PHOTO = { mime: 'image/jpeg', data: Buffer.from('fake jpeg').toString('base64') };
+const reads = (finalAnswer, steps, readable = true) => async () => ({ readable, finalAnswer, steps, note: readable ? '' : 'blurry' });
+const photoDeps = (read, compare = async () => ({ brokeAt: 3, errorType: 'units', why: 'used mm as m' })) => ({ ...ai, canSee: () => true, read, compare });
+
+test('a photo of wrong working: read, checked, and the broken checkpoint suggested but not marked', async () => {
+  const row = data.paperq.find((q) => q.id === 'q1');
+  row.key = { answer: '90 MPa', source: 'you', checkpoints: [{ n: 1, step: 'Mean', value: '50' }, { n: 2, step: 'Radius', value: '50' }, { n: 3, step: 'Max', value: '100' }] };
+  const r = await checkPhoto({ unit: 'EMM 302', questionId: 'q1', image: PHOTO }, photoDeps(reads('120 MPa', ['sx = 80', 'R = 70', 's1 = 120 MPa'])));
+  assert.equal(r.verdict, 'wrong');
+  assert.equal(r.read.finalAnswer, '120 MPa');
+  assert.deepEqual([r.suggest.brokeAt, r.suggest.errorType], [3, 'units']);
+  assert.equal(r.attempt.verdict, 'mismatch', 'nothing held against you until you confirm');
+  assert.match(r.attempt.photo, /^uploads\/photo-.+\.jpg$/);
+  assert.deepEqual(r.attempt.steps, ['sx = 80', 'R = 70', 's1 = 120 MPa']);
+});
+
+test('a photo of right working needs no comparison', async () => {
+  let compared = false;
+  const r = await checkPhoto({ unit: 'EMM 302', questionId: 'q1', image: PHOTO }, photoDeps(reads('0.09 GPa', ['...']), async () => { compared = true; }));
+  assert.equal(r.verdict, 'right');
+  assert.equal(compared, false);
+});
+
+test('an unreadable photo, or an AI that cannot see, says what to do instead', async () => {
+  const blurry = await checkPhoto({ unit: 'EMM 302', questionId: 'q1', image: PHOTO }, photoDeps(reads('', [], false)));
+  assert.equal(blurry.unreadablePhoto, true);
+  assert.match(blurry.note, /blurry/);
+  const blind = await checkPhoto({ unit: 'EMM 302', questionId: 'q1', image: PHOTO }, { ...ai, canSee: () => false });
+  assert.equal(blind.needVision, true);
+  assert.match(blind.message, /type your final answer/i);
+  await assert.rejects(checkPhoto({ unit: 'EMM 302', questionId: 'q1', image: { mime: 'application/pdf', data: 'x' } }, photoDeps(reads('1', []))), /JPEG/);
+});

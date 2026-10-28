@@ -54,3 +54,13 @@ test('a missing unit is compared as a plain number, and unreadable input is not 
   assert.equal(v('12 furlongs', '12 stadia').verdict, 'unreadable');
   assert.equal(v('0', '0 N').verdict, 'right');
 });
+
+test('a final answer written with its symbol, "therefore" or "Ans" is read the same', () => {
+  for (const s of ['d = 3.23 mm', '∴ d = 3.23 mm', 'Ans: 3.23 mm', 'd=3.23mm', 'Answer = 3.23 mm']) {
+    const a = parseAnswer(s);
+    assert.equal(a.value, 3.23, s);
+    assert.equal(a.unitText, 'mm', s);
+  }
+  assert.equal(v('d = 32.3 mm', '0.0323 m').verdict, 'right');
+  assert.equal(parseAnswer('-12 kN').value, -12, 'a leading minus is still a sign');
+});

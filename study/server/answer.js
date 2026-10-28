@@ -43,13 +43,16 @@ const NUMBER = /^\s*(?:[=≈~]\s*)?([+\-−–]?)\s*(\d[\d,]*\.?\d*|\.\d+)\s*(?:
 const sign = (s) => (/[\-−–]/.test(s || '') ? -1 : 1);
 
 // '142.5 MPa' -> { value: 142.5, unitText: 'MPa', unit: {dims, factor} | null }. value null = no number found.
+// A label in front of the value is dropped: "d = 3.23 mm", "∴ d = 3.23 mm", "Ans: 3.23 mm" all read as 3.23 mm.
+const LABEL = /^\s*(?:\u2234|therefore\b)?\s*(?:(?:ans(?:wer)?|final(?: answer)?)\s*[:=]?|[A-Za-z\u0391-\u03c9_]{1,6}(?:_?\{?[\w,]{0,6}\}?)?\s*=)\s*/i;
+
 export function parseAnswer(text) {
-  const m = String(text ?? '').match(NUMBER);
+  const m = String(text ?? '').replace(LABEL, '').match(NUMBER);
   if (!m) return { value: null, unitText: '', unit: null };
   const digits = /^\d{1,3}(,\d{3})+(\.\d*)?$/.test(m[2]) ? m[2].replace(/,/g, '') : m[2].replace(',', '.');
   const exp = m[3] ?? m[4];
   const value = sign(m[1]) * Number(digits) * (exp ? 10 ** (sign(exp) * Number(exp.replace(/[^\d]/g, ''))) : 1);
-  const unitText = String(text).slice(m[0].length).trim().replace(/^[\s.,;]+|[\s.,;]+$/g, '');
+  const unitText = String(text).replace(LABEL, '').slice(m[0].length).trim().replace(/^[\s.,;]+|[\s.,;]+$/g, '');
   return { value, unitText, unit: parseUnit(unitText) };
 }
 

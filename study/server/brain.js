@@ -256,3 +256,50 @@ export async function makeKit({ kind, unit, topic = '', focus = [], subtopics = 
   ].filter(Boolean).join('\n');
   return structured(KIT_SCHEMA[kind], TUTOR, content, 8000);
 }
+
+// Phase 9: a photo of handwritten working → what is on it, transcribed, not corrected.
+export async function readWorking({ unit, question, image }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      readable: { type: 'boolean', description: 'false if the photo is unreadable or is not working for this question' },
+      finalAnswer: { type: 'string', description: 'The final answer exactly as the student wrote it, with its unit. Empty if there is none.' },
+      steps: { type: 'array', items: { type: 'string' }, description: 'Each step of the working in order, as written: the equation, the substituted numbers, the value with units.' },
+      note: { type: 'string', description: 'What was hard to read, if anything. Empty otherwise.' },
+    },
+    required: ['readable', 'finalAnswer', 'steps', 'note'],
+    additionalProperties: false,
+  };
+  const content = `Unit: ${unit}\nQuestion:\n${question}\n\nThe image is the student's handwritten working for this question. Transcribe it faithfully: every step in order, and the final answer with its unit exactly as written. Do NOT correct mistakes and do NOT solve it yourself; a wrong value must stay wrong in your transcription.`;
+  return structured(schema, TUTOR, content, 3000, [image]);
+}
+
+// The student's written steps against the key's checkpoints: the first checkpoint their working disagrees with.
+export async function compareWorking({ question, steps, checkpoints, expected }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      brokeAt: { type: 'integer', description: 'The number of the first checkpoint the student\'s working disagrees with, or 0 if it matches all of them.' },
+      errorType: { type: 'string', enum: ERROR_TYPES.map((e) => e.id) },
+      why: { type: 'string', description: 'One sentence: what the student wrote at that step versus what the checkpoint does.' },
+    },
+    required: ['brokeAt', 'errorType', 'why'],
+    additionalProperties: false,
+  };
+  const content = `Question:\n${question}\n\nCorrect final answer: ${expected}\n\nCheckpoints of a correct solution:\n${checkpoints.map((c) => `${c.n}. ${c.step}${c.equation ? `: ${c.equation}` : ''}${c.value ? ` = ${c.value}` : ''}`).join('\n')}\n\nThe student's working, step by step:\n${steps.map((s, i) => `(${i + 1}) ${s}`).join('\n')}\n\nFind the FIRST checkpoint where the student's working goes wrong (a different equation, sign, unit or value), and name the kind of mistake.`;
+  return structured(schema, TUTOR, content, 1000);
+}
+
+// Phase 9: a spoken teach-back → its transcript (marked afterwards like a typed one).
+export async function transcribe({ topic, audio }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      transcript: { type: 'string', description: 'What the student said, word for word, with equations written as plain text (^ and _).' },
+      clear: { type: 'boolean', description: 'false if the recording is silent, too noisy or not about the topic' },
+    },
+    required: ['transcript', 'clear'],
+    additionalProperties: false,
+  };
+  return structured(schema, TUTOR, `The recording is a student explaining "${topic}" out loud, as if teaching a classmate. Transcribe it faithfully. Do not improve or correct what they say.`, 4000, [audio]);
+}

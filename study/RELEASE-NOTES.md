@@ -1,5 +1,12 @@
 # Study Desk release notes
 
+## 28 Oct 2026, later: understanding model, photos, voice
+
+- **Topic colours now come from the Breakpoint model** (UNDERSTANDING.md). Understanding is read as three links (why it works, setting it up, carrying it through), from where your working breaks, how hard and how new the questions were, how long ago, and how accurate your own ratings have proved. Click a topic chip to see the three links and the weakest one. Expect some topics to change colour: green now means a floor you've earned, about a teach-back and 4 different questions over two weeks.
+- **Check a photo of your working** (Check answer, or a photo with `mark` on Discord). The AI reads your answer and steps, checks it, and suggests the step where it broke; you confirm.
+- **Say it out loud** in Teach it back (or a voice message after `teach` on Discord): transcribed and marked like a typed explanation.
+- Answers written as "d = 3.23 mm", "∴ …" or "Ans: …" are now read correctly.
+
 ## 28 Oct 2026: audit fixes, redesign, Phases 10 and 11, tutorial quests
 
 Restart `start.bat` once so the new version is what you see.

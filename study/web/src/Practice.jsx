@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, useElapsed } from './api.js';
+import { photoData } from './media.js';
 import LimitNote from './LimitNote.jsx';
 
 // Checkpoint feedback: type your final answer (and, if you like, the operations you used). A right answer is
@@ -19,6 +20,7 @@ export default function Practice({ s, unit, setUnit, refresh, go, focus, notify 
   const [form, setForm] = useState({ subtopicId: '', errorType: 'concept-gap' });
   const [done, setDone] = useState({}); // step -> 'broke' | 'flagged'
   const [err, setErr] = useState('');
+  const [photoMsg, setPhotoMsg] = useState(''); // why a photo couldn't be checked
 
   const [want, setWant] = useState(null); // { topicId, subtopicId } from a weakspot: pick its newest question
   useEffect(() => { if (unit) api('GET', `predict?unit=${encodeURIComponent(unit)}`).then((p) => setQuestions(p.questions)).catch(() => setQuestions([])); }, [unit]);
@@ -51,6 +53,25 @@ export default function Practice({ s, unit, setUnit, refresh, go, focus, notify 
       setRes(out);
       setSteps({ list: out.checkpoints || [], note: out.checkpointNote || '' });
       if (out.attempt) refresh();
+    } catch (x) { setErr(x.message); }
+    setBusy(false);
+  };
+
+  // Phase 9: a photo of the working instead of a typed answer; a suggested broken step opens pre-filled
+  const photo = async (file) => {
+    if (!file) return;
+    setBusy(true); clear(); setPhotoMsg('');
+    try {
+      const out = await api('POST', 'attempts/photo', { unit, questionId: questionId || undefined, question: questionId ? undefined : pasted, image: await photoData(file), key: key || undefined });
+      if (out.needVision || out.unreadablePhoto) setPhotoMsg(out.message || out.note);
+      else {
+        setRes(out);
+        setSteps({ list: out.checkpoints || [], note: out.checkpointNote || '' });
+        if (out.read) setAnswer(out.read.finalAnswer);
+        const cp = out.suggest && out.checkpoints.find((c) => c.n === out.suggest.brokeAt);
+        if (cp) { setOpen(cp.n); setForm({ subtopicId: cp.subtopicId || out.guess?.subtopicId || '', errorType: out.suggest.errorType || out.guess?.errorType || cp.errorType || 'concept-gap' }); }
+        if (out.attempt) refresh();
+      }
     } catch (x) { setErr(x.message); }
     setBusy(false);
   };
@@ -117,13 +138,21 @@ export default function Practice({ s, unit, setUnit, refresh, go, focus, notify 
             <label className="small">Answer key{' '}<input value={key} onChange={(e) => setKey(e.target.value)} placeholder="from your marking scheme, e.g. 0.1425 GPa" /></label>
             <span className="muted"> Without one the AI solves it and the key is labelled “AI-solved: verify”.</span>
           </details>
-          <div className="row">
+          <div className="row wrap">
             <button disabled={busy || !answer.trim() || (!questionId && pasted.trim().length < 10)}>{busy ? `Checking… ${waited}s` : 'Check'}</button>
-            {busy && <span className="muted small" role="status">The AI may solve it first: this can take a minute.</span>}
+            <span className="muted small">or</span>
+            <label className={`button ghost${busy || !s.media?.image || (!questionId && pasted.trim().length < 10) ? ' disabled' : ''}`}>
+              Check a photo of my working
+              <input type="file" accept="image/*" capture="environment" hidden disabled={busy || !s.media?.image || (!questionId && pasted.trim().length < 10)}
+                onChange={(e) => { photo(e.target.files[0]); e.target.value = ''; }} />
+            </label>
+            {busy && <span className="muted small" role="status">The AI may read and solve it first: this can take a minute.</span>}
           </div>
+          {!s.media?.image && <p className="muted small">Photos need an AI that can read them (Gemini or Claude, in Settings). You can still type your final answer.</p>}
         </form>
       )}
       {err && <p className="banner bad" role="alert">{err}</p>}
+      {photoMsg && <p className="banner" role="status">{photoMsg}</p>}
       {res?.needKey && (
         <p className="banner" role="status">
           {res.message}{' '}
@@ -139,6 +168,13 @@ export default function Practice({ s, unit, setUnit, refresh, go, focus, notify 
             {res.key.schemeFile && <span className="muted"> ({res.key.schemeFile})</span>}
           </p>
           {res.note && <p className="small warm">{res.note}</p>}
+          {res.read && (
+            <details className="small">
+              <summary>Read from your photo: final answer <b>{res.read.finalAnswer}</b></summary>
+              <ol>{res.read.steps.map((st, i) => <li key={i}>{st}</li>)}</ol>
+            </details>
+          )}
+          {res.suggest && !Object.keys(done).length && <p className="small warm">From your photo, your working seems to break at <b>checkpoint {res.suggest.brokeAt}</b>{res.suggest.why ? `: ${res.suggest.why}` : ''}. It's open below: press Save if that's right, or pick a different step.</p>}
           {res.assumedUnit && <p className="small muted">One of the two had no unit, so the numbers were compared as they are.</p>}
           {res.key.source === 'ai' && <p className="small muted">The AI solved this itself, so if the checkpoints look wrong to you, say so below: nothing is held against you.</p>}
           {right && !steps.list.length && <button className="ghost" onClick={show} disabled={busy}>Show checkpoints</button>}

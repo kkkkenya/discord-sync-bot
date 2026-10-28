@@ -258,7 +258,7 @@ function Unit({ u, s, refresh, go, notify }) {
       {shown && (
         <div className="chippanel small" role="region" aria-label={`Why ${shown.t.name} is ${shown.m.status}`}>
           <p><b>{shown.t.name}</b> is <span className={shown.m.status === 'green' ? 'ok' : shown.m.status === 'amber' ? 'warm' : 'hot'}>{shown.m.status}</span>{shown.m.why ? `: ${shown.m.why}` : ''}.</p>
-          {shown.m.layers && (
+          {shown.m.layers && shown.m.tried && (
             <div className="layers" role="img" aria-label={LAYER.map(([l, name]) => `${name} ${Math.round(shown.m.layers[l].p * 100)}`).join(', ')}>
               {LAYER.map(([l, name]) => (
                 <div key={l} className={`layer${shown.m.bottleneck === l && shown.m.status !== 'green' ? ' weak' : ''}`}>

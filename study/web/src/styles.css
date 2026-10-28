@@ -453,3 +453,9 @@ th { font-weight: 500; color: var(--muted); font-size: 0.8rem; }
 .lbar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--accent); }
 .layer.weak .lbar i { background: var(--red); }
 .lbar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+/* a file input dressed as a button (photo of working) */
+label.button { display: inline-flex; align-items: center; cursor: pointer; border-radius: 8px; padding: 8px 16px; font-weight: 500; }
+label.button.ghost { border: 1px solid var(--line); color: var(--ink); }
+label.button.ghost:hover { border-color: var(--accent); color: var(--accent); }
+label.button.disabled { opacity: 0.45; pointer-events: none; }
+.recdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--red); margin-right: 6px; animation: quest-pulse 1.2s infinite; }

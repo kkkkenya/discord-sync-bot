@@ -49,8 +49,8 @@ The page has four bands, in the order a study day runs: **Today**, **Plan**, **P
 | Plan | **Predict** | Topics ranked by exam weight (how often they come up × their marks × what the lecturer said), the lecturer's hints, and the past-paper questions under each topic. **Map topics with AI** places questions the wording alone couldn't. |
 | Plan | **Weakspots** | Each topic broken into sub-topics you rate solid, shaky or stuck. **Fix first** ranks sub-topics by exam weight × weakness; **How you lose marks** counts your mistake types. |
 | Practise | **Study kit** | Practice made for the unit's stage. Adequate Prep: a ladder (a worked example, the same method with steps to fill in, then one on your own) plus teach-back prompts. 1-Week Mode: solving recipes for the likely topics (how to spot the question type, the steps, a shortcut, the trap). Last-Minute and Exam-Eve: a formula and shortcut sheet (symbols and SI units, when each formula does NOT apply) with your own recurring mistakes as the first warnings, printable on one A4 page. Everything made is saved and can be edited in place. |
-| Practise | **Check answer** | Type a final answer with its unit. A right answer is accepted in any unit (0.1425 GPa = 142.5 MPa). A wrong one shows numbered checkpoints: tap **Broke here** on the step where your working went wrong. |
-| Practise | **Teach it back** | Explain a topic as if to a classmate. The AI scores it out of 5 and names the gaps; a gap can become a shaky sub-topic in one click. |
+| Practise | **Check answer** | Type a final answer with its unit. A right answer is accepted in any unit (0.1425 GPa = 142.5 MPa). A wrong one shows numbered checkpoints: tap **Broke here** on the step where your working went wrong. Or press **Check a photo of my working**: the AI reads your final answer and steps off the photo, checks it the same way, and opens Broke here on the step where your working seems to go wrong, for you to confirm. |
+| Practise | **Teach it back** | Explain a topic as if to a classmate, typed or out loud (**Say it out loud instead**, up to 4 minutes). The AI scores it out of 5 and names the gaps; a gap can become a shaky sub-topic in one click. You see what it heard. |
 | Practise | **Mock exam** | Timed and closed book, at 1.5 minutes a mark. A predicted mock is built from the most likely past-paper questions. **Add questions from your own notes** (inside Mock) turns pasted notes into CAT questions for the bank. |
 | Practise | **Past papers** | Log a paper's score; average per unit. |
 | Review | **Prompt Builder** | A Master Prompt and a `.md` context pack (your weakspots, hints, past questions, synced notes) to use in Claude, ChatGPT or DeepSeek. No AI key needed. |
@@ -116,8 +116,8 @@ With your user ID set, the bot DMs you the day's plan at **07:00** and, if nothi
   - `mark 142.5 MPa`: checks your final answer (any unit). A wrong one lists the checkpoints.
   - `mark broke 2` (or `mark broke 2 units`): the checkpoint where your working broke, and the kind of mistake.
   - `mark dispute`: a checkpoint looks wrong to you; nothing is held against you.
-  - Photos of your working aren't read yet: type the final answer.
-- `teach EMM 302 Mohr's circle`: explain a topic and get it marked (`stop` ends it)
+  - Or send a **photo of your working** with `mark` (after `mark EMM 302`), or with the question named: `mark EMM 302 2023 Exam Q3`. It is read, checked, and the bot suggests where it broke for you to confirm.
+- `teach EMM 302 Mohr's circle`: explain a topic and get it marked (`stop` ends it). Send your explanation as text or as a **voice message**.
 - `files EMM 302`: past papers and CATs for a unit (`files EMM 302 notes` for notes and slides)
 - `log 45 EMM 302`: log 45 minutes
 - `paper EMM 302 34/60 2023 CAT 1`: log a paper score
@@ -136,6 +136,7 @@ With your user ID set, the bot DMs you the day's plan at **07:00** and, if nothi
 ## 10. FAQ
 
 - **AI features off?** Open Settings in the top bar and pick a provider that has a key, or run `setup.bat`.
+- **Photos and speaking?** Gemini reads photos and listens to recordings; Claude reads photos only; DeepSeek does neither. The buttons say so when the chosen AI can't. Photos and recordings are kept in `data/uploads/` and sent only to the AI you chose.
 - **A file synced as "no text (scanned)"?** It's an image-only PDF. Paste its questions in Predict → *Paste a paper's questions*, or attach the file in the Prompt Builder.
 - **The countdown uses a date I don't trust?** Tick TBA on the unit, or use **Mark them TBA** at the top of the page.
 - **DMs not arriving?** Run `setup.bat`, check your user ID, and allow DMs from the Study Hub server.

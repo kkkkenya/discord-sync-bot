@@ -44,8 +44,8 @@ export default function Hero({ s, refresh, go }) {
   return (
     <section id="overview" className="hero reveal" data-tour="countdown">
       <div className="hero-top-badge">
-        <span className="hero-tag">/// FOR ENGINEERS, BY ENGINEERS</span>
-        <span className="hero-coord">[ 001 / OVERVIEW ]</span>
+        <span className="hero-tag">Study Desk v2026.10</span>
+        <span className="hero-coord">Overview</span>
       </div>
       <div className="count">
         {next && days > 0 ? (

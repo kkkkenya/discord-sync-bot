@@ -1,0 +1,79 @@
+// Everything you log lives in study/data/study.json (git-ignored). One file, rewritten on every change.
+// STUDY_DATA_DIR points it somewhere else (tests, or trying a copy of your data).
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+
+const DIR = process.env.STUDY_DATA_DIR ? pathToFileURL(`${process.env.STUDY_DATA_DIR.replace(/[\\/]$/, '')}/`) : new URL('../data/', import.meta.url);
+const FILE = new URL('study.json', DIR);
+export const DATA_DIR = DIR; // uploads (photos of working, voice teach-backs) live in DATA_DIR/uploads/
+mkdirSync(DIR, { recursive: true });
+
+// units: [{ code, title, catDate: 'YYYY-MM-DD'|'TBA'|null (null = KU calendar), confidence }]   (this semester's)
+// topics: [{ id, unit, name, status: red|amber|green, taughtAt }]
+// sessions: [{ id, unit, minutes, focus, kind, energy, endedEarly, at }]
+// papers: [{ id, unit, label, score, outOf, fileId, at }]   teach: [{ id, unit, topic, text, feedback, at }]
+// questions: [{ id, unit, topic, q, a, marks, from, at }]   (CAT-style practice bank for mocks)
+// mocks: [{ id, unit, name, questions: [{q,a,marks,topic}], answers: [{user,earned,note}], score, outOf, overall, finishedAt, at }]
+// subtopics: [{ id, unit, topicId, name, kind, audit, auditAt, auditFrom: 'you'|'teach', mistakeCount, lastTested, order, at }]
+// paperq: [{ id, unit, fileId, source, year, type: 'CAT1'|'CAT2'|'CAT'|'Exam', number, marks, text, topicId,
+//   subtopicIds, topicFrom: 'auto'|'ai'|'you' }]   (past-paper questions; fileId 'paste-…' for pasted papers)
+// hints: [{ id, unit, text, kind: 'focus'|'exclude'|'note', topicIds, at }]   (what the lecturer said)
+// attempts: filled from Phase 8 on (see PHASES.md).
+// materials: [{ id, unit, topicId|null, kind: 'ladder'|'recipes'|'sheet', stage, content, edited, at }]   (Phase 10 study kit)
+// cards, reviews: retired flashcards. Left exactly as they are in old files, never read or sent to the dashboard.
+// settings: { aiProvider: 'gemini'|'deepseek'|'anthropic'|'hub' (the Study Hub's AI, friends' Study Desks), tour: { step, done, skipped }, cardsNotice: true once
+//   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
+//   unitArchive: { code: { catDate, confidence, ... } } (units you un-ticked, restored if you tick them again) }
+const EMPTY = {
+  units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [], materials: [],
+  // a new store starts on the AI chosen in setup (AI_PROVIDER in study/.env); Settings changes it after
+  settings: { aiProvider: process.env.AI_PROVIDER || 'gemini', tour: {}, cohort: null, unitArchive: {} },
+};
+
+// Old files load with every list present and every setting defaulted; nothing in them is dropped.
+const load = () => {
+  const saved = JSON.parse(readFileSync(FILE, 'utf8'));
+  return { ...structuredClone(EMPTY), ...saved, settings: { ...structuredClone(EMPTY.settings), ...saved.settings } };
+};
+export const data = existsSync(FILE) ? load() : structuredClone(EMPTY);
+
+// Bump when a build changes what's stored. The first start of a newer build copies study.json to
+// data/backups/pre-v<N>-<day>.json before anything rewrites it.
+export const VERSION = 1;
+if (existsSync(FILE) && (data.version || 0) < VERSION) {
+  const dir = new URL('backups/', DIR);
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(FILE, new URL(`pre-v${VERSION}-${new Date().toISOString().slice(0, 10)}.json`, dir));
+}
+data.version = VERSION;
+
+export function save() {
+  const tmp = new URL('study.json.tmp', DIR);
+  writeFileSync(tmp, JSON.stringify(data, null, 1));
+  renameSync(tmp, FILE);
+}
+
+export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks', 'subtopics', 'hints', 'paperq', 'materials'];
+
+export function add(list, row) {
+  const item = { id: randomUUID().slice(0, 8), at: new Date().toISOString(), ...row };
+  data[list].push(item);
+  save();
+  return item;
+}
+
+export function patch(list, id, changes) {
+  const item = data[list].find((x) => x.id === id);
+  if (!item) return null;
+  Object.assign(item, changes, { id });
+  save();
+  return item;
+}
+
+export function remove(list, id) {
+  const before = data[list].length;
+  data[list] = data[list].filter((x) => x.id !== id);
+  if (data[list].length !== before) save();
+  return data[list].length !== before;
+}

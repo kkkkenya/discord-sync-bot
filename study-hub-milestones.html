@@ -1,0 +1,737 @@
+<title>Study Hub Milestones</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: an engineering logbook on graph paper. Header strip with the cycle gauge, then two columns: your log (left), the server (right). */
+:root{
+  --paper:#F3F6FA; --panel:#FFFFFF; --ink:#12203A; --ink-2:#4A5873; --line:#D5DDE8; --grid:rgba(47,91,234,.07);
+  --accent:#2F5BEA; --accent-ink:#FFFFFF; --soft:#EAF0FD;
+  --good:#1F8A5B; --warn:#B7791F; --crit:#C2410C;
+  --t-ai:#2F5BEA; --t-sw:#7C3AED; --t-eng:#0E7490; --t-iot:#15803D; --t-biz:#B45309; --t-cn:#C8102E; --t-other:#64748B;
+  --h0:#E3E9F1; --h1:#C7D5F7; --h2:#8EA9F0; --h3:#4F76E6; --h4:#2443B8;
+  --f-display:"IBM Plex Sans Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#0B1322; --panel:#111C30; --ink:#E6ECF5; --ink-2:#9AA8C0; --line:#24334E; --grid:rgba(120,150,255,.07);
+  --accent:#7E9BFF; --accent-ink:#0B1322; --soft:#1A2947;
+  --good:#5BD18B; --warn:#F0B54A; --crit:#FF8A5B;
+  --t-ai:#7E9BFF; --t-sw:#B794F6; --t-eng:#4FC3D9; --t-iot:#5BD18B; --t-biz:#F0A54A; --t-cn:#FF6B6B; --t-other:#94A3B8;
+  --h0:#18243B; --h1:#233B6E; --h2:#2F55A8; --h3:#4B74E0; --h4:#8FA9FF; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#0B1322; --panel:#111C30; --ink:#E6ECF5; --ink-2:#9AA8C0; --line:#24334E; --grid:rgba(120,150,255,.07);
+  --accent:#7E9BFF; --accent-ink:#0B1322; --soft:#1A2947;
+  --good:#5BD18B; --warn:#F0B54A; --crit:#FF8A5B;
+  --t-ai:#7E9BFF; --t-sw:#B794F6; --t-eng:#4FC3D9; --t-iot:#5BD18B; --t-biz:#F0A54A; --t-cn:#FF6B6B; --t-other:#94A3B8;
+  --h0:#18243B; --h1:#233B6E; --h2:#2F55A8; --h3:#4B74E0; --h4:#8FA9FF; color-scheme:dark}
+
+html.lenis,html.lenis body{height:auto}
+.lenis [data-lenis-prevent]{overscroll-behavior:contain}
+
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px;}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:.005em}
+a{color:var(--accent)}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+
+/* header */
+.top{border-bottom:1px solid var(--line);background:var(--panel)}
+.top-in{display:flex;flex-wrap:wrap;gap:24px 40px;justify-content:space-between;align-items:flex-end;padding-block:28px 24px}
+.brand{min-width:0;flex:1 1 360px;display:grid;gap:6px}
+.brand h1{font-size:clamp(30px,5vw,44px);font-weight:700;line-height:1.05}
+.brand p{margin:0;color:var(--ink-2);max-width:56ch}
+.cycle{flex:1 1 320px;max-width:460px;display:grid;gap:8px}
+.cycle-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.cycle-num{font-family:var(--f-display);font-size:40px;font-weight:700;line-height:1}
+.cycle-lbl{color:var(--ink-2);font-size:14px}
+.bar{position:relative;height:10px;border-radius:5px;background:var(--h0);overflow:visible}
+.bar-fill{position:absolute;inset:0 auto 0 0;width:0;border-radius:5px;background:var(--accent)}
+.bar-mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);left:49.6%}
+.bar-legend{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);gap:8px}
+
+.banner{margin-top:16px;padding:12px 16px;border:1px solid var(--warn);border-left-width:4px;background:var(--panel);border-radius:6px;font-size:14px}
+
+/* grid */
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px;padding-block:20px 40px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.col{display:grid;gap:20px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;display:grid;gap:16px;min-width:0}
+.panel-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.panel h2{font-size:22px;font-weight:700}
+.muted{color:var(--ink-2)}
+.small{font-size:13px}
+.empty{padding:16px;border:1px dashed var(--line);border-radius:8px;color:var(--ink-2);font-size:14px}
+
+/* forms */
+.field{display:grid;gap:6px;min-width:0}
+.field label,.lbl{font-size:13px;font-weight:600}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>.field{flex:1 1 140px}
+input[type=text],input[type=url],input[type=number],input[type=date],textarea{width:100%;background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:9px 11px}
+textarea{resize:vertical;min-height:84px}
+.count{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);justify-self:end}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;cursor:pointer;font-size:13.5px;user-select:none;background:var(--panel)}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.chip:has(input:checked){border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,var(--panel))}
+.chip:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:9px 16px;font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.quiet{background:transparent;color:var(--ink-2);border-color:var(--line)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.status{font-size:13px;color:var(--ink-2)}
+.status.err{color:var(--crit)}
+.status.ok{color:var(--good)}
+
+/* stats */
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:520px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{border-top:2px solid var(--ink);padding-top:8px;display:grid;gap:2px}
+.stat b{font-family:var(--f-display);font-size:28px;line-height:1.1}
+.stat span{font-size:12px;color:var(--ink-2);font-family:var(--f-mono);letter-spacing:.04em;text-transform:uppercase}
+
+/* heatmap */
+.heat-wrap{overflow-x:auto;padding-bottom:4px}
+.heat{display:grid;grid-template-rows:repeat(7,11px);grid-auto-flow:column;grid-auto-columns:11px;gap:3px;width:max-content}
+.heat i{display:block;width:11px;height:11px;border-radius:2px;background:var(--h0)}
+.heat i[data-l="1"]{background:var(--h1)}.heat i[data-l="2"]{background:var(--h2)}.heat i[data-l="3"]{background:var(--h3)}.heat i[data-l="4"]{background:var(--h4)}
+.heat i.today{outline:1.5px solid var(--ink);outline-offset:1px}
+.heat i.future{opacity:.45}
+.heat-legend{display:flex;gap:4px;align-items:center;font-size:11.5px;color:var(--ink-2);font-family:var(--f-mono)}
+.heat-legend i{width:11px;height:11px;border-radius:2px;display:inline-block}
+
+/* milestones */
+.ms-groups{display:grid;gap:14px}
+.ms-group h3{font-size:15px;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ms-group h3 .dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.ms-group h3 .num{font-weight:400;color:var(--ink-2);font-size:12px;margin-left:auto}
+.ms{display:grid;grid-template-columns:20px 1fr auto;gap:10px;align-items:start;padding:6px 0;border-bottom:1px solid var(--line);font-size:14px}
+.ms:last-child{border-bottom:0}
+.ms input{margin-top:3px;accent-color:var(--c)}
+.ms .by{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2);white-space:nowrap}
+.ms.done span.txt{text-decoration:line-through;color:var(--ink-2)}
+.ms .x{border:0;background:none;color:var(--ink-2);cursor:pointer;padding:0 4px}
+
+/* lists */
+.list{display:grid;gap:0;max-height:520px;overflow:auto}
+.item{display:grid;grid-template-columns:32px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:0}
+.av{width:32px;height:32px;border-radius:50%;background:var(--h0);object-fit:cover}
+.item-head{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+.item-head b{font-weight:600}
+.item-head .when{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-2)}
+.item p{margin:4px 0 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font-size:11.5px;font-family:var(--f-mono);padding:2px 8px;border-radius:999px;border:1px solid var(--c);color:var(--ink);background:color-mix(in srgb,var(--c) 12%,transparent)}
+.tag.ms-tag{border-style:dashed}
+.link-out{font-size:13px;overflow-wrap:anywhere}
+.del{border:0;background:none;color:var(--ink-2);cursor:pointer;font-size:12px;padding:0;text-decoration:underline}
+.del.arm{color:var(--crit)}
+
+/* board */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-family:var(--f-mono);font-size:11.5px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-2);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink)}
+td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.who{display:flex;align-items:center;gap:10px;min-width:0}
+.who img{width:24px;height:24px;border-radius:50%}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.dots{display:flex;gap:3px}
+.dots i{width:8px;height:8px;border-radius:50%;background:var(--c);display:block}
+tr.me td{background:var(--soft)}
+.flame{color:var(--crit);font-weight:600}
+
+/* resources */
+details{border-top:1px solid var(--line);padding:10px 0}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-weight:600;display:flex;align-items:center;gap:8px}
+summary .dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+details ul{margin:8px 0 0;padding-left:20px;display:grid;gap:4px;font-size:14px}
+
+/* copy sheet */
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:2px solid var(--accent);
+  padding:16px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sheet-in{max-width:760px;margin:0 auto;display:grid;gap:10px}
+.sheet textarea{min-height:120px;font-family:var(--f-mono);font-size:13px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:6px;font-size:14px;z-index:30}
+footer{padding-block:0 32px;font-size:13px;color:var(--ink-2)}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <div class="brand">
+      <span class="eyebrow">Engineering Study Hub · 2026–27 cycle</span>
+      <h1>Study Hub Milestones</h1>
+      <p>Log what you did each day, tick off milestones and keep your streak going with the rest of the server. One year, from 19 Oct 2026 to 18 Oct 2027.</p>
+    </div>
+    <div class="cycle" aria-label="Cycle progress">
+      <div class="cycle-row"><span class="cycle-num num" id="dayNum">Day 0</span><span class="cycle-lbl" id="dayLbl">Starts Monday 19 Oct 2026</span></div>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="365" id="bar"><div class="bar-fill" id="barFill"></div><span class="bar-mark" title="6-month checkpoint"></span></div>
+      <div class="bar-legend"><span>19 Oct</span><span>6-month check · 19 Apr</span><span>18 Oct 2027</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap"><div id="banner" class="banner" hidden></div></div>
+
+<main class="wrap grid">
+  <section class="col">
+    <article class="panel" id="joinPanel" hidden>
+      <div class="panel-head"><h2 id="joinTitle">Join the cycle</h2><span class="eyebrow">Step 1 of 1</span></div>
+      <p class="muted" style="margin:0">Pick the tracks you want to grow in this year. You can change them later.</p>
+      <div class="field"><label for="jHandle">Your Discord name</label><input id="jHandle" type="text" maxlength="32" placeholder="e.g. greg_eng"></div>
+      <div class="field"><span class="lbl">Your tracks</span><div class="chips" id="jTracks"></div></div>
+      <div class="field"><label for="jGoal">Your goal for the year (one line)</label><input id="jGoal" type="text" maxlength="140" placeholder="e.g. Land 3 paying clients and pass HSK 2"></div>
+      <div class="actions"><button class="btn" id="jSave" type="button">Join the cycle</button><button class="btn quiet" id="jCancel" type="button" hidden>Cancel</button><span class="status" id="jStatus"></span></div>
+    </article>
+
+    <article class="panel" id="logPanel">
+      <div class="panel-head"><h2>Log your day</h2><span class="eyebrow" id="logDayTag">Today</span></div>
+      <div class="field"><span class="lbl">What did you work on?</span><div class="chips" id="lTracks"></div></div>
+      <div class="field"><label for="lText">What you did</label><textarea id="lText" maxlength="280" placeholder="e.g. Finished MATLAB Onramp module 6 and wrote 20 new HSK 1 words in Anki"></textarea><span class="count" id="lCount">0 / 280</span></div>
+      <div class="row">
+        <div class="field"><label for="lMins">Minutes</label><input id="lMins" type="number" min="0" max="720" step="5" value="60"></div>
+        <div class="field"><label for="lDate">Date</label><input id="lDate" type="date"></div>
+        <div class="field" style="flex-basis:220px"><label for="lLink">Proof link (optional)</label><input id="lLink" type="url" placeholder="certificate, repo, video"></div>
+      </div>
+      <div class="actions"><button class="btn" id="lSave" type="button">Save log</button><span class="status" id="lStatus"></span></div>
+    </article>
+
+    <article class="panel" id="mePanel">
+      <div class="panel-head"><h2>Your year</h2><button class="btn quiet" id="editProfile" type="button" hidden>Edit tracks</button></div>
+      <p class="muted small" id="myGoal" style="margin:0"></p>
+      <div class="stats">
+        <div class="stat"><b class="num" id="sStreak">0</b><span>Day streak</span></div>
+        <div class="stat"><b class="num" id="sDays">0</b><span>Days logged</span></div>
+        <div class="stat"><b class="num" id="sHours">0</b><span>Hours</span></div>
+        <div class="stat"><b class="num" id="sMs">0</b><span>Milestones</span></div>
+      </div>
+      <div class="field">
+        <div class="panel-head"><span class="lbl">365 days</span><span class="heat-legend">less <i style="background:var(--h0)"></i><i style="background:var(--h1)"></i><i style="background:var(--h2)"></i><i style="background:var(--h3)"></i><i style="background:var(--h4)"></i> 2h+</span></div>
+        <div class="heat-wrap" data-lenis-prevent><div class="heat" id="heat" aria-label="Daily activity map"></div></div>
+      </div>
+      <div class="field"><span class="lbl">Milestones</span><div class="ms-groups" id="msGroups"><div class="empty">Join the cycle to see milestones for your tracks.</div></div></div>
+      <div class="field">
+        <span class="lbl">Your own milestones</span>
+        <div id="customList"></div>
+        <div class="row"><div class="field" style="flex:1 1 240px"><input id="cText" type="text" maxlength="100" placeholder="Add a milestone for your field, e.g. Pass Thermodynamics II"></div><button class="btn ghost" id="cAdd" type="button">Add</button></div>
+      </div>
+      <div class="field"><span class="lbl">Your recent logs</span><div class="list" id="history" data-lenis-prevent><div class="empty">Your logs will show here after you save the first one.</div></div></div>
+    </article>
+  </section>
+
+  <section class="col">
+    <article class="panel">
+      <div class="panel-head"><h2>Server board</h2><button class="btn ghost" id="recapBtn" type="button">Copy weekly recap</button></div>
+      <div class="stats">
+        <div class="stat"><b class="num" id="gMembers">0</b><span>Members</span></div>
+        <div class="stat"><b class="num" id="gToday">0</b><span>Logged today</span></div>
+        <div class="stat"><b class="num" id="gWeek">0</b><span>Hours this week</span></div>
+        <div class="stat"><b class="num" id="gMs">0</b><span>Milestones hit</span></div>
+      </div>
+      <div class="table-wrap" id="board"><div class="empty">Nobody has joined yet. Be the first: pick your tracks on the left.</div></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><h2>Live feed</h2><span class="eyebrow">Logs and milestones</span></div>
+      <div class="list" id="feed" data-lenis-prevent><div class="empty">No logs yet. The first person to log today starts the feed.</div></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><h2>Messages</h2><span class="eyebrow">Last 14 days</span></div>
+      <div class="field"><label for="wText" class="lbl">Say something to the server</label><textarea id="wText" maxlength="500" placeholder="Shout out someone's streak, ask for a study partner, share a resource"></textarea></div>
+      <div class="actions"><button class="btn" id="wPost" type="button">Post message</button><span class="status" id="wStatus"></span></div>
+      <div class="list" id="wall" data-lenis-prevent><div class="empty">No messages yet.</div></div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head"><h2>Free resources</h2><span class="eyebrow">By track</span></div>
+      <div id="resources"></div>
+    </article>
+  </section>
+</main>
+
+<footer class="wrap">Your name on this page is the Discord name you enter. Logs, milestones and messages are visible to everyone who can open this page.</footer>
+
+<div class="sheet" id="sheet" hidden role="dialog" aria-labelledby="sheetTitle">
+  <div class="sheet-in">
+    <div class="panel-head"><strong id="sheetTitle">Post this in Discord</strong><span class="muted small">Copy, then paste in the server</span></div>
+    <textarea id="sheetText" aria-label="Message for Discord"></textarea>
+    <div class="actions"><button class="btn" id="sheetCopy" type="button">Copy</button><button class="btn quiet" id="sheetClose" type="button">Close</button></div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://unpkg.com/lenis@1.3.26/dist/lenis.min.js"></script>
+<script>
+(() => {
+const PAGE_URL = "https://claude.ai/artifact/NUACqe2VsdGERzNN37MMsf";
+const START = "2026-10-19", DAYS = 365;
+
+const TRACKS = [
+  {id:"ai", name:"AI coding"},
+  {id:"sw", name:"Software"},
+  {id:"eng", name:"MATLAB & CAD"},
+  {id:"iot", name:"IoT"},
+  {id:"biz", name:"Clients & business"},
+  {id:"cn", name:"Chinese 中文"},
+  {id:"other", name:"My field"},
+];
+const TRACK = Object.fromEntries(TRACKS.map(t => [t.id, t]));
+const tcol = id => `var(--t-${id})`;
+
+const MILESTONES = {
+  ai:[["ai1","Claude Code 101 certificate","Nov"],["ai2","Claude Code in Action certificate","Nov"],["ai3","CLAUDE.md and tests in one real repo","Dec"],["ai4","Agent skills and subagents certificates","Jan"],["ai5","Building with the Claude API certificate","Feb"],["ai6","Ship an AI tool someone actually uses","Apr"]],
+  sw:[["sw1","Learn Git Branching finished","Oct"],["sw2","CS50x weeks 0 to 5","Dec"],["sw3","CS50x certificate","Mar"],["sw4","Full Stack Open parts 0 to 5","May"],["sw5","freeCodeCamp JavaScript certification","Jul"],["sw6","Portfolio site live","Aug"]],
+  eng:[["e1","MATLAB Onramp certificate","Nov"],["e2","Simulink Onramp certificate","Dec"],["e3","Machine Learning Onramp certificate","Jan"],["e4","First CAD part and assembly","Feb"],["e5","CSWA exam passed","Jun"],["e6","A PCB designed in KiCad","Sep"]],
+  iot:[["i1","Cisco Introduction to IoT badge","Nov"],["i2","ESP32 sensor running in Wokwi","Nov"],["i3","Real board sending data over MQTT","Jan"],["i4","Dashboard with alerts","Mar"],["i5","Prototype tested in the field","Jun"],["i6","Enclosure or PCB version","Sep"]],
+  biz:[["b1","HubSpot Inbound Sales certificate","Dec"],["b2","3 case studies written","Jan"],["b3","50 warm outreach messages sent","Mar"],["b4","First paid client","Apr"],["b5","First monthly retainer","Jul"],["b6","5 written testimonials","Oct"]],
+  cn:[["c1","Pinyin and the 4 tones","Nov"],["c2","HSK 1 word list (150 words)","Jan"],["c3","Introduce yourself for 2 minutes","Feb"],["c4","HSK 2 word list (300 words)","Apr"],["c5","10-minute conversation with a speaker","Jul"],["c6","HSK 3 word list (600 words)","Sep"],["c7","Sit an HSK exam","Oct"]],
+};
+const MS = {};
+for (const [t, list] of Object.entries(MILESTONES)) for (const [id, text, by] of list) MS[id] = {id, text, by, track:t};
+
+const RESOURCES = {
+  ai:[["Anthropic Academy (free certificates)","https://anthropic.skilljar.com/"],["Learn Git Branching","https://learngitbranching.js.org/"]],
+  sw:[["CS50x, Harvard","https://cs50.harvard.edu/x/"],["Full Stack Open","https://fullstackopen.com/en/"],["freeCodeCamp","https://www.freecodecamp.org/learn"]],
+  eng:[["MATLAB Onramps","https://matlabacademy.mathworks.com/"],["SOLIDWORKS for students","https://www.solidworks.com/product/students"],["Onshape Education","https://www.onshape.com/en/education/"],["KiCad","https://www.kicad.org/"]],
+  iot:[["Cisco NetAcad: Introduction to IoT","https://www.netacad.com/"],["Wokwi simulator","https://wokwi.com/"],["Random Nerd Tutorials","https://randomnerdtutorials.com/"],["HiveMQ MQTT Essentials","https://www.hivemq.com/mqtt/"]],
+  biz:[["HubSpot Academy","https://academy.hubspot.com/"],["Ajira Digital","https://ajiradigital.go.ke/"]],
+  cn:[["Duolingo","https://www.duolingo.com/"],["HelloChinese","https://www.hellochinese.cc/"],["Pleco dictionary","https://www.pleco.com/"],["AnkiWeb shared HSK decks","https://ankiweb.net/shared/decks"],["Mandarin Corner on YouTube","https://www.youtube.com/results?search_query=mandarin+corner"]],
+};
+
+/* ---------- dates ---------- */
+const pad = n => String(n).padStart(2, "0");
+const ymd = dt => `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+const parse = s => { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d); };
+const addDays = (s, n) => { const t = parse(s); t.setDate(t.getDate()+n); return ymd(t); };
+const diffDays = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
+const today = () => ymd(new Date());
+const dayNum = s => diffDays(START, s) + 1;
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDay = s => { const t = parse(s); return `${t.getDate()} ${MON[t.getMonth()]}`; };
+const fmtTime = ms => { const t = new Date(ms); return `${t.getDate()} ${MON[t.getMonth()]}, ${pad(t.getHours())}:${pad(t.getMinutes())}`; };
+const dayLabel = s => { const n = dayNum(s); return n < 1 ? "Warm-up" : n > DAYS ? "After the cycle" : `Day ${n}`; };
+const rid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const clone = o => JSON.parse(JSON.stringify(o || {}));
+
+/* ---------- stats ---------- */
+const streakOf = idx => { idx = idx || {}; let d = today(); if (!idx[d]) d = addDays(d, -1); let n = 0; while (idx[d]) { n++; d = addDays(d, -1); } return n; };
+const daysIn = (idx, span) => Object.keys(idx || {}).filter(k => { const g = diffDays(k, today()); return g >= 0 && g < span; }).length;
+const minsOf = (idx, span) => Object.entries(idx || {}).reduce((s, [k, v]) => { const g = diffDays(k, today()); return (span == null || (g >= 0 && g < span)) ? s + (v.m || 0) : s; }, 0);
+const msCount = m => Object.keys(m.milestones || {}).length + (m.custom || []).filter(c => c.done).length;
+const hours = mins => { const h = mins / 60; return h >= 100 ? Math.round(h) : Math.round(h * 10) / 10; };
+
+/* ---------- dom ---------- */
+const $ = id => document.getElementById(id);
+function el(tag, attrs, ...kids) {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "style") n.setAttribute("style", v);
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else if (k === "text") n.textContent = v;
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : document.createTextNode(String(c)));
+  return n;
+}
+function chipSet(container, name, selected) {
+  container.replaceChildren(...TRACKS.map(t => el("label", {class:"chip", style:`--c:${tcol(t.id)}`},
+    el("input", {type:"checkbox", name, value:t.id, checked: selected.includes(t.id)}), el("span", {class:"dot"}), t.name)));
+}
+const checked = container => [...container.querySelectorAll("input:checked")].map(i => i.value);
+function setStatus(id, text, kind) { const s = $(id); s.textContent = text || ""; s.className = "status" + (kind ? " " + kind : ""); }
+let toastTimer;
+function toast(text) { const t = $("toast"); t.textContent = text; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2600); }
+
+/* ---------- copy sheet ---------- */
+function showSheet(title, text) {
+  $("sheetTitle").textContent = title; $("sheetText").value = text; $("sheet").hidden = false;
+}
+$("sheetCopy").addEventListener("click", () => {
+  const ta = $("sheetText"), text = ta.value;
+  const fallback = () => { ta.focus(); ta.select(); toast("Text selected. Press Ctrl+C to copy."); };
+  try { navigator.clipboard.writeText(text).then(() => toast("Copied. Paste it in Discord."), fallback); } catch { fallback(); }
+});
+$("sheetClose").addEventListener("click", () => $("sheet").hidden = true);
+const tail = () => PAGE_URL ? `\nLog yours: ${PAGE_URL}` : "";
+
+/* ---------- state ---------- */
+const S = { db:null, user:null, uid:null, canWrite:true, members:new Map(), months:{}, wall:[], profiles:{}, editing:false, ready:false };
+const me = () => S.uid ? S.members.get(S.uid) : null;
+const nameOf = id => (S.members.get(id)?.handle) || S.profiles[id]?.name || "Someone";
+const avatarOf = id => S.profiles[id]?.avatarUrl || "";
+
+function banner(text) { const b = $("banner"); b.textContent = text || ""; b.hidden = !text; }
+function readOnly(reason) {
+  S.canWrite = false;
+  for (const id of ["lSave","wPost","jSave","cAdd"]) $(id).disabled = true;
+  banner(reason);
+}
+function writeFailed(e, statusId) {
+  if (e && (e.code === "invalid_argument" || e.code === "not_granted")) { readOnly("You can read the board, but you can't log yet. Ask the server admin to add you to this page with edit access."); setStatus(statusId, "Not saved: you don't have edit access yet.", "err"); }
+  else if (e && e.code === "quota_exceeded") setStatus(statusId, "Not saved: the shared storage is full. Tell the server admin.", "err");
+  else setStatus(statusId, "Not saved. Check your connection and try again.", "err");
+}
+
+/* ---------- header ---------- */
+function renderCycle() {
+  const n = dayNum(today());
+  const shown = Math.max(0, Math.min(DAYS, n));
+  $("dayNum").textContent = n < 1 ? "Day 0" : `Day ${shown}`;
+  $("dayLbl").textContent = n < 1 ? `Starts Monday 19 Oct 2026 · ${1 - n} day${1 - n === 1 ? "" : "s"} to go` : n > DAYS ? "Cycle complete" : `of ${DAYS} · ${DAYS - shown} days left`;
+  $("bar").setAttribute("aria-valuenow", shown);
+  return shown / DAYS * 100;
+}
+
+/* ---------- join / profile ---------- */
+function openJoin(edit) {
+  const m = me() || {};
+  S.editing = !!edit;
+  $("joinTitle").textContent = edit ? "Edit your tracks" : "Join the cycle";
+  $("jHandle").value = m.handle || "";
+  $("jGoal").value = m.goal || "";
+  chipSet($("jTracks"), "jt", m.tracks || []);
+  $("jCancel").hidden = !edit;
+  $("joinPanel").hidden = false;
+}
+$("jCancel").addEventListener("click", () => { $("joinPanel").hidden = true; });
+$("editProfile").addEventListener("click", () => openJoin(true));
+$("jSave").addEventListener("click", async () => {
+  const handle = $("jHandle").value.trim(), tracks = checked($("jTracks")), goal = $("jGoal").value.trim();
+  if (!handle) return setStatus("jStatus", "Add your Discord name so the server knows it's you.", "err");
+  if (!tracks.length) return setStatus("jStatus", "Pick at least one track.", "err");
+  if (!S.db || !S.uid) return setStatus("jStatus", "Open this page on claude.ai while signed in to join.", "err");
+  const m = me() ? clone(me()) : { joined: today(), dayIndex:{}, recent:[], milestones:{}, custom:[] };
+  Object.assign(m, { handle, tracks, goal, updated: Date.now() });
+  $("jSave").disabled = true; setStatus("jStatus", "Saving…");
+  try { await S.db.doc(`members/${S.uid}`).set(m); setStatus("jStatus", ""); $("joinPanel").hidden = true; toast(S.editing ? "Tracks updated." : "You're in. Log your first day."); }
+  catch (e) { writeFailed(e, "jStatus"); }
+  finally { $("jSave").disabled = !S.canWrite; }
+});
+
+/* ---------- log ---------- */
+$("lText").addEventListener("input", () => $("lCount").textContent = `${$("lText").value.length} / 280`);
+$("lDate").addEventListener("change", () => $("logDayTag").textContent = dayLabel($("lDate").value || today()));
+function resetLogForm() {
+  $("lDate").value = today(); $("lDate").max = today(); $("lDate").min = addDays(today(), -7);
+  $("logDayTag").textContent = dayLabel(today());
+}
+function aggregateDay(entries) {
+  const t = [...new Set(entries.flatMap(e => e.tracks))];
+  return { t: t.join(","), m: entries.reduce((s, e) => s + (e.mins || 0), 0) };
+}
+function discordLog(d, entries) {
+  const m = me(), streak = streakOf(m.dayIndex);
+  const lines = entries.map(e => `> **[${e.tracks.map(t => TRACK[t]?.name || t).join(" + ")}]** ${e.mins ? e.mins + " min · " : ""}${e.text}${e.link ? "\n> " + e.link : ""}`);
+  return `**${m.handle}** · ${dayLabel(d)} · ${streak}-day streak\n${lines.join("\n")}${tail()}`;
+}
+$("lSave").addEventListener("click", async () => {
+  const m = me();
+  if (!S.db || !S.uid) return setStatus("lStatus", "Open this page on claude.ai while signed in to log.", "err");
+  if (!m) { openJoin(false); return setStatus("lStatus", "Join the cycle first (above).", "err"); }
+  const tracks = checked($("lTracks")), text = $("lText").value.trim(), mins = Math.max(0, Math.min(720, parseInt($("lMins").value, 10) || 0));
+  const d = $("lDate").value || today(), link = $("lLink").value.trim();
+  if (!tracks.length) return setStatus("lStatus", "Pick at least one track.", "err");
+  if (text.length < 3) return setStatus("lStatus", "Write a line about what you did.", "err");
+  if (diffDays(d, today()) < 0 || diffDays(d, today()) > 7) return setStatus("lStatus", "You can log today or up to 7 days back.", "err");
+  if (link && !/^https?:\/\//i.test(link)) return setStatus("lStatus", "Proof link should start with https://", "err");
+  const ym = d.slice(0, 7), entry = { id: rid(), tracks, text, mins, link: link || null, at: Date.now() };
+  const month = clone(S.months[ym] || { month: ym, days: {} });
+  month.days = month.days || {};
+  (month.days[d] = month.days[d] || []).push(entry);
+  const mm = clone(m);
+  mm.dayIndex = mm.dayIndex || {}; mm.dayIndex[d] = aggregateDay(month.days[d]);
+  mm.recent = [{ d, ...entry }, ...(mm.recent || [])].slice(0, 8); mm.updated = Date.now();
+  $("lSave").disabled = true; setStatus("lStatus", "Saving…");
+  try {
+    await S.db.doc(`members/${S.uid}/months/${ym}`).set(month);
+    await S.db.doc(`members/${S.uid}`).set(mm);
+    S.members.set(S.uid, mm); S.months[ym] = month;
+    $("lText").value = ""; $("lLink").value = ""; $("lCount").textContent = "0 / 280";
+    setStatus("lStatus", `Saved for ${fmtDay(d)}.`, "ok");
+    renderAll();
+    showSheet("Post your log in Discord", discordLog(d, month.days[d]));
+  } catch (e) { writeFailed(e, "lStatus"); }
+  finally { $("lSave").disabled = !S.canWrite; }
+});
+async function deleteEntry(d, id) {
+  const ym = d.slice(0, 7), month = clone(S.months[ym]); if (!month.days?.[d]) return;
+  month.days[d] = month.days[d].filter(e => e.id !== id);
+  const mm = clone(me());
+  if (month.days[d].length) mm.dayIndex[d] = aggregateDay(month.days[d]); else { delete month.days[d]; delete mm.dayIndex[d]; }
+  mm.recent = (mm.recent || []).filter(e => e.id !== id);
+  try { await S.db.doc(`members/${S.uid}/months/${ym}`).set(month); await S.db.doc(`members/${S.uid}`).set(mm); toast("Log deleted."); }
+  catch (e) { writeFailed(e, "lStatus"); }
+}
+
+/* ---------- milestones ---------- */
+async function saveMember(mm, okText) {
+  mm.updated = Date.now();
+  try { await S.db.doc(`members/${S.uid}`).set(mm); S.members.set(S.uid, mm); renderAll(); if (okText) toast(okText); return true; }
+  catch (e) { writeFailed(e, "lStatus"); renderAll(); return false; }
+}
+async function toggleMs(id, on) {
+  const mm = clone(me()); mm.milestones = mm.milestones || {};
+  if (on) mm.milestones[id] = { d: today(), at: Date.now() }; else delete mm.milestones[id];
+  if (await saveMember(mm) && on) showSheet("Share your milestone", `**${mm.handle}** hit a milestone: **${MS[id].text}** (${TRACK[MS[id].track].name}) · ${dayLabel(today())}${tail()}`);
+}
+$("cAdd").addEventListener("click", async () => {
+  const text = $("cText").value.trim(); if (!text || !me()) return;
+  const mm = clone(me()); mm.custom = [...(mm.custom || []), { id: rid(), text, done: null }];
+  if (await saveMember(mm, "Milestone added.")) $("cText").value = "";
+});
+async function toggleCustom(id, on) {
+  const mm = clone(me()); const c = (mm.custom || []).find(x => x.id === id); if (!c) return;
+  c.done = on ? { d: today(), at: Date.now() } : null;
+  if (await saveMember(mm) && on) showSheet("Share your milestone", `**${mm.handle}** hit a milestone: **${c.text}** · ${dayLabel(today())}${tail()}`);
+}
+async function removeCustom(id) { const mm = clone(me()); mm.custom = (mm.custom || []).filter(x => x.id !== id); await saveMember(mm, "Milestone removed."); }
+
+/* ---------- wall ---------- */
+$("wPost").addEventListener("click", async () => {
+  const text = $("wText").value.trim();
+  if (!S.db || !S.uid) return setStatus("wStatus", "Open this page on claude.ai while signed in to post.", "err");
+  if (!text) return setStatus("wStatus", "Write a message first.", "err");
+  const d = today(), id = rid(), msg = { by: S.uid, text, at: Date.now() };
+  $("wPost").disabled = true; setStatus("wStatus", "Posting…");
+  const ref = S.db.doc(`wall/${d}`);
+  try {
+    try { await ref.update({ msgs: { [id]: msg } }); }
+    catch (e) { if (e && e.code === "invalid_argument") await ref.set({ date: d, msgs: { [id]: msg } }); else throw e; }
+    $("wText").value = ""; setStatus("wStatus", "Posted.", "ok");
+  } catch (e) { writeFailed(e, "wStatus"); }
+  finally { $("wPost").disabled = !S.canWrite; }
+});
+async function deleteMsg(d, id) {
+  try { await S.db.doc(`wall/${d}`).update({ msgs: { [id]: null } }); toast("Message deleted."); }
+  catch (e) { writeFailed(e, "wStatus"); }
+}
+
+/* ---------- rendering ---------- */
+function confirmBtn(label, action) {
+  const b = el("button", { class:"del", type:"button", text: label });
+  b.addEventListener("click", () => { if (b.classList.contains("arm")) { action(); } else { b.classList.add("arm"); b.textContent = "Click again to delete"; setTimeout(() => { b.classList.remove("arm"); b.textContent = label; }, 3000); } });
+  return b;
+}
+const tagsFor = ids => el("div", { class:"tags" }, ids.map(t => el("span", { class:"tag", style:`--c:${tcol(t)}`, text: TRACK[t]?.name || t })));
+
+function renderMine() {
+  const m = me();
+  $("editProfile").hidden = !m;
+  $("myGoal").textContent = m?.goal ? `Goal: ${m.goal}` : "";
+  const idx = m?.dayIndex || {};
+  $("sStreak").textContent = streakOf(idx);
+  $("sDays").textContent = Object.keys(idx).length;
+  $("sHours").textContent = hours(minsOf(idx));
+  $("sMs").textContent = m ? msCount(m) : 0;
+
+  // heatmap
+  const cells = [], t = today();
+  for (let i = 0; i < DAYS; i++) {
+    const d = addDays(START, i), v = idx[d], mins = v ? v.m : 0;
+    const l = !v ? 0 : mins >= 120 ? 4 : mins >= 60 ? 3 : mins >= 30 ? 2 : 1;
+    cells.push(el("i", { "data-l": l, class: (d === t ? "today " : "") + (d > t ? "future" : ""), title: `${fmtDay(d)} · ${dayLabel(d)}${v ? ` · ${mins} min` : ""}` }));
+  }
+  $("heat").replaceChildren(...cells);
+
+  // milestones
+  const groups = (m?.tracks || []).filter(tr => MILESTONES[tr]).map(tr => {
+    const list = MILESTONES[tr], done = list.filter(([id]) => m.milestones?.[id]).length;
+    return el("div", { class:"ms-group", style:`--c:${tcol(tr)}` },
+      el("h3", {}, el("span", { class:"dot" }), TRACK[tr].name, el("span", { class:"num", text:`${done}/${list.length}` })),
+      list.map(([id, text, by]) => {
+        const hit = m.milestones?.[id];
+        return el("label", { class:"ms" + (hit ? " done" : "") },
+          el("input", { type:"checkbox", checked: !!hit, disabled: !S.canWrite, onchange: e => toggleMs(id, e.target.checked) }),
+          el("span", { class:"txt", text }),
+          el("span", { class:"by", text: hit ? `done ${fmtDay(hit.d)}` : `target ${by}` }));
+      }));
+  });
+  $("msGroups").replaceChildren(...(groups.length ? groups : [el("div", { class:"empty", text: m ? "Your tracks have no preset milestones. Add your own below." : "Join the cycle to see milestones for your tracks." })]));
+
+  // custom
+  const custom = m?.custom || [];
+  $("customList").replaceChildren(...custom.map(c => el("label", { class:"ms" + (c.done ? " done" : ""), style:`--c:${tcol("other")}` },
+    el("input", { type:"checkbox", checked: !!c.done, disabled: !S.canWrite, onchange: e => toggleCustom(c.id, e.target.checked) }),
+    el("span", { class:"txt", text: c.text }),
+    el("span", { class:"by" }, c.done ? `done ${fmtDay(c.done.d)} ` : "", el("button", { class:"x", type:"button", title:"Remove", "aria-label":`Remove ${c.text}`, onclick: e => { e.preventDefault(); removeCustom(c.id); } }, "×")))));
+
+  // history
+  const entries = [];
+  for (const mo of Object.values(S.months)) for (const [d, list] of Object.entries(mo.days || {})) for (const e of list) entries.push({ d, ...e });
+  entries.sort((a, b) => b.at - a.at);
+  $("history").replaceChildren(...(entries.length ? entries.slice(0, 20).map(e => el("div", { class:"item", style:"grid-template-columns:minmax(0,1fr)" },
+    el("div", {},
+      el("div", { class:"item-head" }, el("b", { text: `${dayLabel(e.d)} · ${fmtDay(e.d)}` }), el("span", { class:"when", text: e.mins ? `${e.mins} min` : "" }),
+        el("span", { style:"margin-left:auto" }, el("button", { class:"del", type:"button", text:"Copy for Discord", onclick: () => showSheet("Post your log in Discord", discordLog(e.d, [e])) }), " · ", confirmBtn("Delete", () => deleteEntry(e.d, e.id)))),
+      el("p", { text: e.text }), tagsFor(e.tracks), e.link ? el("a", { class:"link-out", href: e.link, target:"_blank", rel:"noopener", text: e.link }) : null)))
+    : [el("div", { class:"empty", text:"Your logs will show here after you save the first one." })]));
+}
+
+function renderBoard() {
+  const t = today(), ms = [...S.members.entries()];
+  $("gMembers").textContent = ms.length;
+  $("gToday").textContent = ms.filter(([, m]) => m.dayIndex?.[t]).length;
+  $("gWeek").textContent = hours(ms.reduce((s, [, m]) => s + minsOf(m.dayIndex, 7), 0));
+  $("gMs").textContent = ms.reduce((s, [, m]) => s + msCount(m), 0);
+  if (!ms.length) { $("board").replaceChildren(el("div", { class:"empty", text:"Nobody has joined yet. Be the first: pick your tracks on the left." })); return; }
+  const rows = ms.map(([id, m]) => ({ id, m, streak: streakOf(m.dayIndex), d30: daysIn(m.dayIndex, 30), h: hours(minsOf(m.dayIndex)), ms: msCount(m) }))
+    .sort((a, b) => b.streak - a.streak || b.d30 - a.d30 || b.h - a.h);
+  const table = el("table", {},
+    el("thead", {}, el("tr", {}, el("th", { class:"n", text:"#" }), el("th", { text:"Member" }), el("th", { text:"Tracks" }), el("th", { class:"n", text:"Streak" }), el("th", { class:"n", text:"Last 30" }), el("th", { class:"n", text:"Hours" }), el("th", { class:"n", text:"Miles." }))),
+    el("tbody", {}, rows.map((r, i) => el("tr", { class: r.id === S.uid ? "me" : "" },
+      el("td", { class:"n", text: i + 1 }),
+      el("td", {}, el("div", { class:"who" }, avatarOf(r.id) ? el("img", { src: avatarOf(r.id), alt:"" }) : null, el("span", { text: nameOf(r.id) + (r.id === S.uid ? " (you)" : "") }))),
+      el("td", {}, el("div", { class:"dots" }, (r.m.tracks || []).map(tr => el("i", { style:`--c:${tcol(tr)}`, title: TRACK[tr]?.name })))),
+      el("td", { class:"n" + (r.streak >= 7 ? " flame" : ""), text: r.streak }),
+      el("td", { class:"n", text: r.d30 }), el("td", { class:"n", text: r.h }), el("td", { class:"n", text: r.ms })))));
+  $("board").replaceChildren(table);
+}
+
+function feedItems() {
+  const items = [];
+  for (const [id, m] of S.members) {
+    for (const e of m.recent || []) items.push({ id, kind:"log", ...e });
+    for (const [mid, v] of Object.entries(m.milestones || {})) if (MS[mid]) items.push({ id, kind:"ms", d: v.d, at: v.at, text: MS[mid].text, tracks:[MS[mid].track] });
+    for (const c of m.custom || []) if (c.done) items.push({ id, kind:"ms", d: c.done.d, at: c.done.at, text: c.text, tracks:["other"] });
+  }
+  return items.sort((a, b) => b.at - a.at).slice(0, 40);
+}
+function renderFeed() {
+  const items = feedItems();
+  $("feed").replaceChildren(...(items.length ? items.map(it => el("div", { class:"item" },
+    avatarOf(it.id) ? el("img", { class:"av", src: avatarOf(it.id), alt:"" }) : el("span", { class:"av" }),
+    el("div", {},
+      el("div", { class:"item-head" }, el("b", { text: nameOf(it.id) }), el("span", { class:"when", text: `${it.kind === "ms" ? "Milestone · " : ""}${dayLabel(it.d)} · ${fmtTime(it.at)}` }), it.mins ? el("span", { class:"when", text:`${it.mins} min` }) : null),
+      el("p", { text: it.kind === "ms" ? `Hit: ${it.text}` : it.text }),
+      el("div", { class:"tags" }, it.tracks.map(t => el("span", { class:"tag" + (it.kind === "ms" ? " ms-tag" : ""), style:`--c:${tcol(t)}`, text: TRACK[t]?.name || t }))),
+      it.link ? el("a", { class:"link-out", href: it.link, target:"_blank", rel:"noopener", text: it.link }) : null)))
+    : [el("div", { class:"empty", text:"No logs yet. The first person to log today starts the feed." })]));
+}
+
+function renderWall() {
+  const msgs = [];
+  for (const doc of S.wall) for (const [id, m] of Object.entries(doc.msgs || {})) if (m && m.text) msgs.push({ d: doc.date, id, ...m });
+  msgs.sort((a, b) => b.at - a.at);
+  const owner = S.isOwner;
+  $("wall").replaceChildren(...(msgs.length ? msgs.slice(0, 80).map(m => el("div", { class:"item" },
+    avatarOf(m.by) ? el("img", { class:"av", src: avatarOf(m.by), alt:"" }) : el("span", { class:"av" }),
+    el("div", {},
+      el("div", { class:"item-head" }, el("b", { text: nameOf(m.by) }), el("span", { class:"when", text: fmtTime(m.at) }),
+        (m.by === S.uid || owner) ? el("span", { style:"margin-left:auto" }, confirmBtn("Delete", () => deleteMsg(m.d, m.id))) : null),
+      el("p", { text: m.text }))))
+    : [el("div", { class:"empty", text:"No messages yet." })]));
+}
+
+function renderResources() {
+  $("resources").replaceChildren(...Object.entries(RESOURCES).map(([t, list]) => el("details", { style:`--c:${tcol(t)}` },
+    el("summary", {}, el("span", { class:"dot" }), TRACK[t].name),
+    el("ul", {}, list.map(([n, u]) => el("li", {}, el("a", { href:u, target:"_blank", rel:"noopener", text:n }))),
+      t === "cn" ? el("li", { text:"Ask at the KU Confucius Institute about classes and HSK test dates." }) : null))));
+}
+
+function renderLogTracks() {
+  const keep = checked($("lTracks"));
+  chipSet($("lTracks"), "lt", keep.length ? keep : (me()?.tracks || []));
+}
+
+let renderToken = 0;
+async function renderAll() {
+  const token = ++renderToken;
+  if (S.user) {
+    const ids = new Set(S.members.keys());
+    for (const doc of S.wall) for (const m of Object.values(doc.msgs || {})) if (m?.by) ids.add(m.by);
+    if (ids.size) { const ps = await S.user.profiles([...ids]); if (token !== renderToken) return; S.profiles = ps; }
+  }
+  if (!$("lTracks").children.length || (!checked($("lTracks")).length && me())) renderLogTracks();
+  if (S.ready && S.uid && S.canWrite && !me() && $("joinPanel").hidden) openJoin(false);
+  renderMine(); renderBoard(); renderFeed(); renderWall();
+}
+
+/* ---------- recap ---------- */
+$("recapBtn").addEventListener("click", () => {
+  const t = today(), ms = [...S.members.entries()];
+  const active = ms.filter(([, m]) => daysIn(m.dayIndex, 7) > 0).length;
+  const logs = ms.reduce((s, [, m]) => s + daysIn(m.dayIndex, 7), 0);
+  const top = ms.map(([id, m]) => [nameOf(id), streakOf(m.dayIndex)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const hits = [];
+  for (const [id, m] of ms) {
+    for (const [mid, v] of Object.entries(m.milestones || {})) if (MS[mid] && diffDays(v.d, t) < 7) hits.push(`${nameOf(id)}: ${MS[mid].text}`);
+    for (const c of m.custom || []) if (c.done && diffDays(c.done.d, t) < 7) hits.push(`${nameOf(id)}: ${c.text}`);
+  }
+  const text = [
+    `**Study Hub weekly recap · ${fmtDay(addDays(t, -6))} to ${fmtDay(t)} · ${dayLabel(t)}**`,
+    `${active} active member${active === 1 ? "" : "s"} · ${logs} days logged · ${hours(ms.reduce((s, [, m]) => s + minsOf(m.dayIndex, 7), 0))} hours`,
+    top.length ? `\n**Top streaks**\n${top.map(([n, s], i) => `${i + 1}. ${n}: ${s} days`).join("\n")}` : "",
+    hits.length ? `\n**Milestones this week**\n${hits.map(h => "- " + h).join("\n")}` : "",
+  ].filter(Boolean).join("\n") + tail();
+  showSheet("Post the weekly recap", text);
+});
+
+/* ---------- motion ---------- */
+function motion(pct) {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const fill = $("barFill");
+  if (!window.gsap || reduce) { fill.style.width = pct + "%"; return; }
+  gsap.fromTo(fill, { width: "0%" }, { width: pct + "%", duration: 1.2, ease: "power3.out", delay: .2 });
+  gsap.from(".panel", { y: 14, duration: .6, ease: "power2.out", stagger: .06 });
+  if (window.Lenis) {
+    const lenis = new Lenis({ autoRaf: false, allowNestedScroll: true });
+    gsap.ticker.add(time => lenis.raf(time * 1000));
+    gsap.ticker.lagSmoothing(0);
+  }
+}
+
+/* ---------- boot ---------- */
+renderResources();
+resetLogForm();
+chipSet($("lTracks"), "lt", []);
+renderMine(); renderBoard(); renderFeed(); renderWall();
+motion(renderCycle());
+
+async function boot() {
+  if (!window.claude || !window.claude.use) { readOnly("Open this page on claude.ai to log your days. This copy can't save."); return; }
+  const [db, user] = await Promise.all([claude.use("db"), claude.use("user")]);
+  S.user = user;
+  if (!db) { readOnly("Sign in to Claude to see the board and log your days."); return; }
+  S.db = db;
+  S.uid = user ? await user.id() : null;
+  S.isOwner = user ? await user.isOwner() : false;
+  const can = user ? await user.can("data.write") : null;
+  if (!S.uid) readOnly("Sign in to Claude to log. You can still read the board.");
+  else if (can === false) readOnly("You can read the board, but you can't log yet. Ask the server admin to add you to this page with edit access.");
+
+  db.collection("members").onSnapshot(snap => {
+    S.members = new Map(snap.docs.map(d => [d.id, d.data()]));
+    if (!snap.metadata.fromCache) S.ready = true;
+    renderAll();
+  }, () => banner("The board stopped updating. Reload the page."));
+  if (S.uid) db.collection(`members/${S.uid}/months`).onSnapshot(snap => {
+    S.months = Object.fromEntries(snap.docs.map(d => [d.id, d.data()]));
+    renderMine();
+  }, () => {});
+  db.collection("wall").orderBy("date", "desc").limit(14).onSnapshot(snap => {
+    S.wall = snap.docs.map(d => d.data());
+    renderAll();
+  }, () => {});
+}
+boot();
+})();
+</script>

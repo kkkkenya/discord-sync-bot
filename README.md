@@ -110,3 +110,27 @@ now and then joins a busy conversation (at most 6 times a day).
 Setup: double-click `community/setup.bat`. It asks for the bot token and a Gemini key, creates the Supabase table it
 needs, and stores the keys as GitHub Actions secrets. Times, departments, channels and limits are in
 `community/src/config.js`.
+
+## Study dashboard (personal, `study/`)
+
+A private study desk on `http://localhost:5190`, plus DMs from the bot to you only. It uses the bot's token,
+unit list, KU calendar and file library from this repo, so nothing on the server changes.
+
+1. Double-click **`study/setup.bat`**. It asks for your Discord user ID (Developer Mode on, right-click your name,
+   Copy User ID) and sends you a test DM. It also asks for an Anthropic key if `pc/.env` doesn't have one; that key
+   turns on teach-back marking.
+2. Click the **Study Desk** shortcut (Start menu and desktop; right-click → Pin to taskbar). It runs `study/start.bat`
+   minimised: builds the dashboard, opens it and keeps it running. Clicking it again just opens the dashboard.
+   To make the shortcut on another PC: `powershell -File study/make-shortcut.ps1`.
+
+**Dashboard:** countdown to the next CAT week, a daily plan (3 units, weakest and soonest first), your units with
+CAT dates, a confidence rating and topics rated red/amber/green, plus each unit's past papers and CATs from the
+server with "log score". Then **Recall** (type the answer first, then grade it; nothing is scheduled past the
+unit's CAT), **Teach it back** (explain a topic as if teaching a classmate; Claude marks it and turns the gaps
+into recall cards), **Past papers** (scores and averages per unit) and a 25/50-minute focus timer.
+
+**DMs** (07:00 plan, 20:30 nudge if nothing logged): `today`, `quiz [unit]`, `teach EMM 302 Mohr's circle`,
+`log 45 EMM 302`, `paper EMM 302 34/60 2023 CAT 1`, `card EMM 302 | question | answer`, `stop`, `help`.
+It signs in as a second, DM-only connection: buttons and slash commands go to Vercel, so DMs are plain typed replies.
+
+Your data is in `study/data/study.json` (git-ignored). `npm run dev` in `study/` gives hot reload on :5173 while `npm start` runs.

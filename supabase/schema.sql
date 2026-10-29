@@ -147,3 +147,59 @@ create table if not exists log_tracks (
 );
 alter table log_tracks enable row level security;
 alter table log_entries add column if not exists track_name text;
+
+-- Study Desk for friends (api/study.js, the "gateway"). Friends install Study Desk on their own laptops; the gateway
+-- holds every secret (bot token, Supabase key, the owner's AI key) and friends sign in with a personal token.
+-- Only codes' and tokens' sha256 are stored. RLS on with no policies: only the service key (Vercel, PC bot) reads them.
+create table if not exists study_friends (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  via         text not null default 'invite',   -- 'invite' (a code from the owner) or 'premium' (/study link)
+  invite_hash text unique,                      -- the one-time link code, until it's used
+  token_hash  text unique,                      -- the device token Study Desk keeps after linking
+  discord_id  text unique,                      -- set by /study connect (or /study link for Premium)
+  pair_code   text,                             -- the 6-digit code shown in Study Desk for /study connect
+  pair_until  timestamptz,
+  ai_daily_cap int not null default 40,         -- AI actions a day on the owner's key ("use the Study Hub's AI")
+  active      boolean not null default true,
+  created_at  timestamptz not null default now(),
+  linked_at   timestamptz,
+  last_seen   timestamptz                        -- when its Study Desk last asked for /study commands
+);
+alter table study_friends add column if not exists last_seen timestamptz;
+create table if not exists study_usage (
+  friend_id uuid not null references study_friends(id) on delete cascade,
+  day       date not null,
+  ai_calls  int not null default 0,
+  ai_tokens int not null default 0,
+  dms       int not null default 0,
+  primary key (friend_id, day)
+);
+-- /study commands waiting for the friend's Study Desk to answer them (it asks every few seconds while it runs)
+create table if not exists study_inbox (
+  id                bigint generated always as identity primary key,
+  friend_id         uuid not null references study_friends(id) on delete cascade,
+  command           text not null,
+  args              jsonb not null default '{}',
+  interaction_token text,
+  status            text not null default 'new',  -- new, taken, done
+  created_at        timestamptz not null default now()
+);
+create index if not exists study_inbox_friend_idx on study_inbox (friend_id, status);
+alter table study_friends enable row level security;
+alter table study_usage   enable row level security;
+alter table study_inbox   enable row level security;
+
+-- Counts one AI call (or DM) for a friend today and returns the day's total, in one atomic step.
+create or replace function study_count(f uuid, d date, what text, tokens int default 0) returns int
+language plpgsql as $$
+declare n int;
+begin
+  insert into study_usage (friend_id, day) values (f, d) on conflict do nothing;
+  if what = 'dm' then
+    update study_usage set dms = dms + 1 where friend_id = f and day = d returning dms into n;
+  else
+    update study_usage set ai_calls = ai_calls + 1, ai_tokens = ai_tokens + tokens where friend_id = f and day = d returning ai_calls into n;
+  end if;
+  return n;
+end $$;

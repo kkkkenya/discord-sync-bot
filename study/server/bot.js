@@ -12,6 +12,7 @@ import { transcribe } from './brain.js';
 import { paperInfo } from './predict.js';
 import { KEY_LABEL, checkAnswer, checkPhoto, flagCheckpoint, markBroke } from './practice.js';
 import { checkMedia, saveUpload } from './uploads.js';
+import { friendMode, hub } from './hub.js';
 import { learnFor, topicNamed } from './learn-store.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
@@ -348,9 +349,58 @@ export async function reply(text, { photo = false, attachment = null } = {}) {
 }
 
 
+// Friend mode: no bot token on this laptop. /study commands wait in the gateway's queue; this Study Desk picks them up
+// every few seconds while it runs, answers with the same replies the DMs use, and sends the answers back. The 07:00
+// plan and the 20:30 nudge go out as DMs through the gateway too.
+export async function relayReply({ command, args: a = {} }) {
+  switch (command) {
+    case 'today': return reply('today');
+    case 'learn': return reply(`learn ${a.unit} ${a.topic}`);
+    case 'predict': return reply(`predict ${a.unit}`);
+    case 'weakspots': return reply(`weakspots ${a.unit}`);
+    case 'broke': return reply(`mark broke ${a.step} ${a.mistake || ''}`);
+    case 'mark':
+      if (a.photo?.url) return reply('mark', { attachment: a.photo }); // the photo is of the question /study mark gave last
+      if (a.answer) return reply(`mark ${a.answer}`);
+      return reply(`mark ${a.unit}`);
+    case 'teach': {
+      const start = await reply(`teach ${a.unit} ${a.topic}`);
+      if (a.voice?.url) return reply('(voice message)', { attachment: a.voice });
+      if (a.text) return reply(a.text);
+      return `${start}\n\nSend it with \`/study teach\` again: type it in **text**, or attach a **voice** note.`;
+    }
+    default: return HELP;
+  }
+}
+
+function startRelay() {
+  let busy = false;
+  const tick = async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const { items } = await hub('inbox', {}, { timeout: 15000 });
+      for (const it of items) {
+        let text;
+        try { text = await relayReply(it); } catch (e) { text = `Something broke: ${e.message}`; }
+        await hub('reply', { id: it.id, text: chunks(text)[0] }).catch((e) => console.error('reply failed:', e.message));
+      }
+    } catch { /* offline or the Hub is busy: the next tick tries again */ }
+    busy = false;
+  };
+  setInterval(tick, 4000);
+  tick();
+  const send = (text) => hub('dm', { text: chunks(text)[0] });
+  cron.schedule('0 7 * * *', () => send(todayText()).catch((e) => console.error('morning DM failed:', e.message)), { timezone: 'Africa/Nairobi' });
+  cron.schedule('30 20 * * *', () => { const text = eveningText(); if (text) send(text).catch((e) => console.error('evening DM failed:', e.message)); }, { timezone: 'Africa/Nairobi' });
+  console.log('Discord through the Study Hub: /study commands are answered while this window is open.');
+  return { dm: send };
+}
+
 export function startBot() {
   const token = process.env.DISCORD_TOKEN;
   const owner = process.env.OWNER_ID;
+  if (!token && friendMode()) return startRelay();
   if (!token || !owner) {
     console.log(`Discord DMs off: ${!token ? 'DISCORD_TOKEN missing in pc/.env' : 'OWNER_ID missing in study/.env (run setup.bat)'}.`);
     return null;

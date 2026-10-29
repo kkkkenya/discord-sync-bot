@@ -129,4 +129,28 @@ for (const c of COMMANDS) {
   await api('POST', `/applications/${APP_ID}/guilds/${GUILD_ID}/commands`, { type: 1, ...c });
   console.log(`✓ /${c.name}`);
 }
+// /study is global, not server-only, so it also works in a DM with the bot (contexts 0 = server, 1 = bot DM).
+// It drives a friend's own Study Desk (lib/study-gateway.js): link and connect are answered by Vercel, the rest by
+// the friend's Study Desk while it runs.
+const ATTACHMENT = 11;
+const UNIT = { type: STRING, name: 'unit', description: 'A unit code like EMM 302', required: true, max_length: 8 };
+const STUDY = {
+  name: 'study', description: 'Your Study Desk: today’s plan, study a topic, check an answer', contexts: [0, 1], integration_types: [0],
+  options: [
+    { type: SUB, name: 'today', description: 'Today’s plan from your Study Desk' },
+    { type: SUB, name: 'learn', description: 'Study a topic: what to read in your notes, worked examples, then questions', options: [UNIT, { type: STRING, name: 'topic', description: 'The topic, e.g. torsion', required: true, max_length: 80 }] },
+    { type: SUB, name: 'mark', description: 'Get a past-paper question, or check your answer (typed or a photo of your working)', options: [UNIT, { type: STRING, name: 'answer', description: 'Your final answer with its unit, e.g. 142.5 MPa', max_length: 60 }, { type: ATTACHMENT, name: 'photo', description: 'A photo of your working' }] },
+    { type: SUB, name: 'broke', description: 'The checkpoint where your working broke', options: [{ type: INTEGER, name: 'step', description: 'The checkpoint number', required: true, min_value: 1, max_value: 9 }, { type: STRING, name: 'mistake', description: 'What kind of mistake', choices: choices('units', 'sign', 'algebra', 'equation', 'concept', 'boundary', 'misread') }] },
+    { type: SUB, name: 'teach', description: 'Explain a topic and get it marked (typed, or a voice note)', options: [UNIT, { type: STRING, name: 'topic', description: 'The topic', required: true, max_length: 80 }, { type: STRING, name: 'text', description: 'Your explanation', max_length: 1800 }, { type: ATTACHMENT, name: 'voice', description: 'A voice recording of your explanation' }] },
+    { type: SUB, name: 'predict', description: 'The topics most likely to come', options: [UNIT] },
+    { type: SUB, name: 'weakspots', description: 'Your highest-risk sub-topics', options: [UNIT] },
+    { type: SUB, name: 'connect', description: 'Connect this Discord account to your Study Desk', options: [{ type: STRING, name: 'code', description: 'The 6-digit code from Study Desk (Settings → Connect Discord)', required: true, min_length: 6, max_length: 6 }] },
+    { type: SUB, name: 'link', description: 'Premium: get a code to set up Study Desk on your laptop' },
+  ],
+};
+const globals = await api('GET', `/applications/${APP_ID}/commands`);
+const had = globals.find((c) => c.name === 'study');
+await api(had ? 'PATCH' : 'POST', `/applications/${APP_ID}/commands${had ? `/${had.id}` : ''}`, { type: 1, ...STUDY });
+console.log('✓ /study (global: works in the server and in DMs with the bot)');
+
 console.log('Done. The commands show up in Discord within a minute (restart Discord if not).');

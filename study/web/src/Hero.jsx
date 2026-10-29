@@ -43,6 +43,10 @@ export default function Hero({ s, refresh, go }) {
 
   return (
     <section id="overview" className="hero reveal" data-tour="countdown">
+      <div className="hero-top-badge">
+        <span className="hero-tag">/// FOR ENGINEERS, BY ENGINEERS</span>
+        <span className="hero-coord">[ 001 / OVERVIEW ]</span>
+      </div>
       <div className="count">
         {next && days > 0 ? (
           <>

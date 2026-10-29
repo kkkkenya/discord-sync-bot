@@ -16,6 +16,7 @@ const { coach, coachReady } = await import('./coach.js');
 const { aiReady, canRead, clamp, provider } = await import('./ai.js');
 const { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics, suggestTopics, transcribe } = await import('./brain.js');
 const { checkMedia, saveUpload } = await import('./uploads.js');
+const { friendMode, hub } = await import('./hub.js');
 const { LOCAL_TYPES, addLocalFile, contextFor, ingestFile, library, libraryMeta, localFiles, outlineContext, removeLocalFile } = await import('./ingest.js');
 const { ALL_UNITS, calendar, filesFor, nextAssessment } = await import('./library.js');
 const { COURSES, cohortUnits, courses, validCohort } = await import('./cohort.js');
@@ -49,7 +50,7 @@ const state = () => {
     goals: Object.entries(GOALS).map(([id, g]) => ({ id, name: g.name })),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), media: { image: canRead('image'), audio: canRead('audio') }, provider: provider(), settings: data.settings,
-    mastery: masteryMap(today), library: libraryMeta(), discord: Boolean(bot),
+    mastery: masteryMap(today), library: libraryMeta(), discord: Boolean(bot), friend: friendMode(),
   };
 };
 
@@ -274,7 +275,7 @@ const routes = {
   // AI provider toggle + other dashboard settings.
   'POST /api/settings': (q, body) => {
     for (const [k, v] of Object.entries(body || {})) {
-      if (k === 'aiProvider' && !['gemini', 'deepseek', 'anthropic'].includes(v)) throw Object.assign(new Error('unknown AI provider'), { status: 400 });
+      if (k === 'aiProvider' && !['gemini', 'deepseek', 'anthropic', 'hub'].includes(v)) throw Object.assign(new Error('unknown AI provider'), { status: 400 });
       if (k === 'cohort' && !validCohort(v)) throw Object.assign(new Error('pick a course, a year (1-5) and a semester (1 or 2)'), { status: 400 });
       if (k === 'stage' && !validStage(v)) throw Object.assign(new Error('unknown study stage'), { status: 400 });
       data.settings[k] = v;
@@ -319,6 +320,12 @@ const routes = {
   },
   // Build a self-contained prompt to paste into any other AI chat, grounded in the synced library.
   'POST /api/prompt': (q, body) => buildPrompt(body || {}),
+  // Friend mode: this laptop's link with the Study Hub (name, Discord, today's free AI), and a code for /study connect
+  'GET /api/hub': async () => (friendMode() ? hub('me') : { owner: true }),
+  'POST /api/hub/pair': async () => {
+    if (!friendMode()) throw Object.assign(new Error('Only a Study Desk set up with a Study Hub code connects this way.'), { status: 400 });
+    return hub('pair');
+  },
   'POST /api/dm-today': async () => {
     if (!bot) throw Object.assign(new Error('Discord DMs are off. Run setup.bat to add your Discord user ID.'), { status: 400 });
     await bot.dm(todayText());

@@ -9,6 +9,7 @@ netstat -ano | findstr "127.0.0.1:%PORT% " | findstr LISTENING >nul && (start ""
 where node >nul 2>nul || (echo Node.js isn't installed. Get the LTS version from nodejs.org. & pause & exit /b 1)
 if not exist node_modules (echo Installing packages, one moment... & call npm install --no-fund --no-audit --loglevel=error)
 if not exist .env (start "Study dashboard: setup" /wait cmd /c setup.bat)
+if not exist .env (echo Setup wasn't finished, so Study Desk can't start. Run setup.bat again. & pause & exit /b 1)
 call npx vite build --logLevel error
 rem open the browser a few seconds in, once the server is listening
 start "" /min cmd /c "timeout /t 3 /nobreak >nul & start "" http://localhost:%PORT%"

@@ -29,7 +29,11 @@ const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function Band({ n, label, note, children }) {
   return (
     <div className="band">
-      <p className="band-head eyebrow"><b>{n}</b> {label}<span>{note}</span></p>
+      <div className="band-head">
+        <span className="band-tag">[ {n} / {label.toUpperCase()} ]</span>
+        <span className="band-title">{label}</span>
+        <span className="band-note">/// {note}</span>
+      </div>
       {children}
     </div>
   );
@@ -38,6 +42,8 @@ function Band({ n, label, note, children }) {
 export default function App() {
   const [s, setS] = useState(null);
   const [error, setError] = useState('');
+  // active band filter: 'all', '01', '02', '03', '04'
+  const [activeBand, setActiveBand] = useState('all');
   // what a "Today" task asks for: { section, unit, topic } — Teach and Mock preselect from it
   const [focus, setFocus] = useState(null);
   const lenisRef = useRef(null);
@@ -90,10 +96,23 @@ export default function App() {
   const go = (section, extra = {}) => {
     if (extra.unit) setUnit(extra.unit);
     setFocus({ section, ...extra, at: Date.now() });
-    const el = document.getElementById(section);
-    const offset = -((document.querySelector('.top-in')?.offsetHeight || 64) + 16); // clear the fixed bar
-    if (lenisRef.current?.lenis) lenisRef.current.lenis.scrollTo(el, { offset });
-    else el?.scrollIntoView();
+
+    const bandMap = {
+      overview: '01', today: '01',
+      units: '02', predictions: '02', analysis: '02',
+      learn: '03', kit: '03', practice: '03', teach: '03', mock: '03', notes: '03', papers: '03',
+      prompt: '04', progress: '04'
+    };
+    if (activeBand !== 'all' && bandMap[section] && bandMap[section] !== activeBand) {
+      setActiveBand(bandMap[section]);
+    }
+
+    setTimeout(() => {
+      const el = document.getElementById(section);
+      const offset = -((document.querySelector('.top-in')?.offsetHeight || 64) + 16); // clear the fixed bar
+      if (lenisRef.current?.lenis) lenisRef.current.lenis.scrollTo(el, { offset });
+      else el?.scrollIntoView({ behavior: 'smooth' });
+    }, 20);
   };
 
   if (error) return <main className="shell"><p className="banner bad">{error} <button className="link" onClick={() => { setError(''); refresh(); }}>Try again</button></p></main>;
@@ -116,22 +135,76 @@ export default function App() {
             <button className="link" onClick={() => api('POST', 'settings', { cardsNotice: true }).then(refresh).catch((e) => setProblem(e.message))}>Got it</button>
           </p>
         )}
-        <Band n="01" label="Today" note="where you stand, and the next thing to do">
-          <div className="cols lead"><Hero {...props} /><Today {...props} /></div>
-        </Band>
-        <Band n="02" label="Plan" note="what the units cover, and what the exam is likely to ask">
-          <Units {...props} />
-          <div className="cols"><Predictions {...props} /><Analysis {...props} /></div>
-        </Band>
-        <Band n="03" label="Practise" note="closed book first, then check where it broke">
-          <Learn {...props} />
-          <Kit {...props} />
-          <div className="cols"><Practice {...props} /><Teach {...props} /></div>
-          <div className="cols"><Mock {...props}><Notes {...props} /></Mock><Papers {...props} /></div>
-        </Band>
-        <Band n="04" label="Review" note="take it to a stronger AI, and see the trend">
-          <div className="cols"><Prompt {...props} /><Progress {...props} /></div>
-        </Band>
+
+        {/* Industrial Workspace Band Switcher: Prevents Overwhelming Scroll Clutter */}
+        <div className="band-filter-bar">
+          <span className="filter-label">/// WORKSPACE FILTER:</span>
+          <div className="filter-pills">
+            <button
+              type="button"
+              className={`filter-pill ${activeBand === 'all' ? 'active' : ''}`}
+              onClick={() => setActiveBand('all')}
+            >
+              [ ALL BANDS ]
+            </button>
+            <button
+              type="button"
+              className={`filter-pill ${activeBand === '01' ? 'active' : ''}`}
+              onClick={() => setActiveBand('01')}
+            >
+              [ 01 / TODAY ]
+            </button>
+            <button
+              type="button"
+              className={`filter-pill ${activeBand === '02' ? 'active' : ''}`}
+              onClick={() => setActiveBand('02')}
+            >
+              [ 02 / PLAN ]
+            </button>
+            <button
+              type="button"
+              className={`filter-pill ${activeBand === '03' ? 'active' : ''}`}
+              onClick={() => setActiveBand('03')}
+            >
+              [ 03 / PRACTISE ]
+            </button>
+            <button
+              type="button"
+              className={`filter-pill ${activeBand === '04' ? 'active' : ''}`}
+              onClick={() => setActiveBand('04')}
+            >
+              [ 04 / REVIEW ]
+            </button>
+          </div>
+        </div>
+
+        {(activeBand === 'all' || activeBand === '01') && (
+          <Band n="01" label="Today" note="where you stand, and the next thing to do">
+            <div className="cols lead"><Hero {...props} /><Today {...props} /></div>
+          </Band>
+        )}
+
+        {(activeBand === 'all' || activeBand === '02') && (
+          <Band n="02" label="Plan" note="what the units cover, and what the exam is likely to ask">
+            <Units {...props} />
+            <div className="cols"><Predictions {...props} /><Analysis {...props} /></div>
+          </Band>
+        )}
+
+        {(activeBand === 'all' || activeBand === '03') && (
+          <Band n="03" label="Practise" note="closed book first, then check where it broke">
+            <Learn {...props} />
+            <Kit {...props} />
+            <div className="cols"><Practice {...props} /><Teach {...props} /></div>
+            <div className="cols"><Mock {...props}><Notes {...props} /></Mock><Papers {...props} /></div>
+          </Band>
+        )}
+
+        {(activeBand === 'all' || activeBand === '04') && (
+          <Band n="04" label="Review" note="take it to a stronger AI, and see the trend">
+            <div className="cols"><Prompt {...props} /><Progress {...props} /></div>
+          </Band>
+        )}
       </main>
       <Timer {...props} />
       {toast && (

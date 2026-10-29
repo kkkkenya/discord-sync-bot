@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { CALENDAR, GUILD_ID } from '../../lib/config.js';
 import { db, enc } from '../../lib/db.js';
 import { catalogue } from './cohort.js';
+import { friendMode, hub } from './hub.js';
 
 const lib = (file) => JSON.parse(readFileSync(new URL(`../../lib/${file}`, import.meta.url), 'utf8'));
 export const ALL_UNITS = catalogue(lib('units.json'), lib('threads.json'));
@@ -21,11 +22,13 @@ const link = (f) => `https://discord.com/channels/${GUILD_ID}/${f.channel_id}/${
 
 const cache = new Map(); // unit code -> { at, files }
 export async function filesFor(code) {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) return { files: [], note: 'Supabase keys missing in pc/.env' };
+  const owner = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_KEY;
+  if (!owner && !friendMode()) return { files: [], note: 'Supabase keys missing in pc/.env' };
   const hit = cache.get(code);
   if (hit && Date.now() - hit.at < 10 * 60 * 1000) return { files: hit.files };
   const codes = ALL_UNITS.find((u) => u.codes.includes(code))?.codes || [code];
-  const rows = await db.select('files', `select=id,name,kind,channel_id,message_id,created_at&unit_code=in.(${codes.map((c) => `"${enc(c)}"`).join(',')})&order=name`);
+  // a friend's Study Desk asks the gateway (it holds the Supabase key)
+  const rows = !owner ? (await hub('files', { codes })).files : await db.select('files', `select=id,name,kind,channel_id,message_id,created_at&unit_code=in.(${codes.map((c) => `"${enc(c)}"`).join(',')})&order=name`);
   // paper: a past paper, CAT or test (by the uploader's kind, or by name for files posted by hand)
   const files = rows.map((f) => ({ id: f.id, name: f.name, kind: f.kind, channel_id: f.channel_id, message_id: f.message_id, url: link(f), paper: f.kind === 'paper' || /(?<![a-z])(cats?|exams?|papers?|tests?|quiz)(?![a-z])/i.test(f.name) }));
   cache.set(code, { at: Date.now(), files });

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { extract } from './extract.js';
+import { friendMode, hub } from './hub.js';
 
 // Same folder as study.json (STUDY_DATA_DIR overrides both).
 const DIR = process.env.STUDY_DATA_DIR ? pathToFileURL(`${process.env.STUDY_DATA_DIR.replace(/[\\/]$/, '')}/`) : new URL('../data/', import.meta.url);
@@ -95,6 +96,8 @@ export function removeLocalFile(id) {
 }
 
 async function messageFor(channelId, messageId) {
+  // a friend's Study Desk has no bot token: the gateway reads the message and hands back the file's link
+  if (!process.env.DISCORD_TOKEN && friendMode()) return { attachments: [await hub('file', { channel_id: channelId, message_id: messageId })] };
   const r = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
     headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
   });

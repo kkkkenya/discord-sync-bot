@@ -1,5 +1,5 @@
 @echo off
-rem Double-click to set your Discord user ID (who the bot DMs) and an optional Anthropic key. Saves study\.env.
+rem Double-click to set up Study Desk: your Discord user ID (owner) or a Study Hub code (friends), the AI to use and the port. Saves study\.env.
 title Study dashboard: setup
 cd /d "%~dp0"
 where node >nul 2>nul || (echo Node.js isn't installed. Get the LTS version from nodejs.org, then run this again. & pause & exit /b 1)

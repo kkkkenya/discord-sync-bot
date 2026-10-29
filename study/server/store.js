@@ -22,12 +22,13 @@ mkdirSync(DIR, { recursive: true });
 // attempts: filled from Phase 8 on (see PHASES.md).
 // materials: [{ id, unit, topicId|null, kind: 'ladder'|'recipes'|'sheet', stage, content, edited, at }]   (Phase 10 study kit)
 // cards, reviews: retired flashcards. Left exactly as they are in old files, never read or sent to the dashboard.
-// settings: { aiProvider: 'gemini'|'deepseek'|'anthropic', tour: { step, done, skipped }, cardsNotice: true once
+// settings: { aiProvider: 'gemini'|'deepseek'|'anthropic'|'hub' (the Study Hub's AI, friends' Study Desks), tour: { step, done, skipped }, cardsNotice: true once
 //   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
 //   unitArchive: { code: { catDate, confidence, ... } } (units you un-ticked, restored if you tick them again) }
 const EMPTY = {
   units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [], materials: [],
-  settings: { aiProvider: 'gemini', tour: {}, cohort: null, unitArchive: {} },
+  // a new store starts on the AI chosen in setup (AI_PROVIDER in study/.env); Settings changes it after
+  settings: { aiProvider: process.env.AI_PROVIDER || 'gemini', tour: {}, cohort: null, unitArchive: {} },
 };
 
 // Old files load with every list present and every setting defaulted; nothing in them is dropped.

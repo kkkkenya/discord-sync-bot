@@ -11,7 +11,8 @@
     "build": "vite build",
     "start": "vite build && node server/index.js",
     "dev": "vite",
-    "test": "node --test \"test/*.test.js\" \"server/*.test.js\""
+    "test": "node --test \"test/*.test.js\" \"server/*.test.js\"",
+    "installer": "node tools/make-installer.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

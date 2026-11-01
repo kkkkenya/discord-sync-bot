@@ -7,3 +7,6 @@ community/data/
 study/data/
 study/dist/
 study/dist-installer/
+
+# Local working plan (lists security findings; this repo is public)
+fixplan.md

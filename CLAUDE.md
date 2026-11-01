@@ -7,7 +7,8 @@ Plan and status: fixplan.md (local only, not in git). Read §0–6 and the phase
 - Crux: cd study && npm test | npm run dev | npm run build
 - Drive dumper: cd pc && npm run dry-run | npm start      Community: cd community && npm start | npm run try
 - Community posts (GitHub Actions): node community/scheduler.js
-- Supervisor: node ops/supervise.js      Task: powershell -File ops/install-task.ps1
+- Supervisor: node ops/supervise.js | node --test ops/test/      Task: powershell -File ops/install-task.ps1
+- Community tests: cd community && npm test
 - Logs: pc/data/logs/, community/data/logs/ (restarts.log for restarts)
 
 ## Rules

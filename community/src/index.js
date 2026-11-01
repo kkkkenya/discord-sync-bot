@@ -27,9 +27,10 @@ const client = new Client({
 client.once(Events.ClientReady, async () => {
   const channel = await client.channels.fetch(CHANNEL);
   console.log(`Signed in as ${client.user.tag}: chatting in #${channel.name}, its threads, and wherever it's mentioned.`);
-  if (process.argv.includes('--post-now')) {
-    execFile(process.execPath, ['scheduler.js', '--now'], { cwd: new URL('..', import.meta.url) }, (e, out, err) => console.log(`posts now: ${out}${err}`.trim()));
-  }
+  const runPosts = (args) => execFile(process.execPath, ['scheduler.js', ...args], { cwd: new URL('..', import.meta.url) }, (e, out, err) => console.log(`posts: ${out}${err}`.trim()));
+  if (process.argv.includes('--post-now')) runPosts(['--now']);
+  // GitHub Actions sends the posts too, but often hours late; whichever runs first sends, the other skips.
+  setInterval(() => runPosts([]), 15 * 60e3);
 });
 
 client.on(Events.MessageCreate, (msg) => onMessage(msg, client).catch((e) => console.error('message:', e.message)));

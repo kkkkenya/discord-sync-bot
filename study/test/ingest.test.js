@@ -13,7 +13,8 @@ test('topic suggestions read the course outline first, then past-paper questions
   assert.deepEqual(sources, ['EAR_306_Course_Outline.pdf', '2 past-paper questions', 'Welded_joints.pdf']);
   assert.ok(text.indexOf('Week 1 Design') < text.indexOf('Design a shaft') && text.indexOf('Design a shaft') < text.indexOf('Welded joints notes'));
   assert.doesNotMatch(text, /raw paper text|another unit/);
-  assert.deepEqual(outlineContext('EMM 318', [], {}), { text: '', sources: [] });
+  assert.deepEqual(outlineContext('EMM 318', [], {}), { text: '', sources: [], outline: false });
+  assert.equal(outlineContext('EMM 318', [], files).outline, true);
 });
 
 test('a file is found on a plain message and on a forwarded one', () => {

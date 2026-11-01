@@ -59,7 +59,7 @@ export async function suggestSubtopics({ unit, topic, have = [], context = '' })
 }
 
 // A unit's exam topics, from its synced course outline and past papers (or the unit title alone when nothing is synced).
-export async function suggestTopics({ unit, title = '', have = [], context = '' }) {
+export async function suggestTopics({ unit, title = '', have = [], context = '', outline = false }) {
   const schema = {
     type: 'object',
     properties: {
@@ -80,7 +80,12 @@ export async function suggestTopics({ unit, title = '', have = [], context = '' 
     required: ['topics'],
     additionalProperties: false,
   };
-  const content = `Unit: ${unit} ${title}${have.length ? `\nAlready listed (don't repeat): ${have.join('; ')}` : ''}${context
+  // With an outline: its topics only, in its words and order. Without one: the papers' topics, then the standard
+  // topics a course with this title covers, marked general so the app shows them as expected rather than certain.
+  const rule = outline
+    ? '\n\nTake the topics STRICTLY from the course outline: its headings, its order, its wording. Do not add any topic the outline does not list, even if the papers or notes mention it. Mark each one outline (or both if the papers examine it too).'
+    : '\n\nThere is no course outline. List the topics the past papers examine first (from papers), then fill gaps with the standard topics a course with this title covers (from general).';
+  const content = `Unit: ${unit} ${title}${have.length ? `\nAlready listed (don't repeat): ${have.join('; ')}` : ''}${rule}${context
     ? `\n\nThe student's course material. List the topics THIS course teaches and examines, named the way its outline names them, and in the outline's own order (that is the order the student will learn them):\n${context}`
     : '\n\nNo course material is synced. List the standard topics for this unit at KU 3rd-year level, and mark each one general.'}`;
   return structured(schema, TUTOR, content, 2000);

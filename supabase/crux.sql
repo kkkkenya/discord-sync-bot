@@ -81,3 +81,59 @@ alter table crux_notes     enable row level security;
 alter table crux_file_text enable row level security;
 alter table crux_usage     enable row level security;
 alter table crux_spend     enable row level security;
+
+-- Focus page: who is in a focus block until when. Only a count is ever read back (study/server/focus.js).
+create table if not exists crux_focus (
+  user_id text primary key,                          -- Discord id
+  until   timestamptz not null
+);
+create index if not exists crux_focus_until_idx on crux_focus (until);
+alter table crux_focus enable row level security;
+-- The bell's new-material check reads the bot's files table by unit and time (study/server/inbox.js).
+create index if not exists files_unit_created_idx on files (unit_code, created_at desc);
+
+-- Hub announcements: written by the bot's /announce (admins only), read by the Crux bell (study/server/inbox.js).
+create table if not exists crux_announcements (
+  id         bigserial primary key,
+  body       text not null,
+  by_id      text not null,                          -- Discord id of the admin who posted it
+  created_at timestamptz not null default now()
+);
+create index if not exists crux_announcements_at_idx on crux_announcements (created_at desc);
+alter table crux_announcements enable row level security;
+
+-- Shared unit library (fixplan D1): material derived from hub files and papers, made once per unit and shared.
+create table if not exists crux_unit_kb (
+  unit_code  text primary key,
+  topics     jsonb not null,                         -- [{ name, subtopics: [names] }] in outline order
+  updated_by text not null,
+  updated_at timestamptz not null default now()
+);
+create table if not exists crux_question_kb (
+  qkey        text primary key,                      -- sha1 of unit + the question's wording
+  unit_code   text not null,
+  checkpoints jsonb not null,                        -- the worked steps the AI wrote, reused for every student
+  updated_at  timestamptz not null default now()
+);
+alter table crux_unit_kb     enable row level security;
+alter table crux_question_kb enable row level security;
+create table if not exists crux_kit_kb (
+  kkey       text primary key,                       -- unit|kind|stage|topic
+  unit_code  text not null,
+  content    jsonb not null,                         -- a ladder or recipes (never a trap sheet: those are personal)
+  updated_at timestamptz not null default now()
+);
+create table if not exists crux_class_hints (
+  id         bigserial primary key,
+  unit_code  text not null,
+  kind       text not null,                          -- focus | exclude | note
+  text       text not null,
+  topics     text[] not null default '{}',           -- topic names, not ids
+  by_ids     text[] not null,                        -- who heard it; only the count reaches the app
+  created_at timestamptz not null default now()
+);
+create index if not exists crux_class_hints_unit_idx on crux_class_hints (unit_code);
+alter table crux_kit_kb      enable row level security;
+alter table crux_class_hints enable row level security;
+-- Study rooms: a focus block can belong to a unit's room (study/server/focus.js counts per room).
+alter table crux_focus add column if not exists unit_code text;

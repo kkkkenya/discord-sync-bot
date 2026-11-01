@@ -10,6 +10,7 @@ import { compareWorking, readWorking, solveWithCheckpoints } from './brain.js';
 import { ERROR_TYPES } from './defs.js';
 import { library } from './ingest.js';
 import { paperInfo } from './predict.js';
+import { shareSolution, sharedSolution } from './shared.js';
 import { add, data, patch, save } from './store.js';
 import { checkMedia, saveUpload } from './uploads.js';
 
@@ -138,17 +139,20 @@ export async function checkPhoto(body, { read = readWorking, compare = compareWo
 }
 
 // "Show checkpoints" on an attempt that has none (a right answer): writes them for the key, once. { checkpoints, note }.
-export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, ready = aiReady } = {}) {
+export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, ready = aiReady, shared = { get: sharedSolution, put: shareSolution } } = {}) {
   const a = data.attempts.find((x) => x.id === id);
   if (!a) throw bad('That attempt was not found.', 404);
   if (a.checkpoints?.length) return { checkpoints: a.checkpoints, note: '' };
   const row = data.paperq.find((q) => q.id === a.questionId);
   const question = row?.text || a.question;
-  if (!ready() || !question) return { checkpoints: [], note: 'The checkpoints need the built-in AI. Take the question to the Prompt Builder for a full step-by-step solution.' };
   const topic = data.topics.find((t) => t.id === a.topicId);
   const subs = data.subtopics.filter((s) => s.unit === a.unit && (!topic || s.topicId === topic.id));
+  // a classmate already had this question solved: reuse it (free, instant, works without AI)
+  const known = question ? await shared.get(a.unit, question) : null;
+  if (!known && (!ready() || !question)) return { checkpoints: [], note: 'The checkpoints need the built-in AI. Take the question to the Prompt Builder for a full step-by-step solution.' };
   try {
-    const out = await solve({ unit: a.unit, topic: topic?.name || '', question, subtopics: subs.map((s) => s.name), expected: a.keyAnswer });
+    const out = known || await solve({ unit: a.unit, topic: topic?.name || '', question, subtopics: subs.map((s) => s.name), expected: a.keyAnswer });
+    if (!known) await shared.put(a.unit, question, out.checkpoints);
     const checkpoints = tidy(out.checkpoints, subs, row?.subtopicIds?.[0]);
     if (row?.key) row.key.checkpoints = checkpoints;
     patch('attempts', id, { checkpoints });

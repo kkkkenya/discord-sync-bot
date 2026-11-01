@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
-import { api, daysUntil, markUndatedTba, prepareUnit } from './api.js';
-import Busy from './Busy.jsx';
-
+import { api, markUndatedTba, prepareUnit } from './api.js';
+import { Icon } from './icons.jsx';
+import { href, unitSlug } from './route.js';
 
 const YEARS = [1, 2, 3, 4, 5];
-// the Breakpoint model's three links (server/understanding.js)
-const LAYER = [['why', 'Why it works'], ['how', 'Setting it up'], ['do', 'Carrying it through']];
-const FROM = { outline: 'outline', papers: 'past papers', both: 'outline and papers', general: 'general' }; // where a suggested topic came from
+const daysText = (d) => (d == null ? 'No date' : d < 0 ? 'Passed' : d === 0 ? 'Today' : `${d} day${d === 1 ? '' : 's'}`);
 
-// Setup and "Edit units": Course → Year → Semester loads that cohort's units from the Study Hub catalogue. The Hub
-// doesn't record semesters, so the whole year is listed: untick what you aren't sitting. Units you already picked
-// from elsewhere (retakes, electives) stay ticked under their own heading; nothing is dropped unless you untick it.
+// "Edit units": Course → Year → Semester loads that cohort's units from the Study Hub catalogue. The Hub doesn't
+// record semesters, so the whole year is listed: untick what you aren't sitting. Units you already picked from
+// elsewhere (retakes, electives) stay ticked under their own heading; nothing is dropped unless you untick it.
 function Picker({ s, refresh, close }) {
   const saved = s.settings.cohort || { course: 'EMM', year: 3, sem: 1 };
   const [cohort, setCohort] = useState(saved);
@@ -22,7 +20,7 @@ function Picker({ s, refresh, close }) {
   useEffect(() => {
     api('GET', `catalog?course=${cohort.course}&year=${cohort.year}`).then(setCat).catch((e) => setStatus(e.message));
   }, [cohort.course, cohort.year]);
-  if (!cat) return <p className="muted small">{status || 'Loading units…'}</p>;
+  if (!cat) return status ? <p className="notice bad" role="alert">{status}</p> : <div className="skeleton" style={{ height: 240 }} />;
 
   const titles = new Map(cat.all.flatMap((u) => u.codes.map((c) => [c, u.title])));
   for (const u of s.data.units) if (u.title) titles.set(u.code, u.title);
@@ -44,68 +42,78 @@ function Picker({ s, refresh, close }) {
     } catch (e) { setStatus(e.message); }
   };
   const item = (u) => (
-    <li key={u.code}><label><input type="checkbox" checked={picked.has(u.code)} onChange={() => toggle(u.code)} /> <span className="code">{u.code}</span> {u.title || <span className="muted small">(no title in the Hub yet)</span>}</label></li>
+    <label key={u.code} className="list-row check-row">
+      <input type="checkbox" checked={picked.has(u.code)} onChange={() => toggle(u.code)} />
+      <span className="row-main"><b className="num">{u.code}</b><span className="row-sub">{u.title || 'No title in the Hub yet'}</span></span>
+    </label>
+  );
+  const group = (title, list, bulk) => list.length > 0 && (
+    <div className="stack-s">
+      <div className="card-head">
+        <h3 className="sub-title">{title}</h3>
+        {bulk && <span className="toolbar"><button type="button" className="btn plain" onClick={() => tickAll(list, true)}>Tick all</button><button type="button" className="btn plain" onClick={() => tickAll(list, false)}>None</button></span>}
+      </div>
+      <div className="list flat">{list.map(item)}</div>
+    </div>
   );
 
   return (
-    <div className="picker">
-      <div className="row wrap">
-        <label className="small">Course{' '}
+    <section className="card stack" aria-labelledby="picker-title">
+      <h2 className="card-title" id="picker-title">Your units</h2>
+      <div className="pair">
+        <label className="field">Course
           <select value={cohort.course} onChange={(e) => set('course', e.target.value)}>
             {cat.courses.map((c) => <option key={c.code} value={c.code}>{c.code} · {c.name}</option>)}
           </select>
         </label>
-        <label className="small">Year{' '}
+        <label className="field">Year
           <select value={cohort.year} onChange={(e) => set('year', Number(e.target.value))}>{YEARS.map((y) => <option key={y} value={y}>{y}</option>)}</select>
         </label>
-        <label className="small">Semester{' '}
+        <label className="field">Semester
           <select value={cohort.sem} onChange={(e) => set('sem', Number(e.target.value))}><option value={1}>1</option><option value={2}>2</option></select>
         </label>
-        <label className="small">Study stage{' '}
+        <label className="field">Study stage
           <select value={stage} onChange={(e) => setStage(e.target.value)}>
-            <option value="">Auto: from each unit's date (recommended)</option>
+            <option value="">Automatic, from each unit's date</option>
             {s.stages.map((st) => <option key={st.id} value={st.id}>{st.name} ({st.window})</option>)}
           </select>
         </label>
       </div>
       <p className="muted small">
-        {courseName} {cohort.year}.{cohort.sem}: {cat.core.length} unit{cat.core.length === 1 ? '' : 's'} from the Study Hub{cat.shared.length ? `, plus ${cat.shared.length} shared maths/common unit${cat.shared.length === 1 ? '' : 's'}` : ''}.
-        The Hub doesn't know which semester each unit is in yet, so the whole year is listed: tick the ones you're sitting this semester.
+        {courseName} {cohort.year}.{cohort.sem}: <span className="num">{cat.core.length}</span> unit{cat.core.length === 1 ? '' : 's'} from the Study Hub{cat.shared.length ? `, plus ${cat.shared.length} shared` : ''}.
+        The Hub doesn't know each unit's semester yet, so the whole year is listed. Tick the ones you're sitting.
       </p>
-      {cat.core.length > 0 ? (
-        <>
-          <div className="row"><h4>Your course</h4><button className="link" onClick={() => tickAll(cat.core, true)}>tick all</button><button className="link" onClick={() => tickAll(cat.core, false)}>none</button></div>
-          <ul>{cat.core.map(item)}</ul>
-        </>
-      ) : <p className="muted small">No {cohort.course} year {cohort.year} units in the Study Hub yet. Search below to add yours.</p>}
-      {cat.shared.length > 0 && <><h4>Shared units</h4><ul>{cat.shared.map(item)}</ul></>}
-      {others.length > 0 && <><h4>Retakes and electives</h4><ul>{others.map((code) => item({ code, title: titles.get(code) }))}</ul></>}
-      <input placeholder="Add a retake or elective: search all units (code or title)" aria-label="Search all units" value={q} onChange={(e) => setQ(e.target.value)} />
-      {found.length > 0 && <ul>{found.map((u) => item({ code: inCohort.has(u.code) ? u.code : (u.codes.find((c) => c.startsWith(cohort.course)) || u.code), title: u.title }))}</ul>}
-      <div className="row">
-        <button onClick={saveIt} disabled={status === 'Saving…'}>Save {picked.size} unit{picked.size === 1 ? '' : 's'}</button>
-        {s.data.units.length > 0 && <button className="ghost" onClick={close}>Cancel</button>}
-        {status && <span className={status === 'Saving…' ? 'muted small' : 'hot small'} role="status">{status}</span>}
+      {cat.core.length > 0 ? group('Your course', cat.core, true) : <p className="muted small">No {cohort.course} year {cohort.year} units in the Study Hub yet. Search below to add yours.</p>}
+      {group('Shared units', cat.shared)}
+      {group('Retakes and electives', others.map((code) => ({ code, title: titles.get(code) })))}
+      <label className="field">Add a retake or elective
+        <input type="search" placeholder="Search by code or title" value={q} onChange={(e) => setQ(e.target.value)} />
+      </label>
+      {found.length > 0 && <div className="list flat">{found.map((u) => item({ code: inCohort.has(u.code) ? u.code : (u.codes.find((c) => c.startsWith(cohort.course)) || u.code), title: u.title }))}</div>}
+      <div className="toolbar">
+        <button type="button" className="btn primary" onClick={saveIt} disabled={status === 'Saving…'}>Save <span className="num">{picked.size}</span> unit{picked.size === 1 ? '' : 's'}</button>
+        {s.data.units.length > 0 && <button type="button" className="btn" onClick={close}>Cancel</button>}
+        {status && <span className={status === 'Saving…' ? 'muted small' : 'bad-text small'} role="status">{status}</span>}
       </div>
-    </div>
+    </section>
   );
 }
 
-// Pull every unit's server files into the context library in one go, one unit at a time, with a running summary.
-function SyncAll({ s }) {
+// Read every unit's hub files in one go, one unit at a time, with a running summary.
+function ReadAll({ s }) {
   const [busy, setBusy] = useState(false);
   const [lines, setLines] = useState([]);
   const run = async () => {
     setBusy(true);
     const out = [];
     for (const [i, u] of s.data.units.entries()) {
-      setLines([...out, `Syncing ${u.code} (${i + 1}/${s.data.units.length})…`]);
+      setLines([...out, `Reading ${u.code} (${i + 1} of ${s.data.units.length})…`]);
       try {
-        const r = await prepareUnit(u.code, (p) => setLines([...out, `Reading ${u.code} (${i + 1}/${s.data.units.length}): ${p.done ?? 0} of ${p.total ?? '?'} files…`]));
+        const r = await prepareUnit(u.code, (p) => setLines([...out, `Reading ${u.code} (${i + 1} of ${s.data.units.length}): ${p.done ?? 0} of ${p.total ?? '?'} files`]));
         if (r.note) { out.push(`${u.code}: ${r.note}`); continue; }
         const text = r.files.filter((f) => f.chars > 0).length;
         const failed = r.files.filter((f) => f.error && !/scanned/.test(f.error)).length;
-        out.push(`${u.code}: ${r.files.length} file${r.files.length === 1 ? '' : 's'}, ${text} with text${r.files.length - text - failed ? `, ${r.files.length - text - failed} scanned (no text)` : ''}${failed ? `, ${failed} failed` : ''}${r.parsed?.questions ? `, ${r.parsed.questions} past-paper question${r.parsed.questions === 1 ? '' : 's'} read` : ''}`);
+        out.push(`${u.code}: ${r.files.length} file${r.files.length === 1 ? '' : 's'}, ${text} with text${r.files.length - text - failed ? `, ${r.files.length - text - failed} scanned` : ''}${failed ? `, ${failed} failed` : ''}${r.parsed?.questions ? `, ${r.parsed.questions} past-paper question${r.parsed.questions === 1 ? '' : 's'}` : ''}`);
       } catch (e) { out.push(`${u.code}: ${e.message}`); }
     }
     setLines(out);
@@ -113,264 +121,92 @@ function SyncAll({ s }) {
   };
   return (
     <>
-      <button className="ghost" onClick={run} disabled={busy || !s.data.units.length} data-tour="sync">{busy ? 'Syncing…' : 'Sync all files'}</button>
-      {lines.length > 0 && <ul className="synclog muted small" role="status">{lines.map((l) => <li key={l}>{l}</li>)}</ul>}
+      <button type="button" className="btn" onClick={run} disabled={busy || !s.data.units.length}>{busy ? 'Reading…' : 'Read all files'}</button>
+      {lines.length > 0 && <ul className="plain-list muted small readlog" role="status">{lines.map((l) => <li key={l}>{l}</li>)}</ul>}
     </>
   );
 }
 
-const snippet = (text, q) => {
-  const i = text.toLowerCase().indexOf(q.toLowerCase());
-  if (i < 0) return text.slice(0, 200);
-  return `${i > 60 ? '…' : ''}${text.slice(Math.max(0, i - 60), i + 180)}${i + 180 < text.length ? '…' : ''}`;
-};
-
-function Library({ code, go, refresh }) {
-  const [lib, setLib] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [q, setQ] = useState('');
-  const load = () => api('GET', `library?unit=${encodeURIComponent(code)}`).then(setLib).catch((e) => setLib({ files: [], note: e.message }));
-  useEffect(() => { load(); }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const [read, setRead] = useState(null); // past-paper questions read after the last sync
-  const [progress, setProgress] = useState('');
-  const sync = async () => {
-    setBusy(true);
-    try { const r = await prepareUnit(code, (p) => setProgress(p.total ? `${p.done} of ${p.total} files read` : '')); setRead(r.parsed?.questions ?? null); await load(); }
-    catch (e) { setLib((x) => ({ ...(x || { files: [] }), note: e.message })); }
-    setBusy(false);
-  };
-
-  // files from this computer: a tutorial sheet's questions (and printed answers) go straight into Predict and Check answer
-  const [added, setAdded] = useState('');
-  const addFiles = async (list) => {
-    setBusy(true); setAdded('');
-    const lines = [];
-    for (const file of list) {
-      try {
-        const data = await new Promise((ok, fail) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = fail; r.readAsDataURL(file); });
-        const r = await api('POST', 'library/upload', { unit: code, name: file.name, file: { data } });
-        lines.push(r.note ? `${file.name}: ${r.note}` : r.duplicate ? `${file.name}: already added.` : `${file.name}: added${r.paper ? `, ${r.parsed?.questions ?? 0} questions now in Predict` : ' (read as notes or an outline)'}.`);
-      } catch (e) { lines.push(`${file.name}: ${e.message}`); }
-    }
-    setAdded(lines.join(' ')); await load(); refresh?.(); setBusy(false);
-  };
-  const removeLocal = async (f) => { await api('POST', 'library/remove', { id: f.id }); await load(); refresh?.(); };
-
-  if (!lib) return <p className="muted small">Checking the server library…</p>;
-  const synced = lib.files.filter((f) => f.synced).length;
-  const papers = lib.files.filter((f) => f.paper);
-  const rest = lib.files.filter((f) => !papers.includes(f));
-  const withText = lib.files.filter((f) => f.synced && f.text);
-  const hits = q.trim() ? withText.filter((f) => f.text.toLowerCase().includes(q.toLowerCase())) : [];
-
-  const item = (f) => (
-    <li key={f.id}>
-      {f.url ? <a href={f.url} target="_blank" rel="noreferrer">{f.name}</a> : <span>{f.name}</span>}
-      {f.local && <><span className="badge">from this computer</span><button className="link small" onClick={() => removeLocal(f)}>remove</button></>}
-      {papers.includes(f) && <button className="link" onClick={() => go('papers', { unit: code, label: f.name.replace(/\.[a-z0-9]+$/i, ''), fileId: f.id })}>log score</button>}
-      <span className={`muted small ${f.synced ? '' : 'hot'}`}>{f.synced ? (f.chars ? `${f.chars} chars` : 'no text (scanned)') : 'not synced'}</span>
-      {f.synced && f.text && <details className="preview"><summary>preview</summary><p>{f.text.slice(0, 500)}{f.text.length > 500 ? '…' : ''}</p></details>}
-    </li>
-  );
-
+// One unit: a row that opens the unit, and a pencil that opens its date and stage.
+function UnitRow({ u, s, refresh }) {
+  const [open, setOpen] = useState(false);
+  const tba = u.catDate === 'TBA';
+  const info = s.units[u.code] || {};
+  const st = info.stage;
+  const auto = st && st.source !== 'unit' ? st.name : s.stages.find((x) => x.id === (s.settings.stage || 'adequate'))?.name;
+  const topics = s.data.topics.filter((t) => t.unit === u.code);
+  const solid = topics.filter((t) => s.mastery?.[t.id]?.status === 'green').length;
+  const set = (body) => api('PATCH', `units?code=${encodeURIComponent(u.code)}`, body).then(refresh);
+  const id = u.code.replace(/\W+/g, '-');
   return (
-    <div className="library">
-      <div className="row">
-        <button className="ghost" onClick={sync} disabled={busy || !lib.files.length}>{busy ? (progress || 'Reading…') : `Read files (${synced}/${lib.files.length})`}</button>
-        <input className="grow" placeholder="Search synced material…" aria-label={`Search ${code} synced material`} value={q} onChange={(e) => setQ(e.target.value)} />
+    <div className="urow">
+      <div className="urow-line">
+        <a className="urow-main" href={href('unit', unitSlug(u.code), 'topics')}>
+          <span className={`dot ${st?.id || ''}`} aria-hidden="true" />
+          <span className="row-main"><b className="num">{u.code}</b><span className="row-sub">{u.title}</span></span>
+          {topics.length
+            ? <span className="meter-wrap" title={`${solid} of ${topics.length} topics solid`}><span className="meter"><span style={{ width: `${Math.round((solid / topics.length) * 100)}%` }} /></span><span className="row-sub num">{solid}/{topics.length}</span></span>
+            : <span className="meter-wrap row-sub">No topics</span>}
+          <span className={`chip num ${st?.id || ''}`} title={u.catDate ? undefined : 'From the KU calendar'}>{tba ? 'TBA' : daysText(info.days)}</span>
+        </a>
+        <button type="button" className="iconbtn" aria-expanded={open} aria-controls={`edit-${id}`} aria-label={`${u.code} date and stage`} onClick={() => setOpen(!open)}><Icon name="edit" /></button>
       </div>
-      <div className="row wrap small">
-        <label className={`button ghost${busy ? ' disabled' : ''}`}>
-          Add a file from this computer
-          <input type="file" multiple hidden accept=".pdf,.docx,.pptx,.txt,.md" disabled={busy} onChange={(e) => { addFiles([...e.target.files]); e.target.value = ''; }} />
-        </label>
-        <span className="muted">Tutorials, CATs, an outline: PDF, Word or PowerPoint. Answers printed on a tutorial become its answer keys.</span>
-      </div>
-      {added && <p className="muted small" role="status">{added}</p>}
-      {lib.note && <p className="muted small">{lib.note}</p>}
-      {read != null && <p className="muted small" role="status">{read} past-paper question{read === 1 ? '' : 's'} read for Predict.</p>}
-      {!lib.files.length && <p className="muted small">Nothing in the server library for this unit yet.</p>}
-      {papers.length > 0 && <><h4>Past papers and CATs</h4><ul>{papers.map(item)}</ul></>}
-      {rest.length > 0 && <details><summary>Notes and other files ({rest.length})</summary><ul>{rest.map(item)}</ul></details>}
-      {q.trim() && (
-        <div className="searchresults">
-          <h4>Matches ({hits.length})</h4>
-          {hits.length === 0 && <p className="muted small">No synced material contains that.</p>}
-          {hits.map((f) => (
-            <div key={f.id} className="hit">
-              <b>{f.name}</b>
-              <p className="small">{snippet(f.text, q)}</p>
-            </div>
-          ))}
+      {open && (
+        <div className="urow-edit" id={`edit-${id}`}>
+          <label className="field">CAT or exam date
+            <input type="date" value={tba ? '' : u.catDate || ''} disabled={tba} onChange={(e) => set({ catDate: e.target.value || null })} />
+          </label>
+          <label className="field">Study stage
+            <select value={u.stage || ''} onChange={(e) => set({ stage: e.target.value || null })}>
+              <option value="">Automatic ({auto})</option>
+              {s.stages.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+            </select>
+          </label>
+          <label className="check"><input type="checkbox" checked={tba} onChange={(e) => set({ catDate: e.target.checked ? 'TBA' : null })} /> Date not announced</label>
+          <a className="btn plain" href={href('unit', unitSlug(u.code), 'notes')}>Files and notes</a>
         </div>
       )}
     </div>
   );
 }
 
-function Unit({ u, s, refresh, go, notify }) {
-  const [topic, setTopic] = useState('');
-  const [open, setOpen] = useState(false);
-  const [ideas, setIdeas] = useState(null); // { suggestions, sources } from "Suggest topics"
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [chip, setChip] = useState(null); // the topic whose why-panel is open
-  const topics = s.data.topics.filter((t) => t.unit === u.code);
-  const tba = u.catDate === 'TBA';
-  const st = s.units[u.code]?.stage;
-  const auto = st && st.source !== 'unit' ? st.name : s.stages.find((x) => x.id === (s.settings.stage || 'adequate'))?.name;
-  const cat = tba ? null : u.catDate || s.next?.start;
-  const rated = topics.map((t) => ({ t, m: s.mastery?.[t.id] || { status: 'red', manual: false, why: '', next: '' } }));
-  const green = rated.filter((x) => x.m.status === 'green').length;
-  const amber = rated.filter((x) => x.m.status === 'amber').length;
-  const covered = topics.length ? Math.round(((green + amber * 0.5) / topics.length) * 100) : 0;
-  const pending = rated.find((x) => x.m.status !== 'green');
-  const set = (body) => api('PATCH', `units?code=${encodeURIComponent(u.code)}`, body).then(refresh);
-  // new topics re-tag the unit's past-paper questions straight away (by wording, no AI), so Predict can rank them
-  const addTopics = async (names) => {
-    for (const name of names) await api('POST', 'topics', { unit: u.code, name });
-    await api('POST', 'predict/parse', { unit: u.code }).catch(() => {});
-    refresh();
-  };
-  const addTopic = async (e) => {
-    e.preventDefault();
-    await addTopics(topic.split(',').map((x) => x.trim()).filter(Boolean));
-    setTopic('');
-  };
-  const suggest = async () => {
-    setBusy(true); setError('');
-    try { setIdeas(await api('POST', 'topics/suggest', { unit: u.code })); } catch (x) { setError(x.message); }
-    setBusy(false);
-  };
-  const addIdeas = async (list) => {
-    await addTopics(list.map((i) => i.name));
-    setIdeas((x) => ({ ...x, suggestions: x.suggestions.filter((i) => !list.includes(i)) }));
-  };
-  const shown = rated.find((x) => x.t.id === chip);
-  return (
-    <article className="unit">
-      <header>
-        <div><span className="code">{u.code}</span> <span className="title">{u.title}</span></div>
-        <div className="meta">
-          <label>CAT/exam <input type="date" value={tba ? '' : u.catDate || ''} disabled={tba} onChange={(e) => set({ catDate: e.target.value || null })} /></label>
-          <label className="small"><input type="checkbox" checked={tba} onChange={(e) => set({ catDate: e.target.checked ? 'TBA' : null })} /> TBA</label>
-          {tba ? <span className="when">TBA</span> : cat && (
-            <span className={`when ${daysUntil(s.today, cat) <= 3 ? 'hot' : ''}`} title={u.catDate ? '' : 'No date set: using the KU calendar'}>
-              {Math.max(0, daysUntil(s.today, cat))}d{u.catDate ? '' : ' (KU calendar)'}
-            </span>
-          )}
-          <select value={u.stage || ''} onChange={(e) => set({ stage: e.target.value || null })} aria-label={`${u.code} study stage`}>
-            <option value="">Stage: auto ({auto})</option>
-            {s.stages.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
-          </select>
-          <span className="conf" title="How ready do you feel?">
-            {[1, 2, 3, 4, 5].map((n) => <button key={n} aria-label={`confidence ${n}`} className={n <= (u.confidence || 0) ? 'on' : ''} onClick={() => set({ confidence: n })} />)}
-          </span>
-        </div>
-      </header>
-      <div className="topics">
-        {rated.map(({ t, m }) => (
-          <span key={t.id} className={`chip ${m.status}`}>
-            <button onClick={() => setChip(chip === t.id ? null : t.id)} aria-expanded={chip === t.id}>
-              {t.name}{t.taughtAt ? ' ✓' : ''}{m.manual ? ' · you' : ''}
-            </button>
-            <button className="x" aria-label={`remove ${t.name}`} onClick={() => api('DELETE', `topics/${t.id}`).then(() => { notify(`Removed "${t.name}"`, () => api('POST', 'topics', t)); refresh(); })}>×</button>
-          </span>
-        ))}
-        <form onSubmit={addTopic}><input data-tour="topics" placeholder={topics.length ? 'Add topic' : 'CAT topics, comma separated'} aria-label={`Add topics to ${u.code}, comma separated`} value={topic} onChange={(e) => setTopic(e.target.value)} /></form>
-        {s.ai && <button className="ghost small" onClick={suggest} disabled={busy}><Busy on={busy} label="Reading your outline and papers…" idle="Suggest topics" /></button>}
-      </div>
-      {shown && (
-        <div className="chippanel small" role="region" aria-label={`Why ${shown.t.name} is ${shown.m.status}`}>
-          <p><b>{shown.t.name}</b> is <span className={shown.m.status === 'green' ? 'ok' : shown.m.status === 'amber' ? 'warm' : 'hot'}>{shown.m.status}</span>{shown.m.why ? `: ${shown.m.why}` : ''}.</p>
-          {shown.m.layers && shown.m.tried && (
-            <div className="layers" role="img" aria-label={LAYER.map(([l, name]) => `${name} ${Math.round(shown.m.layers[l].p * 100)}`).join(', ')}>
-              {LAYER.map(([l, name]) => (
-                <div key={l} className={`layer${shown.m.bottleneck === l && shown.m.status !== 'green' ? ' weak' : ''}`}>
-                  <span>{name}</span>
-                  <span className="lbar" title="bar: best estimate · line: what it is surely above"><i style={{ width: `${shown.m.layers[l].p * 100}%` }} /><b style={{ left: `${shown.m.layers[l].lo * 100}%` }} /></span>
-                  <span className="num">{Math.round(shown.m.layers[l].p * 100)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {shown.m.lastsDays && <p className="muted">Lasts about {shown.m.lastsDays} days without practice.</p>}
-          {!shown.m.manual && shown.m.next && <p>Next: {shown.m.next}.</p>}
-          <div className="row wrap">
-            <label>Colour{' '}
-              <select value={shown.t.manual || ''} onChange={(e) => api('PATCH', `topics/${shown.t.id}`, { manual: e.target.value || null }).then(refresh)}>
-                <option value="">From the evidence (recommended)</option>
-                <option value="green">Green: I can teach it</option>
-                <option value="amber">Amber: getting there</option>
-                <option value="red">Red: not yet</option>
-              </select>
-            </label>
-            <button className="link small" onClick={() => go('learn', { unit: u.code, topicId: shown.t.id })}>study this topic</button>
-            <button className="link small" onClick={() => go('teach', { unit: u.code, topic: shown.t.name })}>teach it back</button>
-            <button className="link small" onClick={() => setChip(null)}>close</button>
-          </div>
-        </div>
-      )}
-      {error && <p className="hot small" role="alert">{error}</p>}
-      {ideas && (
-        <div className="suggest" aria-label={`Suggested topics for ${u.code}`}>
-          {ideas.suggestions.length
-            ? ideas.suggestions.map((i, n) => <button key={i.name} className="ghost small" onClick={() => addIdeas([i])}><span className="muted">{n + 1}.</span> + {i.name} <span className="muted">({FROM[i.from] || i.from})</span></button>)
-            : <span className="muted small">Nothing new to suggest.</span>}
-          {ideas.suggestions.length > 1 && <button className="link small" onClick={() => addIdeas(ideas.suggestions)}>add all, in this order</button>}
-          <p className="muted small">
-            {ideas.sources.length ? `Read: ${ideas.sources.join(', ')}.` : 'Nothing is synced for this unit, so these are general guesses from its title. Sync its files for topics from your own outline.'}
-            {' '}AI suggestions can be off: keep only what your course actually covers.
-          </p>
-        </div>
-      )}
-      {topics.length > 0 && (
-        <div className="cover" role="img" aria-label={`${u.code}: ${covered}% covered`}>
-          <span className="muted small">{covered}%</span>
-          <span className="track">
-            <i className="seg-g" style={{ width: `${green / topics.length * 100}%` }} />
-            <i className="seg-a" style={{ width: `${amber / topics.length * 100}%` }} />
-            <i className="seg-r" style={{ width: `${(topics.length - green - amber) / topics.length * 100}%` }} />
-          </span>
-          <span className="muted small">{green}/{topics.length} mastered</span>
-        </div>
-      )}
-      {pending && <p className="muted small next">Next to turn green: <b>{pending.t.name}</b>. {pending.m.next}.</p>}
-      <div className="row small">
-        <button className="link" onClick={() => go('mock', { unit: u.code })}>timed mock</button>
-        <button className="link" onClick={() => go('prompt', { unit: u.code })}>prompt pack</button>
-        <button className="link" onClick={() => go('teach', { unit: u.code })}>teach a topic</button>
-        <button className="link" onClick={() => setOpen(!open)}>{open ? 'hide' : 'show'} files</button>
-      </div>
-      {open && <Library code={u.code} go={go} refresh={refresh} />}
-    </article>
-  );
-}
-
+// Units: every unit grouped by when its paper is. Topics, files and practice live on each unit's own page.
 export default function Units(props) {
   const { s } = props;
   const [picking, setPicking] = useState(!s.data.units.length);
-  // units still counting down to the KU calendar (no date of their own, not TBA)
-  const undated = s.data.units.filter((u) => !u.catDate);
+  const undated = s.data.units.filter((u) => !u.catDate); // still counting down to the KU calendar
   const allTba = () => markUndatedTba(s.data.units).then(props.refresh);
+  const withDays = s.data.units.map((u) => ({ u, d: u.catDate === 'TBA' ? null : s.units[u.code]?.days })).sort((a, b) => (a.d ?? 999) - (b.d ?? 999));
+  const groups = [
+    ['This week', withDays.filter((x) => x.d != null && x.d >= 0 && x.d <= 7)],
+    ['Later', withDays.filter((x) => x.d != null && x.d > 7)],
+    ['Date not announced', withDays.filter((x) => x.d == null)],
+    ['Already sat', withDays.filter((x) => x.d != null && x.d < 0)],
+  ].filter(([, list]) => list.length);
+  const next = withDays.find((x) => x.d != null && x.d >= 0);
   return (
-    <section id="units" className="reveal" data-tour="units">
-      <div className="head"><h2>Units</h2>{!picking && <button className="ghost" onClick={() => setPicking(true)}>Edit units</button>}</div>
+    <>
+      <header className="page-head units-head">
+        <div>
+          <h1>Units</h1>
+          <p><span className="num">{s.data.units.length}</span> units{next ? <>. Next paper: <b className="num">{next.u.code}</b>, {next.d === 0 ? 'today' : <>in <span className="num">{daysText(next.d).toLowerCase()}</span></>}</> : ''}</p>
+        </div>
+        {!picking && <button type="button" className="btn" onClick={() => setPicking(true)}>Edit units</button>}
+      </header>
       {picking ? <Picker {...props} close={() => setPicking(false)} /> : (
         <>
-          <div className="row wrap">
-            <SyncAll s={s} />
-            {undated.length > 0 && (
-              <button className="link small" onClick={allTba} title="CAT and exam dates are uncertain (the strike): stop counting down to the KU calendar">
-                Mark {undated.length} calendar date{undated.length === 1 ? '' : 's'} TBA
-              </button>
-            )}
+          <div className="toolbar">
+            <ReadAll s={s} />
+            {undated.length > 0 && <button type="button" className="btn plain" onClick={allTba}>Mark {undated.length} calendar date{undated.length === 1 ? '' : 's'} TBA</button>}
           </div>
-          <p className="muted small">A topic's colour follows the evidence (a teach-back scored 4/5+ and 2 exam questions solved at 70%+), not a tick. Click a chip to see why it has its colour and what's missing; you can override the colour there (it then shows "· you"). ✓ means you've done a teach-back.</p>
-          <div className="unitgrid">{s.data.units.map((u) => <Unit key={u.code} u={u} {...props} />)}</div>
+          {groups.map(([title, list]) => (
+            <div key={title}>
+              <h2 className="list-title">{title}</h2>
+              <div className="list">{list.map(({ u }) => <UnitRow key={u.code} u={u} {...props} />)}</div>
+            </div>
+          ))}
         </>
       )}
-    </section>
+    </>
   );
 }

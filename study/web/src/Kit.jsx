@@ -17,7 +17,7 @@ const setIn = (obj, [k, ...rest], value) => {
 // text you can correct in place while editing (saved when you click away)
 function Field({ value, path, edit, save, as: Tag = 'span', className = '' }) {
   return (
-    <Tag className={`field ${className}`} contentEditable={edit} suppressContentEditableWarning spellCheck={false}
+    <Tag className={`kfield ${className}`} contentEditable={edit} suppressContentEditableWarning spellCheck={false}
       onBlur={(e) => { const v = e.currentTarget.innerText.trim(); if (edit && v !== value) save(path, v); }}>{value}</Tag>
   );
 }
@@ -101,7 +101,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:t
   w.document.close();
 }
 
-export default function Kit({ s, unit, setUnit, refresh, go, focus, notify }) {
+export default function Kit({ s, unit, refresh, go, focus, notify }) {
   const stage = s.units?.[unit]?.stage;
   const own = s.kits.forStage[stage?.id] || 'ladder';
   const [kind, setKind] = useState('');
@@ -120,11 +120,12 @@ export default function Kit({ s, unit, setUnit, refresh, go, focus, notify }) {
   const mine = s.data.materials.filter((m) => m.unit === unit).sort((a, b) => b.at.localeCompare(a.at));
   const shown = mine.find((m) => m.id === openId) || mine[0];
   const topicName = (id) => s.data.topics.find((t) => t.id === id)?.name;
+  const what = own === 'sheet' ? 'a one-page formula and trap sheet' : own === 'recipes' ? 'solving recipes for the likely topics' : 'a ladder: a worked example, the same method with gaps, then one on your own';
 
-  const make = async () => {
+  const make = async (fresh = false) => {
     setBusy(true); setErr(''); setNeed(null);
     try {
-      const out = await api('POST', 'materials/make', { unit, kind: k, topicId: k === 'ladder' && topicId ? topicId : undefined });
+      const out = await api('POST', 'materials/make', { unit, kind: k, topicId: k === 'ladder' && topicId ? topicId : undefined, fresh });
       if (out.needKey) setNeed(out); else { setOpenId(out.id); setEdit(false); setReveal(false); await refresh(); }
     } catch (x) { setErr(x.message); }
     setBusy(false);
@@ -134,63 +135,64 @@ export default function Kit({ s, unit, setUnit, refresh, go, focus, notify }) {
 
   const Body = shown && BODY[shown.kind];
   return (
-    <section id="kit" className="reveal">
-      <div className="head"><h2>Study kit</h2>{stage && <span className={`stage ${stage.id}`}>{stage.name}</span>}</div>
-      <p className="muted small">
-        Practice made for how close {unit || 'the unit'}'s paper is. {stage ? `${stage.name} gets ` : ''}<b>{s.kits.names[own].name.toLowerCase()}</b>
-        {own === 'sheet' ? ', with your own recurring mistakes on it, on one printable page.' : own === 'recipes' ? ' for the topics most likely to come.' : ': a worked example, the same method with steps to fill in, then one on your own.'}
-        {' '}Everything you make is saved here and can be edited.
-      </p>
-      {!s.data.units.length ? <p className="muted">Pick your units first.</p> : (
-        <div className="row wrap">
-          <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unit">
-            {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code} {u.title}</option>)}
-          </select>
-          <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="Kind of material">
-            <option value="">For {stage?.name || 'this stage'}: {s.kits.names[own].name}</option>
-            {Object.entries(s.kits.names).filter(([id]) => id !== own).map(([id, x]) => <option key={id} value={id}>{x.name}</option>)}
-          </select>
-          {k === 'ladder' && (
-            <select value={topicId} onChange={(e) => setTopicId(e.target.value)} aria-label="Topic">
-              <option value="">Topic: your top weakspot</option>
-              {topics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          )}
-          <button onClick={make} disabled={busy || !unit}><Busy on={busy} label="Making it…" idle="Make it" /></button>
+    <div className="stack">
+      <section id="kit" className="card stack kit-make" aria-labelledby="kit-title">
+        <div className="card-head">
+          <h2 className="card-title" id="kit-title">Make a sheet</h2>
+          {stage && <span className={`chip ${stage.id}`}>{stage.name}</span>}
         </div>
-      )}
-      {err && <p className="banner bad" role="alert">{err}</p>}
-      {need && (
-        <p className="banner" role="status">{need.message}{' '}
-          <button className="link" onClick={() => go('prompt', { unit, goal: need.goal })}>Open in Prompt Builder →</button>
-        </p>
-      )}
+        <p className="muted small">{stage ? `${stage.name} gets ` : 'This stage gets '}{what}. Everything you make is saved here, can be edited, and prints.</p>
+        <div className="pair">
+          <label className="field">Kind
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
+              <option value="">{s.kits.names[own].name} (for {stage?.name || 'this stage'})</option>
+              {Object.entries(s.kits.names).filter(([id]) => id !== own).map(([id, x]) => <option key={id} value={id}>{x.name}</option>)}
+            </select>
+          </label>
+          {k === 'ladder' && (
+            <label className="field">Topic
+              <select value={topicId} onChange={(e) => setTopicId(e.target.value)}>
+                <option value="">Your top weakspot</option>
+                {topics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </label>
+          )}
+        </div>
+        <div className="toolbar"><button className="btn primary" type="button" onClick={() => make()} disabled={busy || !unit}><Busy on={busy} label="Making it…" idle="Make it" /></button></div>
+        {err && <p className="notice bad" role="alert">{err}</p>}
+        {need && (
+          <p className="notice" role="status">{need.message}{' '}
+            <button type="button" className="btn plain" onClick={() => go('prompt', { unit, goal: need.goal })}>Go deeper</button>
+          </p>
+        )}
+      </section>
 
       {mine.length > 1 && (
-        <div className="kitlist" role="tablist" aria-label="Saved material">
+        <div className="chips kit-tabs" role="tablist" aria-label="Saved sheets">
           {mine.slice(0, 8).map((m) => (
-            <button key={m.id} role="tab" aria-selected={m.id === shown?.id} className={`tag${m.id === shown?.id ? ' on' : ''}`} onClick={() => { setOpenId(m.id); setEdit(false); setReveal(false); }}>
-              {s.kits.names[m.kind].name.split(' ')[0]}{m.topicId ? `: ${topicName(m.topicId) || ''}` : ''} · {m.at.slice(5, 10)}
+            <button key={m.id} type="button" role="tab" aria-selected={m.id === shown?.id} aria-pressed={m.id === shown?.id} className="chip" onClick={() => { setOpenId(m.id); setEdit(false); setReveal(false); }}>
+              {s.kits.names[m.kind].name.split(' ')[0]}{m.topicId ? `: ${topicName(m.topicId) || ''}` : ''} · <span className="num">{m.at.slice(5, 10)}</span>
             </button>
           ))}
         </div>
       )}
 
       {shown && (
-        <article className={`kitdoc ${shown.kind}`} id={`kitdoc-${shown.id}`} data-title={`${unit} ${s.kits.names[shown.kind].name}`}>
-          <p className="eyebrow">{unit} · {s.kits.names[shown.kind].name}{shown.topicId ? ` · ${topicName(shown.topicId) || ''}` : ''} · {shown.at.slice(0, 10)}{shown.edited ? ' · edited' : ''}</p>
+        <article className={`card kitdoc ${shown.kind}`} id={`kitdoc-${shown.id}`} data-title={`${unit} ${s.kits.names[shown.kind].name}`}>
+          <p className="eyebrow num">{unit} · {s.kits.names[shown.kind].name}{shown.topicId ? ` · ${topicName(shown.topicId) || ''}` : ''} · {shown.at.slice(0, 10)}{shown.edited ? ' · edited' : ''}{shown.shared ? ' · from your class' : ''}</p>
           {shown.content.title && <h3><Field value={shown.content.title} path={['title']} edit={edit} save={save(shown)} /></h3>}
-          <div className="kit-tools row wrap small">
-            {shown.kind !== 'sheet' && <button className="ghost" onClick={() => setReveal(!reveal)}>{reveal ? 'Hide answers' : 'Show answers'}</button>}
-            <button className="ghost" onClick={() => setEdit(!edit)} aria-pressed={edit}>{edit ? 'Done editing' : 'Edit'}</button>
-            <button className="ghost" onClick={() => printKit(shown.id)}>{shown.kind === 'sheet' ? 'Print (one A4 page)' : 'Print'}</button>
-            <button className="link small" onClick={() => del(shown)}>delete</button>
-            {edit && <span className="muted">Click any text to correct it. It saves when you click away.</span>}
+          <div className="kit-tools toolbar">
+            {shown.kind !== 'sheet' && <button type="button" className="btn" onClick={() => setReveal(!reveal)}>{reveal ? 'Hide answers' : 'Show answers'}</button>}
+            <button type="button" className="btn" onClick={() => setEdit(!edit)} aria-pressed={edit}>{edit ? 'Done editing' : 'Edit'}</button>
+            <button type="button" className="btn" onClick={() => printKit(shown.id)}>{shown.kind === 'sheet' ? 'Print on one page' : 'Print'}</button>
+            {shown.shared && <button type="button" className="btn plain" disabled={busy} onClick={() => make(true)}>Make a fresh one</button>}
+            <button type="button" className="btn plain" onClick={() => del(shown)}>Delete</button>
           </div>
+          {edit && <p className="muted small kit-tools">Tap any text to correct it. It saves when you tap away.</p>}
           <div className={`${shown.kind}-body`}><Body c={shown.content} edit={edit} save={save(shown)} reveal={reveal} /></div>
         </article>
       )}
-      {!shown && !need && s.data.units.length > 0 && <p className="muted small">Nothing made for {unit} yet. Press <b>Make it</b>.</p>}
-    </section>
+      {!shown && !need && <p className="muted small">Nothing made for {unit} yet.</p>}
+    </div>
   );
 }

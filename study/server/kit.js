@@ -5,6 +5,7 @@ import { aiReady } from './ai.js';
 import { makeKit } from './brain.js';
 import { contextFor } from './ingest.js';
 import { predictFor, unitStage, weakspotsFor } from './plan.js';
+import { SHARED_KITS, kitKey, shareKit, sharedKit } from './shared.js';
 import { add, data } from './store.js';
 
 export const KIT_FOR = { adequate: 'ladder', 'one-week': 'recipes', 'last-minute': 'sheet', 'exam-eve': 'sheet' };
@@ -18,7 +19,7 @@ const bad = (message, status = 400) => Object.assign(new Error(message), { statu
 
 // body: { unit, kind?, topicId? }. kind defaults to the unit's stage. A ladder is about one topic (the one asked
 // for, else the top weakspot's, else the most likely to come); recipes and sheets cover the likely topics.
-export async function makeKitFor({ unit, kind, topicId }, { make = makeKit, ready = aiReady } = {}) {
+export async function makeKitFor({ unit, kind, topicId, fresh = false }, { make = makeKit, ready = aiReady, shared = { get: sharedKit, put: shareKit } } = {}) {
   const u = data.units.find((x) => x.code === unit);
   if (!u) throw bad('Pick one of your units first.');
   const stage = unitStage(u).stage.id;
@@ -31,6 +32,10 @@ export async function makeKitFor({ unit, kind, topicId }, { make = makeKit, read
     ? topics.find((t) => t.id === topicId)
     : k === 'ladder' ? topics.find((t) => t.id === critical[0]?.topicId) || topics.find((t) => t.id === ranked[0]?.topicId) || topics[0] : null;
   if (k === 'ladder' && !topic) throw bad('Add the unit\'s topics first (Units → Suggest topics).');
+  // ladders and recipes are shared per unit, stage and topic: a classmate's copy is reused unless you ask for a fresh one
+  const key = SHARED_KITS.includes(k) ? kitKey(unit, k, stage, topic?.name || '') : null;
+  const known = key && !fresh ? await shared.get(key) : null;
+  if (known) return add('materials', { unit, topicId: topic?.id || null, kind: k, stage, content: known, edited: false, shared: true });
   if (!ready()) return { needKey: true, goal: KITS[k].goal, message: `No AI key, so it can't be made here. The Prompt Builder makes the same thing ("${KITS[k].name}") in any AI chat.` };
   const subs = data.subtopics.filter((s) => s.unit === unit && (!topic || s.topicId === topic.id));
   const content = await make({
@@ -42,5 +47,6 @@ export async function makeKitFor({ unit, kind, topicId }, { make = makeKit, read
     traps: errors.counts.map((e) => `${e.label} (${e.n}×)`),
     context: contextFor(unit, topic?.name || ranked[0]?.name || '', 10000),
   });
+  if (key) await shared.put(key, unit, content);
   return add('materials', { unit, topicId: topic?.id || null, kind: k, stage, content, edited: false });
 }

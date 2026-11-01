@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
 import ImportNotes from './ImportNotes.jsx';
+import { getLook, setLook } from './look.js';
 
 const TIER = { owner: 'Owner', premium: 'Premium', basic: 'Basic', trial: 'Free trial' };
 
@@ -23,6 +24,7 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
   const [usage, setUsage] = useState(null);
   useEffect(() => { api('GET', 'usage').then(setUsage).catch(() => {}); }, []);
   const setting = (body) => api('POST', 'settings', body).then(refresh).catch((e) => onProblem(e.message));
+  const [look, setLookState] = useState(getLook);
   return (
     <>
       <div className="scrim" onClick={onClose} />
@@ -43,6 +45,19 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
               <option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option>
             </select>
             <span className="hint">{s.ai ? 'Ready.' : `Not available right now. Pick the other one.`}{usage?.ai && usage.ai.limit !== null && Number.isFinite(usage.ai.limit) ? ` AI today: ${usage.ai.used} of ${usage.ai.limit}.` : ''}</span>
+          </label>
+        </div>
+        <div className="card">
+          <label className="field">Wallpaper
+            <select value={look.wp} onChange={(e) => setLookState(setLook({ wp: e.target.value }))}>
+              <option value="auto">Lagoon in light mode, Ember in dark mode</option>
+              <option value="lagoon">Lagoon</option>
+              <option value="ember">Ember</option>
+            </select>
+          </label>
+          <label className="check">
+            <input type="checkbox" checked={look.motion === 'on'} onChange={(e) => setLookState(setLook({ motion: e.target.checked ? 'on' : 'off' }))} />
+            Moving wallpaper
           </label>
         </div>
         {s.data.units.length > 0 && <ImportNotes s={s} unit={unit} refresh={refresh} notify={notify} onProblem={onProblem} />}

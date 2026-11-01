@@ -1,4 +1,4 @@
-// Crux service worker. Hashed assets come from the cache; the page and /api/state go to the network first and fall
+// Crux service worker. Hashed assets come from the cache; the page and every API read go to the network first and fall
 // back to the last copy, so Crux opens read-only without a connection. There is no skipWaiting: a new version
 // installs in the background and takes over the next time Crux is opened, never in the middle of a task.
 const VERSION = new URL(location).searchParams.get('v') || 'dev';
@@ -38,6 +38,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/assets/')) return e.respondWith(cacheFirst(e.request));
-  if (url.pathname === '/api/state') return e.respondWith(networkFirst(e.request));
+  // API reads: the network first, the last copy when offline. Downloads and sign-in are never kept.
+  if (url.pathname.startsWith('/api/') && !/(^\/api\/me$|\/download$)/.test(url.pathname)) return e.respondWith(networkFirst(e.request));
   if (e.request.mode === 'navigate') return e.respondWith(networkFirst(e.request, '/'));
 });

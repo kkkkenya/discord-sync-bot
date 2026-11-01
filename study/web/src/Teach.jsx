@@ -8,16 +8,16 @@ const MAX_SECS = 240; // 4 minutes of voice is about 7.7 MB as WAV, under the up
 
 function Feedback({ f }) {
   return (
-    <div className="feedback">
-      <p className="score">{f.score}/5</p>
-      <p>✓ {f.good}</p>
-      <ul>{f.gaps.map((g) => <li key={g}>✗ {g}</li>)}</ul>
-      <p><b>Answer this next, from memory:</b> {f.followUp}</p>
-    </div>
+    <section className="card stack" aria-label="Marking">
+      <p className="score-big num">{f.score}<span className="muted">/5</span></p>
+      <p><b className="good-text">Good:</b> {f.good}</p>
+      {f.gaps.length > 0 && <ul className="plain-list">{f.gaps.map((g) => <li key={g}><b className="bad-text">Gap:</b> {g}</li>)}</ul>}
+      <p className="notice">Answer this next, from memory: {f.followUp}</p>
+    </section>
   );
 }
 
-// Gaps that don't match a sub-topic yet: one click lists each under the topic (as shaky: you just missed it).
+// Gaps that don't match a sub-topic yet: one tap lists each under the topic (as shaky: you just missed it).
 function GapsToSubtopics({ topicId, gaps, refresh }) {
   const [done, setDone] = useState([]);
   const addOne = async (gap) => {
@@ -27,14 +27,22 @@ function GapsToSubtopics({ topicId, gaps, refresh }) {
     refresh();
   };
   return (
-    <div className="small">
-      <p className="muted">Not in your sub-topic list yet:</p>
-      <ul className="gaps">{gaps.map((g) => <li key={g}>{g} {done.includes(g) ? <span className="ok">added ✓</span> : <button className="link" onClick={() => addOne(g)}>add as a shaky sub-topic</button>}</li>)}</ul>
+    <div className="stack-s">
+      <h3 className="sub-title">Not in your sub-topics yet</h3>
+      <div className="list flat">
+        {gaps.map((g) => (
+          <div key={g} className="list-row static">
+            <span className="row-main">{g}</span>
+            {done.includes(g) ? <span className="chip good">Added</span> : <button type="button" className="btn plain" onClick={() => addOne(g)}>Add as shaky</button>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-export default function Teach({ s, unit, setUnit, refresh, focus, go }) {
+// Explain it: teach a topic back as if to a classmate, typed or out loud; the AI marks it and names the gaps.
+export default function Teach({ s, unit, refresh, focus, go }) {
   const [topic, setTopic] = useState('');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -56,7 +64,7 @@ export default function Teach({ s, unit, setUnit, refresh, focus, go }) {
     setBusy(false);
   };
 
-  // Phase 9: say it instead of typing it. Recorded in the browser, sent as WAV, transcribed and marked the same way.
+  // say it instead of typing it: recorded in the browser, sent as WAV, transcribed and marked the same way
   const [rec, setRec] = useState(null); // the MediaRecorder while recording
   const [secs, setSecs] = useState(0);
   const chunks = useRef([]);
@@ -89,41 +97,45 @@ export default function Teach({ s, unit, setUnit, refresh, focus, go }) {
   };
 
   return (
-    <section id="teach" className="reveal">
-      <h2>Teach it back</h2>
-      <p className="muted small">Explain a topic as if a classmate missed the lecture: what it is, the key equation and what each term means, when it applies, one worked example. If you get stuck, that's the gap to study.{s.coach ? ' The AI marks it and names the exact gaps.' : ''}</p>
-      <form onSubmit={send}>
-        <div className="row wrap">
-          <select value={unit} onChange={(e) => setUnit(e.target.value)} aria-label="Unit">
-            {s.data.units.map((u) => <option key={u.code} value={u.code}>{u.code} {u.title}</option>)}
-          </select>
-          <input className="grow" list="topics" placeholder="Topic (e.g. Mohr's circle)" aria-label="Topic" value={topic} onChange={(e) => setTopic(e.target.value)} />
-          <datalist id="topics">{topics.map((t) => <option key={t.id} value={t.name} />)}</datalist>
-        </div>
-        <textarea rows={8} placeholder="Start with: 'Imagine you have…'" aria-label="Your explanation" value={text} onChange={(e) => setText(e.target.value)} />
-        <div className="row wrap">
-          <button disabled={busy || rec || !unit || !topic.trim() || text.trim().length < 40}><Busy on={busy} label="Marking…" idle={s.coach ? 'Get it marked' : 'Save teach-back'} /></button>
-          <span className="muted small">or</span>
+    <div className="stack">
+      <form className="card stack" onSubmit={send}>
+        <p className="muted small">Explain it as if a classmate missed the lecture: what it is, the key equation and each term, when it applies, one worked example. Where you get stuck is the gap to study.</p>
+        <label className="field">Topic
+          <input list="teach-topics" placeholder="Mohr's circle" value={topic} onChange={(e) => setTopic(e.target.value)} />
+          <datalist id="teach-topics">{topics.map((t) => <option key={t.id} value={t.name} />)}</datalist>
+        </label>
+        <label className="field">Your explanation
+          <textarea rows={8} placeholder="Imagine you have…" value={text} onChange={(e) => setText(e.target.value)} />
+        </label>
+        <div className="toolbar">
+          <button className="btn primary" disabled={busy || rec || !unit || !topic.trim() || text.trim().length < 40}><Busy on={busy} label="Marking…" idle={s.coach ? 'Get it marked' : 'Save'} /></button>
           {rec
-            ? <button type="button" className="ghost" onClick={() => rec.stop()}><span className="recdot" />Stop and mark ({Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')} of 4:00)</button>
-            : <button type="button" className="ghost" onClick={record} disabled={busy || !s.media?.audio || !unit || !topic.trim()}>Say it out loud instead</button>}
+            ? <button type="button" className="btn" onClick={() => rec.stop()}><span className="recdot" />Stop and mark <span className="num">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</span></button>
+            : <button type="button" className="btn" onClick={record} disabled={busy || !s.media?.audio || !unit || !topic.trim()}>Say it out loud</button>}
         </div>
-        {!s.media?.audio && <p className="muted small">Speaking needs an AI that can listen (Gemini, in Settings). Typing works with any.</p>}
-        {rec && <p className="muted small" role="status">Recording. Explain it as if to a classmate, then press Stop.</p>}
+        {!s.media?.audio && <p className="muted small">Speaking needs Gemini (Settings → AI). Typing works with either.</p>}
+        {rec && <p className="muted small" role="status">Recording. Up to 4 minutes, then press Stop.</p>}
       </form>
-      {result?.error && <p className="banner bad">{result.error}</p>}
-      {result?.transcript && <details className="past" open><summary>What you said</summary><p className="small">{result.transcript}</p></details>}
+      {result?.error && <p className="notice bad" role="alert">{result.error}</p>}
+      {result?.transcript && <details className="disclosure" open><summary>What you said</summary><p className="muted small">{result.transcript}</p></details>}
       {result?.item && <LimitNote s={s} unit={unit} topic={topic} go={go} what="marking a derivation" />}
       {result?.item?.feedback && <Feedback f={result.item.feedback} />}
       {result?.flags?.flagged?.length > 0 && <p className="muted small" role="status">Marked shaky in your weakspots: <b>{result.flags.flagged.join(', ')}</b>.</p>}
       {result?.flags?.topicId && result.flags.unmatched?.length > 0 && <GapsToSubtopics topicId={result.flags.topicId} gaps={result.flags.unmatched} refresh={refresh} />}
-      {result?.item && !result.item.feedback && <p className="muted">Saved.</p>}
+      {result?.item && !result.item.feedback && <p className="muted" role="status">Saved.</p>}
       {past.length > 0 && (
-        <details className="past">
-          <summary>Earlier teach-backs for {unit} ({past.length})</summary>
-          {past.map((t) => <div key={t.id}><b>{t.topic}</b>{t.feedback && ` · ${t.feedback.score}/5`} <span className="muted small">{t.at.slice(0, 10)}</span><p className="small">{t.text}</p></div>)}
+        <details className="disclosure">
+          <summary>Earlier explanations <span className="muted num">({past.length})</span></summary>
+          <div className="list flat">
+            {past.map((t) => (
+              <div key={t.id} className="list-row static">
+                <span className="row-main"><span><b>{t.topic}</b>{t.feedback && <span className="num"> · {t.feedback.score}/5</span>}</span><span className="row-sub qtext">{t.text}</span></span>
+                <span className="row-sub num">{t.at.slice(0, 10)}</span>
+              </div>
+            ))}
+          </div>
         </details>
       )}
-    </section>
+    </div>
   );
 }

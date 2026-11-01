@@ -49,7 +49,7 @@ async function saveEntry(id, e, method, error = null) {
 }
 
 export const libraryMeta = () =>
-  Object.fromEntries(Object.entries(library.files).map(([id, e]) => [id, { unit: e.unit, name: e.name, chars: e.chars, paper: e.paper }]));
+  Object.fromEntries(Object.entries(library.files).map(([id, e]) => [id, { unit: e.unit, name: e.name, chars: e.chars, paper: e.paper, at: e.at }]));
 
 // Relevant material to ground an AI call: the student's own notes for the unit first, then the unit's hub files,
 // topic-matching ones first within each, capped.
@@ -96,7 +96,7 @@ export function outlineContext(unit, questions = [], files = library.files, maxC
     parts.push(`--- Notes: ${e.name} ---\n${e.text.slice(0, 3000)}`);
     sources.push(e.name);
   }
-  return { text: parts.join('\n\n').slice(0, maxChars), sources };
+  return { text: parts.join('\n\n').slice(0, maxChars), sources, outline: mine.some((x) => OUTLINE.test(x.name)) };
 }
 
 // Files added from this computer (a tutorial sheet, an outline you were sent): kept in the library like synced ones,

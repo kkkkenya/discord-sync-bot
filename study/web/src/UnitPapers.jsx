@@ -8,7 +8,9 @@ export default function UnitPapers({ s, unit, refresh, go, notify }) {
   const [p, setP] = useState(null);
   const [problem, setProblem] = useState('');
   const [busy, setBusy] = useState(false);
-  const [hint, setHint] = useState({ text: '', kind: 'focus', topicIds: [] });
+  const [hint, setHint] = useState({ text: '', kind: 'focus', topicIds: [], everyone: false });
+  const [cls, setCls] = useState([]);
+  useEffect(() => { api('GET', `class/hints?unit=${encodeURIComponent(unit)}`).then(setCls).catch(() => {}); }, [unit]);
   const [paste, setPaste] = useState({ label: '', text: '' });
   const [score, setScore] = useState({ label: '', score: '', outOf: '' });
   const load = () => api('GET', `predict?unit=${encodeURIComponent(unit)}`).then(setP).catch((e) => setProblem(e.message));
@@ -17,7 +19,7 @@ export default function UnitPapers({ s, unit, refresh, go, notify }) {
 
   const topics = s.data.topics.filter((t) => t.unit === unit);
   const toggleTopic = (id) => setHint((h) => ({ ...h, topicIds: h.topicIds.includes(id) ? h.topicIds.filter((x) => x !== id) : [...h.topicIds, id] }));
-  const saveHint = (e) => { e.preventDefault(); run(async () => { await api('POST', 'hints', { unit, ...hint }); setHint({ text: '', kind: 'focus', topicIds: [] }); await load(); }); };
+  const saveHint = (e) => { e.preventDefault(); run(async () => { const { everyone, ...h } = hint; await api('POST', 'hints', { unit, ...h }); if (everyone) setCls(await api('POST', 'class/hints', { unit, ...h })); setHint({ text: '', kind: 'focus', topicIds: [], everyone: false }); await load(); }); };
   const savePaste = (e) => { e.preventDefault(); run(async () => { const rows = await api('POST', 'predict/paste', { unit, ...paste }); notify(`${rows.length} question${rows.length === 1 ? '' : 's'} added.`); setPaste({ label: '', text: '' }); await load(); }); };
   const saveScore = (e) => { e.preventDefault(); run(async () => { await api('POST', 'papers', { unit, label: score.label, score: Number(score.score), outOf: Number(score.outOf) }); setScore({ label: '', score: '', outOf: '' }); notify('Score saved.'); await refresh(); }); };
 
@@ -59,9 +61,25 @@ export default function UnitPapers({ s, unit, refresh, go, notify }) {
             {topics.map((t) => <button type="button" key={t.id} className="chip" aria-pressed={hint.topicIds.includes(t.id)} onClick={() => toggleTopic(t.id)}>{t.name}</button>)}
           </div>
         )}
+        <label className="check"><input type="checkbox" checked={hint.everyone} onChange={(e) => setHint({ ...hint, everyone: e.target.checked })} /> The whole class heard this</label>
         <button className="btn primary" disabled={busy || !hint.text.trim()}>Save hint</button>
         {p.hints.length > 0 && <ul className="plain-list">{p.hints.map((h) => <li key={h.id}><span className="chip">{KINDS.find((k) => k.id === h.kind)?.label}</span> {h.text}</li>)}</ul>}
       </form>
+
+      {cls.length > 0 && (
+        <section className="card stack" aria-labelledby="class-hints">
+          <h2 className="card-title" id="class-hints">What the class heard</h2>
+          <div className="list flat">
+            {cls.map((h) => (
+              <div key={h.id} className="list-row static">
+                <span className="row-main"><span><span className="chip">{KINDS.find((k) => k.id === h.kind)?.label || h.kind}</span> {h.text}</span><span className="row-sub"><span className="num">{h.count}</span> heard it{h.topics.length ? ` · ${h.topics.join(', ')}` : ''}</span></span>
+                {h.mine ? <span className="chip good">You heard it</span> : <button type="button" className="btn plain" disabled={busy} onClick={() => run(async () => { setCls(await api('POST', 'class/hints/confirm', { id: h.id })); await load(); })}>I heard it too</button>}
+              </div>
+            ))}
+          </div>
+          <p className="muted small">Saying you heard it adds it to your own hints, so it moves your predictions. Nobody sees who.</p>
+        </section>
+      )}
 
       <div>
         <h2 className="list-title">Past-paper questions</h2>

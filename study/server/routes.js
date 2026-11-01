@@ -23,6 +23,9 @@ import { bump, usedToday } from './usage.js';
 import { downloadLink } from './downloads.js';
 import { requestScope } from './store.js';
 import { KITS, KIT_FOR, makeKitFor } from './kit.js';
+import { focusCounts, setFocus } from './focus.js';
+import { classHints, classList, confirmHint, listOf, offerList, shareHint } from './shared.js';
+import { newMaterial } from './inbox.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, flagCheckpoint, markBroke } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
@@ -52,6 +55,65 @@ const routes = {
   // Imported notes (Obsidian, Notion): parsed in the browser, saved per unit and title.
   'GET /api/notes': (q, body, ctx) => listNotes(ctx.user.id, q.get('unit')),
   // Today's AI actions against the member's limit, for Settings.
+  // the bell and the Focus page: small, cheap reads the app makes at most every few minutes
+  // the shared unit library: the class's topic list for a unit. Opening a unit with your own list of 3+ topics
+  // shares it if the class has none yet; using the class list copies it into your document.
+  'GET /api/class': async (q, body, ctx) => {
+    const unit = q.get('unit');
+    const mine = listOf(data, unit);
+    const list = (await offerList(unit, mine, ctx?.user?.id || 'local').catch(() => null)) || await classList(unit).catch(() => null);
+    return { list, yours: mine.length };
+  },
+  'POST /api/class/use': async (q, { unit } = {}) => {
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    const list = await classList(unit);
+    if (!list) throw Object.assign(new Error('No class list for this unit yet.'), { status: 404 });
+    let order = Math.max(0, ...data.topics.filter((t) => t.unit === unit).map((t) => t.order || 0));
+    for (const t of list.topics) {
+      let tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === t.name.toLowerCase());
+      if (!tp) tp = add('topics', { unit, name: t.name, status: 'red', order: ++order });
+      let n = Math.max(0, ...data.subtopics.filter((x) => x.topicId === tp.id).map((x) => x.order || 0));
+      const have = new Set(data.subtopics.filter((x) => x.topicId === tp.id).map((x) => x.name.toLowerCase()));
+      for (const name of t.subtopics || []) if (!have.has(name.toLowerCase())) add('subtopics', { ...checkSubtopic({ name, kind: 'concept' }, { create: true }), unit, topicId: tp.id, order: ++n });
+    }
+    parsePapers(unit); // the new topics tag the unit's past-paper questions straight away
+    return state();
+  },
+  // the owner can replace a unit's class list with theirs (a better or corrected outline)
+  'POST /api/class/share': async (q, { unit } = {}, ctx) => {
+    if (ctx?.user && ctx.user.tier !== 'owner') throw Object.assign(new Error('Only the owner can replace a class list.'), { status: 403 });
+    return { list: await offerList(unit, listOf(data, unit), ctx?.user?.id || 'local', { force: true }) };
+  },
+  // class hints: a lecturer hint marked "the whole class heard this", with a count of who heard it too
+  'GET /api/class/hints': (q, body, ctx) => classHints(q.get('unit'), ctx?.user?.id || 'local'),
+  'POST /api/class/hints': (q, { unit, kind, text, topicIds = [] } = {}, ctx) => {
+    if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (!['focus', 'exclude', 'note'].includes(kind) || !String(text || '').trim()) throw Object.assign(new Error('A hint needs its words and a kind.'), { status: 400 });
+    const topics = data.topics.filter((t) => topicIds.includes(t.id)).map((t) => t.name);
+    return shareHint(unit, { kind, text, topics }, ctx?.user?.id || 'local');
+  },
+  // "I heard it too": counts you once and copies the hint into your own hints, so it moves your predictions
+  'POST /api/class/hints/confirm': async (q, { id } = {}, ctx) => {
+    const me = ctx?.user?.id || 'local';
+    const h = await confirmHint(id, me);
+    if (!h) throw Object.assign(new Error('That hint is gone.'), { status: 404 });
+    if (data.units.some((u) => u.code === h.unit_code) && !data.hints.some((x) => x.unit === h.unit_code && x.text === h.text)) {
+      const names = (h.topics || []).map((n) => n.toLowerCase());
+      const topicIds = data.topics.filter((t) => t.unit === h.unit_code && names.includes(t.name.toLowerCase())).map((t) => t.id);
+      add('hints', hintFields(h.unit_code, h.text, { kind: h.kind, topicIds: topicIds.length ? topicIds : undefined }));
+    }
+    return classHints(h.unit_code, me);
+  },
+  'POST /api/sync': (q, body = {}) => {
+    const at = Date.now();
+    data.settings.sync = { ...data.settings.sync };
+    for (const k of ['look', 'unit', 'bellSeen', 'inboxSeen', 'focus']) if (k in body) data.settings.sync[k] = { v: body[k], at };
+    save();
+    return { at };
+  },
+  'GET /api/inbox': (q) => newMaterial(data.units.map((u) => u.code), q.get('since')),
+  'GET /api/focus': (q, body, ctx) => focusCounts(ctx?.user?.id || 'local', q.get('unit') || null).catch(() => ({ others: null, room: null })),
+  'POST /api/focus': (q, { until = null, unit = null } = {}, ctx) => setFocus(ctx?.user?.id || 'local', until, Date.now(), data.units.some((u) => u.code === unit) ? unit : null).catch((e) => { if (e.status) throw e; return { others: null, room: null }; }),
   'GET /api/usage': async (q, body, ctx) => ({ ai: await usedToday(ctx?.user, 'ai'), download: await usedToday(ctx?.user, 'download') }),
   'POST /api/notes/import': (q, { notes } = {}, ctx) => importNotes(ctx.user.id, notes, data.units.map((u) => u.code)),
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.
@@ -106,9 +168,9 @@ const routes = {
     if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Copy the topics from the course outline by hand, or use the Prompt Builder.'), { status: 400 });
     if (!data.paperq.some((x) => x.unit === unit)) parsePapers(unit);
     const have = data.topics.filter((t) => t.unit === unit).map((t) => t.name);
-    const { text, sources } = outlineContext(unit, data.paperq.filter((x) => x.unit === unit).map((x) => x.text));
-    const { topics } = await suggestTopics({ unit, title: u.title, have, context: text });
-    return { suggestions: topics.filter((t) => !have.some((h) => h.toLowerCase() === t.name.toLowerCase())), sources };
+    const { text, sources, outline } = outlineContext(unit, data.paperq.filter((x) => x.unit === unit).map((x) => x.text));
+    const { topics } = await suggestTopics({ unit, title: u.title, have, context: text, outline });
+    return { suggestions: topics.filter((t) => !have.some((h) => h.toLowerCase() === t.name.toLowerCase())), sources, outline };
   },
   // body: [{ code, title }] — the units you're taking. Keeps the dates and confidence you already set; a unit you
   // untick is remembered in settings.unitArchive (its topics and logs are never touched), so ticking it again

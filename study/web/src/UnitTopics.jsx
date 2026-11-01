@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
 import Learn from './Learn.jsx';
@@ -16,7 +16,7 @@ function Picks({ items, onAdd, onCancel, busy }) {
         {items.map((x) => (
           <label key={x.name} className="check">
             <input type="checkbox" checked={on.has(x.name)} onChange={(e) => { const n = new Set(on); if (e.target.checked) n.add(x.name); else n.delete(x.name); setOn(n); }} />
-            {x.name}
+            {x.name}{x.from === 'general' && <span className="chip">Expected</span>}
           </label>
         ))}
       </fieldset>
@@ -67,7 +67,8 @@ function Topic({ t, s, refresh, go, unit, onProblem }) {
             <button type="button" className="btn" disabled={busy || !s.ai} onClick={suggest}>{busy && picks === null ? 'Thinking…' : 'Suggest'}</button>
           </form>
           {picks?.length === 0 && <p className="row-sub">No new suggestions. Add them by hand.</p>}
-          {picks?.length > 0 && <Picks items={picks} busy={busy} onAdd={addNames} onCancel={() => setPicks(null)} />}
+          {picks?.length > 0 && noOutline && <p className="notice" role="status">No course outline for {unit} on the hub yet. These come from past papers first; the ones marked expected are what a course like this usually covers. Add the outline to the hub and suggest again for the exact list.</p>}
+      {picks?.length > 0 && <Picks items={picks} busy={busy} onAdd={addNames} onCancel={() => setPicks(null)} />}
           <button className="btn plain" onClick={() => go('learn', { unit, topic: t.name })}>Study this topic</button>
         </div>
       )}
@@ -77,20 +78,34 @@ function Topic({ t, s, refresh, go, unit, onProblem }) {
 
 // Topics in outline order. Open one to rate its sub-topics (one tap each) or add more.
 export default function UnitTopics(props) {
-  const { s, unit, refresh, notify } = props;
+  const { s, unit, refresh, notify, user } = props;
+  const [noOutline, setNoOutline] = useState(false);
   const [picks, setPicks] = useState(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
   const [problem, setProblem] = useState('');
   const topics = s.data.topics.filter((t) => t.unit === unit);
   const run = async (fn) => { setBusy(true); setProblem(''); try { await fn(); } catch (e) { setProblem(e.message); } setBusy(false); };
-  const suggest = () => run(async () => { const r = await api('POST', 'topics/suggest', { unit }); setPicks(r.suggestions); if (!r.suggestions.length) notify('No new topics found in the outline or past papers.'); });
+  const suggest = () => run(async () => { const r = await api('POST', 'topics/suggest', { unit }); setPicks(r.suggestions); setNoOutline(r.outline === false); if (!r.suggestions.length) notify('No new topics found in the outline or past papers.'); });
+  // the class's list for this unit (shared unit library); opening the tab also shares yours if the class has none
+  const [cls, setCls] = useState(null);
+  useEffect(() => { setCls(null); api('GET', `class?unit=${encodeURIComponent(unit)}`).then(setCls).catch(() => {}); }, [unit, topics.length]);
+  const subCount = cls?.list?.topics.reduce((n, t) => n + (t.subtopics?.length || 0), 0) || 0;
+  const useClass = () => run(async () => { await api('POST', 'class/use', { unit }); await refresh(); notify('Added the class list. Your changes to it stay yours.'); });
   const addTopics = (names) => run(async () => { for (const n of names) await api('POST', 'topics', { unit, name: n, status: 'red' }); setPicks(null); setName(''); await refresh(); });
 
   return (
     <>
       {problem && <p className="notice bad" role="alert">{problem}</p>}
-      {!topics.length && !picks && (
+      {!topics.length && !picks && cls?.list && (
+        <section className="card stack" aria-labelledby="class-title">
+          <h2 className="card-title" id="class-title">Your class already listed {unit}</h2>
+          <p className="muted small"><span className="num">{cls.list.topics.length}</span> topics{subCount > 0 && <> and <span className="num">{subCount}</span> sub-topics</>} from the outline and past papers. Your ratings stay private, and anything you change is yours.</p>
+          <ol className="plain-list small">{cls.list.topics.slice(0, 6).map((t) => <li key={t.name}>{t.name}</li>)}{cls.list.topics.length > 6 && <li className="muted">and <span className="num">{cls.list.topics.length - 6}</span> more</li>}</ol>
+          <div className="toolbar"><button type="button" className="btn primary" onClick={useClass} disabled={busy}>{busy ? 'Adding…' : 'Use the class list'}</button><button type="button" className="btn plain" onClick={suggest} disabled={busy || !s.ai}>Suggest my own</button></div>
+        </section>
+      )}
+      {!topics.length && !picks && !cls?.list && (
         <div className="empty">
           <h2>No topics yet</h2>
           <p>Crux can list them from the course outline and past papers.</p>
@@ -108,7 +123,8 @@ export default function UnitTopics(props) {
         <button className="btn" disabled={busy || !name.trim()}>Add</button>
         {topics.length > 0 && <button type="button" className="btn" onClick={suggest} disabled={busy || !s.ai}>Suggest</button>}
       </form>
-      <div className="legacy"><Learn {...props} /></div>
+      {user?.tier === 'owner' && topics.length >= 3 && <div className="toolbar"><button type="button" className="btn plain" disabled={busy} onClick={() => run(async () => { await api('POST', 'class/share', { unit }); notify(`Your ${unit} list is now the class list.`); })}>Make this the class list</button></div>}
+      <Learn {...props} />
     </>
   );
 }

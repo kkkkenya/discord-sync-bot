@@ -3,15 +3,50 @@ import { useEffect, useState } from 'react';
 // Shown when Crux can't be reached (no connection): nothing was saved.
 export const OFFLINE = "Couldn't reach Crux, so nothing was saved. Check your connection and try again.";
 
-export async function api(method, path, body) {
+const send = async (method, path, body) => {
   const r = await fetch(`/api/${path}`, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
-  }).catch(() => { throw new Error(OFFLINE); });
+  });
   const out = await r.json();
-  if (!r.ok) throw new Error(out.error || r.statusText);
+  if (!r.ok) throw Object.assign(new Error(out.error || r.statusText), { status: r.status });
   return out;
+};
+
+// Offline changes: edits that need no AI (dates, ratings, topics, settings, timer, marks) are kept on this device
+// and sent in order when Crux is back online. Anything that needs AI or reads files still needs a connection.
+const QUEUE = /^(units|topics(\/[\w-]+)?|subtopics(\/audit|\/(?!suggest)[\w-]+)?|settings|sync|focus|hints|attempts\/(broke|flag)|mocks\/[\w-]+|materials\/[\w-]+)(\?.*)?$/;
+const OUTBOX = 'crux-outbox';
+export const outbox = () => { try { return JSON.parse(localStorage.getItem(OUTBOX)) || []; } catch { return []; } };
+const keep = (list) => { try { localStorage.setItem(OUTBOX, JSON.stringify(list)); } catch { /* private window */ } window.dispatchEvent(new Event('crux-outbox')); };
+
+export async function api(method, path, body) {
+  try {
+    return await send(method, path, body);
+  } catch (e) {
+    if (e.status) throw e; // the server answered: a real error, not a lost connection
+    if (method === 'GET' || !QUEUE.test(path)) throw new Error(OFFLINE);
+    keep([...outbox(), { method, path, body, at: Date.now() }]);
+    return { queued: true };
+  }
+}
+
+// Sends what was saved offline, oldest first. Stops at the first lost connection; drops a change the server refuses.
+let flushing = false;
+export async function flushOutbox() {
+  if (flushing || !outbox().length) return 0;
+  flushing = true;
+  let sent = 0;
+  try {
+    for (let list = outbox(); list.length; list = outbox()) {
+      const [next] = list;
+      try { await send(next.method, next.path, next.body); } catch (e) { if (!e.status) break; }
+      keep(outbox().slice(1));
+      sent += 1;
+    }
+  } finally { flushing = false; }
+  return sent;
 }
 
 // Seconds since `busy` turned on, ticking once a second: long AI waits show they are still going.

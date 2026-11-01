@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-// Shown when the server can't be reached: the page stays open in the browser after the server window is closed.
-export const OFFLINE = "The study server isn't running, so nothing was saved. Click the Study Desk shortcut to start it.";
+// Shown when Crux can't be reached (no connection): nothing was saved.
+export const OFFLINE = "Couldn't reach Crux, so nothing was saved. Check your connection and try again.";
 
 export async function api(method, path, body) {
   const r = await fetch(`/api/${path}`, {
@@ -26,9 +26,6 @@ export function useElapsed(busy) {
   }, [busy]);
   return n;
 }
-
-// Tells the tutorial (Quests.jsx) that you just did something it asks for, like opening the top-bar menu.
-export const questEvent = (name) => window.dispatchEvent(new CustomEvent('study-quest', { detail: name }));
 
 // Units with no date of their own count down to the KU calendar. This marks them all TBA (dates moved by the strike).
 export async function markUndatedTba(units) {

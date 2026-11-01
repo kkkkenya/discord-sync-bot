@@ -1,20 +1,27 @@
-// Screenshots for UI checks: node tools/shots.js <url> <name> [--dark]. Saves to study/data/shots/<name>-<width>.png
-// at 375 and 1280 px wide, with the Edge that ships with Windows (no browser download).
+// Screenshots for UI checks, with the Edge that ships with Windows (no browser download):
+//   node tools/shots.js <base url> [route ...]     e.g. node tools/shots.js http://localhost:5190 today units unit/EMM-302/papers
+// Each route at 375×812 and 1280×800, light and dark, into study/shots/<route>-<theme>-<width>.png (git-ignored).
+// Against the local server you are signed in as the owner (server/index.js), so no sign-in step is needed.
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
-const [url, name] = process.argv.slice(2);
-const dark = process.argv.includes('--dark');
-const out = new URL('../data/shots/', import.meta.url);
+const [base, ...args] = process.argv.slice(2);
+const routes = args.length ? args : ['today', 'units', 'practise', 'insights', 'settings'];
+const out = fileURLToPath(new URL('../shots/', import.meta.url));
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ channel: 'msedge' });
-for (const width of [375, 1280]) {
-  const page = await browser.newPage({ viewport: { width, height: width < 600 ? 812 : 800 }, colorScheme: dark ? 'dark' : 'light' });
-  await page.goto(url, { waitUntil: 'networkidle' });
-  const file = fileURLToPath(new URL(`${name}${dark ? '-dark' : ''}-${width}.png`, out));
-  await page.screenshot({ path: file, fullPage: true });
-  console.log(file);
-  await page.close();
+for (const theme of ['light', 'dark']) {
+  for (const [width, height] of [[375, 812], [1280, 800]]) {
+    const page = await browser.newPage({ viewport: { width, height }, colorScheme: theme });
+    for (const r of routes) {
+      await page.goto(`${base}/#/${r}`, { waitUntil: 'networkidle' });
+      await page.waitForTimeout(300);
+      const file = `${out}${r.replace(/\//g, '_')}-${theme}-${width}.png`;
+      await page.screenshot({ path: file, fullPage: width > 600 });
+      console.log(file);
+    }
+    await page.close();
+  }
 }
 await browser.close();

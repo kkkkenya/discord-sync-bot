@@ -108,7 +108,7 @@ export default function Practice({ s, unit, setUnit, refresh, go, focus, notify 
     <section id="practice" className="reveal">
       <div className="head"><h2>Check my answer</h2></div>
       <p className="muted small">
-        Type your final answer with its unit. If it is wrong you get numbered checkpoints: tap <b>Broke here</b> on the step where your working diverged and Study Desk learns which sub-topic and which kind of mistake is costing you marks.
+        Type your final answer with its unit. If it is wrong you get numbered checkpoints: tap <b>Broke here</b> on the step where your working diverged and Crux learns which sub-topic and which kind of mistake is costing you marks.
       </p>
       {!s.data.units.length ? <p className="muted">Pick your units first.</p> : (
         <form onSubmit={check}>

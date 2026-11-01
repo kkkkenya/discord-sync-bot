@@ -4,7 +4,7 @@ import Analysis from './Analysis.jsx';
 import { Icon } from './icons.jsx';
 import Kit from './Kit.jsx';
 import Mock from './Mock.jsx';
-import Practice from './Practice.jsx';
+import PractiseQuestions from './PractiseQuestions.jsx';
 import Progress from './Progress.jsx';
 import Prompt from './Prompt.jsx';
 import { go as goTo, href, unitCode, unitSlug, useRoute } from './route.js';
@@ -22,6 +22,7 @@ const TABS = [
   { id: 'practise', label: 'Practise', icon: 'practise' },
   { id: 'insights', label: 'Insights', icon: 'insights' },
 ];
+const MODES = [{ id: 'questions', label: 'Questions' }, { id: 'explain', label: 'Explain it' }, { id: 'timed', label: 'Timed paper' }];
 const UNIT_TABS = [{ id: 'topics', label: 'Topics' }, { id: 'papers', label: 'Papers' }, { id: 'notes', label: 'Notes' }, { id: 'sheet', label: 'Sheet' }];
 
 // Where the old panels' links (go('predictions'), go('teach'), …) land in the new map (fixplan Appendix C).
@@ -29,7 +30,7 @@ const PLACE = {
   overview: ['today'], today: ['today'], units: ['units'],
   predictions: ['unit', 'papers'], papers: ['unit', 'papers'], analysis: ['unit', 'topics'], learn: ['unit', 'topics'],
   kit: ['unit', 'sheet'], notes: ['unit', 'notes'],
-  practice: ['practise'], teach: ['practise'], mock: ['practise'], prompt: ['insights'], progress: ['insights'],
+  practice: ['practise', 'questions'], teach: ['practise', 'explain'], mock: ['practise', 'timed'], prompt: ['insights'], progress: ['insights'],
 };
 
 export default function App({ user }) {
@@ -68,7 +69,7 @@ export default function App({ user }) {
     if (extra.unit) setUnit(extra.unit);
     setFocus({ section, ...extra, at: Date.now() });
     const [name, tab] = PLACE[section] || ['today'];
-    goTo(name === 'unit' ? href('unit', unitSlug(target), tab) : href(name));
+    goTo(name === 'unit' ? href('unit', unitSlug(target), tab) : href(name, tab));
     setTimeout(() => document.getElementById(section)?.scrollIntoView({ block: 'start' }), 50);
   };
   const props = { s, refresh, go, focus, notify, unit, setUnit };
@@ -99,7 +100,18 @@ export default function App({ user }) {
   } else if (page === 'units') {
     content = <><header className="page-head"><h1>Units</h1></header><div className="legacy"><Units {...props} /></div></>;
   } else if (page === 'practise') {
-    content = <><header className="page-head"><h1>Practise</h1></header><div className="legacy"><Practice {...props} /><Teach {...props} /><Mock {...props} /></div></>;
+    const mode = MODES.some((m) => m.id === route.rest[0]) ? route.rest[0] : 'questions';
+    content = (
+      <>
+        <header className="page-head"><h1>Practise</h1><p>{unit}</p></header>
+        <nav className="segmented" aria-label="Ways to practise">
+          {MODES.map((m) => <a key={m.id} href={href('practise', m.id)} aria-current={mode === m.id ? 'page' : undefined}>{m.label}</a>)}
+        </nav>
+        {mode === 'questions' && <PractiseQuestions key={unit} {...props} />}
+        {mode === 'explain' && <div className="legacy"><Teach {...props} /></div>}
+        {mode === 'timed' && <div className="legacy"><Mock {...props} /></div>}
+      </>
+    );
   } else if (page === 'insights') {
     content = <><header className="page-head"><h1>Insights</h1></header><div className="legacy"><Analysis {...props} /><Progress {...props} /><Prompt {...props} /></div></>;
   } else {

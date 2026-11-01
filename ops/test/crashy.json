@@ -1,0 +1,1 @@
+[{ "name": "crashy", "dir": "ops/test", "args": ["crash.js"], "delays": [1, 1, 1, 1] }]

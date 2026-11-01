@@ -1,0 +1,4 @@
+[
+  { "name": "drive-dumper", "dir": "pc", "args": ["src/index.js"] },
+  { "name": "community", "dir": "community", "args": ["src/index.js"] }
+]

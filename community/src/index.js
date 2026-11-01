@@ -2,7 +2,7 @@
 // The daily posts are sent by GitHub Actions (scheduler.js), so they go out even when this isn't running.
 //   npm start      chat          npm run try     also send any of today's posts not sent yet, right now
 import { config } from 'dotenv';
-import { appendFileSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { CHANNEL } from './config.js';
@@ -11,13 +11,6 @@ import { onMessage } from './talk.js';
 config({ path: new URL('../.env', import.meta.url), quiet: true });
 for (const key of ['COMMUNITY_DISCORD_TOKEN', 'GEMINI_API_KEY']) {
   if (!process.env[key]) { console.error(`Missing ${key} in community/.env. Double-click setup.bat to add it.`); process.exit(1); }
-}
-
-// everything printed also goes to community/data/bot.log
-const LOG = new URL('../data/bot.log', import.meta.url);
-for (const level of ['log', 'error']) {
-  const print = console[level].bind(console);
-  console[level] = (...a) => { print(...a); try { appendFileSync(LOG, `${new Date().toISOString()} ${level === 'error' ? 'ERROR ' : ''}${a.map((x) => (x instanceof Error ? x.stack : String(x))).join(' ')}\n`); } catch { /* busy */ } };
 }
 
 // one copy at a time

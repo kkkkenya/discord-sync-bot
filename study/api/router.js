@@ -54,7 +54,7 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       return reply(result);
     } catch (e) {
       if (!e.status) console.error(e);
-      return json({ error: e.message }, e.status || 500);
+      return json({ error: e.message, ...(e.resetsAt && { resetsAt: e.resetsAt }) }, e.status || 500);
     }
   };
 }

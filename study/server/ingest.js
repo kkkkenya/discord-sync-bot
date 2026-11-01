@@ -125,7 +125,7 @@ export function removeLocalFile(id) {
   return true;
 }
 
-async function messageFor(channelId, messageId) {
+export async function messageFor(channelId, messageId) {
   const r = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages/${messageId}`, {
     headers: { Authorization: `Bot ${process.env.DISCORD_TOKEN}` },
   });

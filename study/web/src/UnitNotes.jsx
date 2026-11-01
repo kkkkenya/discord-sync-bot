@@ -15,6 +15,18 @@ export default function UnitNotes(props) {
   const load = () => api('GET', `library?unit=${encodeURIComponent(unit)}`).then(setLib).catch((e) => setProblem(e.message));
   const loadMine = () => api('GET', `notes?unit=${encodeURIComponent(unit)}`).then(setMine).catch(() => setMine([]));
   useEffect(() => { load(); loadMine(); }, [unit, props.s]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [dl, setDl] = useState(null); // { used, limit } downloads today; limit null = no limit
+  useEffect(() => { api('GET', 'usage').then((u) => setDl(u.download)).catch(() => {}); }, []);
+  const download = async (f) => {
+    setProblem('');
+    try {
+      const r = await api('GET', `files/${f.id}/download`);
+      window.location.href = r.url;
+      if (dl?.limit) setDl({ ...dl, used: dl.limit - r.left });
+    } catch (e) {
+      setProblem(e.message === 'download-limit' ? "Today's downloads are used. More tomorrow, or open the file in Discord." : e.message);
+    }
+  };
   const remove = (n) => api('DELETE', `notes/${n.id}`).then(loadMine).catch((e) => setProblem(e.message));
   // questions for the mock bank from one of your notes (needs the AI)
   const makeQuestions = async (n) => {
@@ -44,7 +56,7 @@ export default function UnitNotes(props) {
       {problem && <p className="notice bad" role="alert">{problem}</p>}
       <div className="card">
         <div className="card-head">
-          <span className="row-main"><h2>Hub files</h2><span className="row-sub">{lib ? `${files.length - unread} of ${files.length} read` : 'Loading…'}</span></span>
+          <span className="row-main"><h2>Hub files</h2><span className="row-sub">{lib ? `${files.length - unread} of ${files.length} read` : 'Loading…'}{dl?.limit ? ` · ${Math.max(0, dl.limit - dl.used)} download${dl.limit - dl.used === 1 ? '' : 's'} left today` : ''}</span></span>
           <button className="btn primary" onClick={prepare} disabled={busy || !lib || !files.length}>{busy ? (progress ? `${progress.done} of ${progress.total} read` : 'Reading…') : unread ? 'Prepare' : 'Check again'}</button>
         </div>
         {busy && <div className="progress" aria-hidden="true"><span style={{ width: `${progress ? (100 * progress.done) / progress.total : 5}%` }} /></div>}
@@ -59,6 +71,7 @@ export default function UnitNotes(props) {
                 <span className="row-main"><span className="filename">{f.name}</span><span className="row-sub">{f.paper ? 'Paper' : 'Notes'}{f.pages ? ` · ${f.pages} pages` : ''}</span></span>
                 <span className={`chip ${tone || ''}`}>{label}</span>
                 {f.url && <a className="btn" href={f.url} target="_blank" rel="noreferrer">Open in Discord</a>}
+                {f.url && /^\d+$/.test(f.id) && <button className="btn plain" onClick={() => download(f)}>Download</button>}
               </div>
             );
           })}

@@ -20,6 +20,7 @@ import { nextActions } from './next.js';
 import { insights } from './insights.js';
 import { deleteNote, importNotes, listNotes, loadNotes, ownNotes } from './notes-store.js';
 import { bump, usedToday } from './usage.js';
+import { downloadLink } from './downloads.js';
 import { requestScope } from './store.js';
 import { KITS, KIT_FOR, makeKitFor } from './kit.js';
 import { learnFor } from './learn-store.js';
@@ -51,7 +52,7 @@ const routes = {
   // Imported notes (Obsidian, Notion): parsed in the browser, saved per unit and title.
   'GET /api/notes': (q, body, ctx) => listNotes(ctx.user.id, q.get('unit')),
   // Today's AI actions against the member's limit, for Settings.
-  'GET /api/usage': async (q, body, ctx) => ({ ai: await usedToday(ctx?.user, 'ai') }),
+  'GET /api/usage': async (q, body, ctx) => ({ ai: await usedToday(ctx?.user, 'ai'), download: await usedToday(ctx?.user, 'download') }),
   'POST /api/notes/import': (q, { notes } = {}, ctx) => importNotes(ctx.user.id, notes, data.units.map((u) => u.code)),
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.
   'GET /api/catalog': (q) => {
@@ -405,6 +406,8 @@ export async function dispatch(method, pathname, query, body, ctx) {
   await ensureLibrary([...data.units.map((u) => u.code), query?.get?.('unit'), body?.unit]); // shared file text, cached
   const unitHere = query?.get?.('unit') || body?.unit || data.topics.find((t) => t.id === (query?.get?.('topicId') || body?.topicId))?.unit;
   if (READS_NOTES.test(pathname) && ctx?.user) await loadNotes(ctx.user.id, unitHere);
+  const file = method === 'GET' && pathname.match(/^\/api\/files\/(\d+)\/download$/);
+  if (file) return downloadLink(ctx.user, file[1]);
   const note = method === 'DELETE' && pathname.match(/^\/api\/notes\/([\w-]+)$/);
   if (note) return { removed: await deleteNote(ctx.user.id, note[1]) };
   const route = routes[`${method} ${pathname}`];

@@ -30,7 +30,7 @@ createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));
     } catch (e) {
       if (!e.status) console.error(e);
-      res.writeHead(e.status || 500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: e.message }));
+      res.writeHead(e.status || 500, { 'Content-Type': 'application/json' }).end(JSON.stringify({ error: e.message, ...(e.resetsAt && { resetsAt: e.resetsAt }) }));
     }
     return;
   }

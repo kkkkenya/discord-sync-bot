@@ -2,7 +2,7 @@
 # servers so they go out with the PC off. Times are UTC: 07:00 = 10:00 in Nairobi. GitHub can start a few minutes
 # late; every run sends whatever is due and not yet sent, so late runs catch up.
 # Secrets (repo → Settings → Secrets and variables → Actions): COMMUNITY_DISCORD_TOKEN, GEMINI_API_KEY,
-# SUPABASE_URL, SUPABASE_SERVICE_KEY. community/setup.bat can add them for you.
+# SUPABASE_URL, SUPABASE_SERVICE_KEY. community/setup.bat adds them, or `node community/push-secrets.js` after gh auth login.
 name: Community posts
 on:
   schedule:

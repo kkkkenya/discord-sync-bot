@@ -5,6 +5,7 @@ import { CHANNEL, DEPARTMENTS } from './config.js';
 import { latestNews, latestPapers, latestVideos } from './feeds.js';
 import { askJson } from './gemini.js';
 import { discord, load, nairobiDay, store } from './rest.js';
+import { revealReady } from './due.js';
 
 const LETTERS = ['🇦', '🇧', '🇨', '🇩'];
 const NONE = { parse: [] };
@@ -45,13 +46,14 @@ export async function trivia() {
     `Trivia: ${unit.title}`, q.discussion,
   );
   for (const e of LETTERS) await discord('PUT', `/channels/${CHANNEL}/messages/${msg.id}/reactions/${encodeURIComponent(e)}/@me`);
-  await store('trivia', { messageId: msg.id, threadId: thread.id, answer: order.indexOf(q.answer), choices, explanation: q.explanation, day: nairobiDay() });
+  await store('trivia', { messageId: msg.id, threadId: thread.id, answer: order.indexOf(q.answer), choices, explanation: q.explanation, day: nairobiDay(), postedAt: Date.now() });
   await remember('units', unit.codes[0]);
 }
 
 export async function reveal() {
   const t = await load('trivia', null);
   if (!t || t.revealed || t.day !== nairobiDay()) return;
+  if (!revealReady(t)) return false;
   const me = (await discord('GET', '/users/@me')).id;
   const voters = new Map(); // user -> letters they reacted with
   for (const [n, e] of LETTERS.entries()) {

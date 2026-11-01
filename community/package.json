@@ -9,7 +9,8 @@
   "scripts": {
     "setup": "node setup-keys.js",
     "start": "node src/index.js",
-    "try": "node src/index.js --post-now"
+    "try": "node src/index.js --post-now",
+    "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "discord.js": "^14.16.3",

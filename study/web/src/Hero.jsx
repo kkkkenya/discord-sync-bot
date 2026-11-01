@@ -36,11 +36,6 @@ export default function Hero({ s, refresh, go }) {
   const minutes = Object.values(s.stats.minutesWeek).reduce((a, b) => a + b, 0);
   const green = s.data.topics.filter((t) => s.mastery?.[t.id]?.status === 'green').length;
 
-  const dm = async () => {
-    setSent('Sending…');
-    try { await api('POST', 'dm-today'); setSent('Sent. Check your DMs.'); } catch (e) { setSent(e.message); }
-  };
-
   return (
     <section id="overview" className="hero reveal" data-tour="countdown">
       <div className="hero-top-badge">
@@ -76,7 +71,6 @@ export default function Hero({ s, refresh, go }) {
         <div><dt>This week</dt><dd>{Math.round(minutes / 6) / 10}h</dd></div>
       </dl>
       <div className="hero-foot">
-        {s.discord ? <button className="ghost" onClick={dm}>DM me today's plan</button> : <span className="muted">Discord DMs are off. Run <code>setup.bat</code> in the study folder.</span>}
         {!s.coach && <span className="muted">Teach-back marking is off: no key for the selected AI provider.</span>}
         {sent && <span className="muted">{sent}</span>}
       </div>

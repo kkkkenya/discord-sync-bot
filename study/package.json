@@ -1,26 +1,21 @@
 {
-  "name": "esh-study",
+  "name": "crux",
   "private": true,
   "type": "module",
-  "description": "Personal study dashboard (localhost) + private DMs from the Study Hub bot: CAT countdown, past-paper predictions, weakspots, checked answers, teach-backs, mocks.",
+  "description": "Crux: a study app for KU engineering students, on the web at crux.engineeringhub.site. Discord sign-in, plans from past papers, weakspots, checkpoints.",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "setup": "node setup.js",
+    "dev": "node tools/dev.js",
     "build": "vite build",
     "start": "vite build && node server/index.js",
-    "dev": "vite",
-    "test": "node --test \"test/*.test.js\" \"server/*.test.js\"",
-    "installer": "node tools/make-installer.js"
+    "test": "node --test \"test/*.test.js\" \"server/*.test.js\""
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.3.0",
-    "discord.js": "^14.27.0",
     "dotenv": "^18.0.9",
     "jszip": "^3.10.2",
     "mammoth": "^1.13.0",
-    "node-cron": "^4.6.0",
     "pdfjs-dist": "^4.10.38"
   },
   "devDependencies": {

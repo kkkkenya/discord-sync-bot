@@ -1,8 +1,5 @@
-// Your private study channel: the Study Hub bot DMs you, and you DM it back. Only OWNER_ID gets answers.
-// It signs in with the same token as the PC bot, as a second, DM-only connection, so the server bots are untouched.
-// Buttons and slash commands go to Vercel, so everything here is plain typed replies.
-import { ChannelType, Client, Events, GatewayIntentBits, Partials } from 'discord.js';
-import cron from 'node-cron';
+// Study DMs: the typed replies (today, files, teach, predict, hint, weakspots, mark, learn, log, paper) and the
+// morning and evening texts. Kept for week 2, when the bot sends them again from the cloud; no Discord connection here.
 import { coach, coachReady } from './coach.js';
 import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
 import { daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
@@ -12,7 +9,6 @@ import { transcribe } from './brain.js';
 import { paperInfo } from './predict.js';
 import { KEY_LABEL, checkAnswer, checkPhoto, flagCheckpoint, markBroke } from './practice.js';
 import { checkMedia, saveUpload } from './uploads.js';
-import { friendMode, hub } from './hub.js';
 import { learnFor, topicNamed } from './learn-store.js';
 import { stageMix } from './stages.js';
 import { add, data, save } from './store.js';
@@ -346,93 +342,4 @@ export async function reply(text, { photo = false, attachment = null } = {}) {
   if (word === 'mark') return markText(t, { photo, attachment }).catch((e) => (e.status ? e.message : Promise.reject(e)));
   if (word === 'quiz' || word === 'card') return 'Flashcards are retired in Study Desk. Try `teach EMM 302 <topic>`, or a timed mock on the dashboard.';
   return mode ? 'Type `stop` to end this first.' : HELP;
-}
-
-
-// Friend mode: no bot token on this laptop. /study commands wait in the gateway's queue; this Study Desk picks them up
-// every few seconds while it runs, answers with the same replies the DMs use, and sends the answers back. The 07:00
-// plan and the 20:30 nudge go out as DMs through the gateway too.
-export async function relayReply({ command, args: a = {} }) {
-  switch (command) {
-    case 'today': return reply('today');
-    case 'learn': return reply(`learn ${a.unit} ${a.topic}`);
-    case 'predict': return reply(`predict ${a.unit}`);
-    case 'weakspots': return reply(`weakspots ${a.unit}`);
-    case 'broke': return reply(`mark broke ${a.step} ${a.mistake || ''}`);
-    case 'mark':
-      if (a.photo?.url) return reply('mark', { attachment: a.photo }); // the photo is of the question /study mark gave last
-      if (a.answer) return reply(`mark ${a.answer}`);
-      return reply(`mark ${a.unit}`);
-    case 'teach': {
-      const start = await reply(`teach ${a.unit} ${a.topic}`);
-      if (a.voice?.url) return reply('(voice message)', { attachment: a.voice });
-      if (a.text) return reply(a.text);
-      return `${start}\n\nSend it with \`/study teach\` again: type it in **text**, or attach a **voice** note.`;
-    }
-    default: return HELP;
-  }
-}
-
-function startRelay() {
-  let busy = false;
-  const tick = async () => {
-    if (busy) return;
-    busy = true;
-    try {
-      const { items } = await hub('inbox', {}, { timeout: 15000 });
-      for (const it of items) {
-        let text;
-        try { text = await relayReply(it); } catch (e) { text = `Something broke: ${e.message}`; }
-        await hub('reply', { id: it.id, text: chunks(text)[0] }).catch((e) => console.error('reply failed:', e.message));
-      }
-    } catch { /* offline or the Hub is busy: the next tick tries again */ }
-    busy = false;
-  };
-  setInterval(tick, 4000);
-  tick();
-  const send = (text) => hub('dm', { text: chunks(text)[0] });
-  cron.schedule('0 7 * * *', () => send(todayText()).catch((e) => console.error('morning DM failed:', e.message)), { timezone: 'Africa/Nairobi' });
-  cron.schedule('30 20 * * *', () => { const text = eveningText(); if (text) send(text).catch((e) => console.error('evening DM failed:', e.message)); }, { timezone: 'Africa/Nairobi' });
-  console.log('Discord through the Study Hub: /study commands are answered while this window is open.');
-  return { dm: send };
-}
-
-export function startBot() {
-  const token = process.env.DISCORD_TOKEN;
-  const owner = process.env.OWNER_ID;
-  if (!token && friendMode()) return startRelay();
-  if (!token || !owner) {
-    console.log(`Discord DMs off: ${!token ? 'DISCORD_TOKEN missing in pc/.env' : 'OWNER_ID missing in study/.env (run setup.bat)'}.`);
-    return null;
-  }
-  const client = new Client({ intents: [GatewayIntentBits.DirectMessages], partials: [Partials.Channel] });
-  const dm = async (text) => {
-    const user = await client.users.fetch(owner);
-    for (const part of chunks(text)) await user.send(part);
-  };
-  client.on(Events.MessageCreate, async (msg) => {
-    if (msg.author.bot || msg.channel.type !== ChannelType.DM || msg.author.id !== owner) return;
-    try {
-      await msg.channel.sendTyping();
-      const att = msg.attachments.first();
-      const text = await reply(msg.content || (att?.contentType?.startsWith('audio/') ? '(voice message)' : ''), { attachment: att ? { url: att.url, contentType: att.contentType, size: att.size } : null });
-      for (const part of chunks(text)) await msg.channel.send(part);
-    } catch (e) {
-      console.error('DM reply failed:', e);
-      msg.channel.send(`Something broke: ${e.message}`).catch(() => {});
-    }
-  });
-
-  client.once(Events.ClientReady, () => {
-    console.log(`Discord DMs on: ${client.user.tag} will message you. DM it "help".`);
-    // 07:00 plan, 20:30 nudge if nothing was done today. Nairobi time.
-    cron.schedule('0 7 * * *', () => dm(todayText()).catch((e) => console.error('morning DM failed:', e.message)), { timezone: 'Africa/Nairobi' });
-    cron.schedule('30 20 * * *', () => {
-      const text = eveningText();
-      if (text) dm(text).catch((e) => console.error('evening DM failed:', e.message));
-    }, { timezone: 'Africa/Nairobi' });
-  });
-
-  client.login(token).catch((e) => console.error(`Discord sign-in failed: ${e.message}. Check DISCORD_TOKEN in pc/.env.`));
-  return { client, dm };
 }

@@ -6,7 +6,7 @@ useStore('legacy-study.json');
 const { data } = await import('../server/store.js');
 const { todayPlan, stats } = await import('../server/plan.js');
 const { topicMastery } = await import('../server/mastery.js');
-const { reply } = await import('../server/bot.js');
+const { reply } = await import('../server/dm.js');
 
 const TODAY = '2026-10-28';
 

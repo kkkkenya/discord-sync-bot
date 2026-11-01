@@ -5,7 +5,7 @@ import { useStore } from './helpers.js';
 useStore('legacy-study.json');
 for (const k of ['GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'ANTHROPIC_API_KEY']) delete process.env[k]; // no AI: keys come from the question
 const { data } = await import('../server/store.js');
-const { eveningText, reply } = await import('../server/bot.js');
+const { eveningText, reply } = await import('../server/dm.js');
 
 const TODAY = '2026-10-28';
 data.subtopics.push({ id: 's1', unit: 'EMM 302', topicId: 't1', name: 'Principal stresses', audit: 'shaky', at: 'x' });

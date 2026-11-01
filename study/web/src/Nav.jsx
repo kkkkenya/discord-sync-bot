@@ -87,10 +87,6 @@ export default function Nav({ s, go, refresh, unit, setUnit, onTour, onProblem }
   const [open, setOpen] = useState(null); // a group id, 'settings', or 'sheet'
   const [hot, setHot] = useState(null); // the section under the pointer, for the panel's caption
   const timer = useRef(0);
-  // friend mode: this laptop's link with the Study Hub (name, Discord, today's free AI)
-  const [hubInfo, setHubInfo] = useState(null);
-  const [pair, setPair] = useState('');
-  useEffect(() => { if (s.friend && open === 'settings') api('GET', 'hub').then(setHubInfo).catch(() => {}); }, [s.friend, open]);
   const bar = useRef(null);
   const later = () => { clearTimeout(timer.current); timer.current = setTimeout(() => setOpen((o) => (o === 'sheet' ? o : null)), 160); };
   const now = (id) => { clearTimeout(timer.current); setOpen(id); setHot(null); if (id !== 'settings') questEvent('nav-open'); };
@@ -117,14 +113,10 @@ export default function Nav({ s, go, refresh, unit, setUnit, onTour, onProblem }
       </label>
       <label className="small">AI provider
         <select value={s.settings.aiProvider} onChange={(e) => setting({ aiProvider: e.target.value })}>
-          {s.friend && <option value="hub">Study Hub AI (free{hubInfo ? `, ${hubInfo.aiDailyCap} a day` : ''})</option>}
-          <option value="gemini">Gemini (your key)</option><option value="deepseek">DeepSeek (your key)</option><option value="anthropic">Claude (your key)</option>
+          <option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option>
         </select>
       </label>
-      <p className={`small ${s.ai ? 'muted' : 'warm'}`}>{s.ai ? (s.provider === 'hub' ? `Study Hub AI: ${hubInfo ? `${hubInfo.aiToday} of ${hubInfo.aiDailyCap} used today.` : 'ready.'} Free for now; later part of Premium (you'll be told first).` : `AI ready (${s.provider}).`) : `No key for ${s.provider}. Pick another provider or add the key with setup.bat.`}</p>
-      {s.friend && (hubInfo?.discordLinked
-        ? <p className="small muted">Discord connected: /study works while Study Desk is open.</p>
-        : <p className="small">{pair ? <>In Discord type <code>/study connect code:{pair}</code> (works 15 minutes).</> : <button className="link small" onClick={() => api('POST', 'hub/pair').then((p) => setPair(p.code)).catch((e) => onProblem(e.message))}>Connect Discord</button>}</p>)}
+      <p className={`small ${s.ai ? 'muted' : 'warm'}`}>{s.ai ? `AI ready (${s.provider}).` : `No key for ${s.provider}. Pick another provider.`}</p>
       <button className="link small" onClick={() => { setOpen(null); onTour(); }}>{s.settings.quest?.off ? 'Show the tutorial quests' : 'Tutorial quests are on (bottom left)'}</button>
     </div>
   );

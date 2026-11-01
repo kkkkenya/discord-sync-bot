@@ -1,21 +1,17 @@
-// One AI helper for the study desk, with a provider switch. Every AI call goes through structured().
-// Providers: gemini (default; native REST, schema-enforced), deepseek (OpenAI-compatible JSON, validated + retried),
-// anthropic (legacy SDK). Keys: GEMINI_API_KEY, DEEPSEEK_API_KEY, ANTHROPIC_API_KEY. Model names override via AI_MODEL.
-import Anthropic from '@anthropic-ai/sdk';
-import { friendMode, hub } from './hub.js';
+// One AI helper for Crux, with a provider switch. Every AI call goes through structured().
+// Providers: gemini (default; native REST, schema-enforced), deepseek (OpenAI-compatible JSON, validated + retried).
+// Keys: GEMINI_API_KEY, DEEPSEEK_API_KEY. Model names override via AI_MODEL.
 import { data } from './store.js';
 
-let anthropic;
-
-export const PROVIDERS = ['gemini', 'deepseek', 'anthropic', 'hub'];
+export const PROVIDERS = ['gemini', 'deepseek'];
 export const provider = () => data?.settings?.aiProvider || process.env.AI_PROVIDER || 'gemini';
 
-const MODELS = { gemini: 'gemini-3.8-flash', deepseek: 'deepseek-flash', anthropic: 'claude-opus-5-5' };
-const KEYS = { gemini: 'GEMINI_API_KEY', deepseek: 'DEEPSEEK_API_KEY', anthropic: 'ANTHROPIC_API_KEY' };
+const MODELS = { gemini: 'gemini-3.8-flash', deepseek: 'deepseek-flash' };
+const KEYS = { gemini: 'GEMINI_API_KEY', deepseek: 'DEEPSEEK_API_KEY' };
 
-export const aiReady = () => (provider() === 'hub' ? friendMode() : Boolean(process.env[KEYS[provider()]]));
-// What each provider can read besides text (Phase 9): photos of working, and voice teach-backs.
-export const CAN = { gemini: { image: true, audio: true }, anthropic: { image: true, audio: false }, deepseek: { image: false, audio: false }, hub: { image: true, audio: true } };
+export const aiReady = () => Boolean(process.env[KEYS[provider()]]);
+// What each provider can read besides text: photos of working, and voice teach-backs.
+export const CAN = { gemini: { image: true, audio: true }, deepseek: { image: false, audio: false } };
 export const canRead = (kind) => aiReady() && Boolean(CAN[provider()]?.[kind]);
 const model = () => process.env.AI_MODEL || MODELS[provider()];
 
@@ -36,23 +32,6 @@ const fetchWithTimeout = (url, options, ms = 30000) => {
     .finally(() => clearTimeout(t));
 };
 const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
-
-// ---- Anthropic (structured output enforced server-side) ----
-async function anthropicCall(schema, system, content, maxTokens, media = []) {
-  anthropic ||= new Anthropic();
-  const response = await anthropic.beta.messages.create({
-    model: model(),
-    max_tokens: maxTokens,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort: 'low', format: { type: 'json_schema', schema } },
-    system,
-    messages: [{ role: 'user', content: media.length ? [...media.map((m) => ({ type: 'image', source: { type: 'base64', media_type: m.mime, data: m.data } })), { type: 'text', text: content }] : content }],
-  });
-  if (response.stop_reason === 'refusal') throw new Error('Claude declined this one.');
-  if (response.stop_reason === 'max_tokens') throw new Error('The output was cut off — try a shorter input.');
-  return JSON.parse(response.content.filter((b) => b.type === 'text').map((b) => b.text).join(''));
-}
 
 // ---- Gemini (native REST, schema enforced via responseSchema) ----
 const GEMINI_FALLBACK = 'gemini-3.5-flash-lite';
@@ -164,13 +143,11 @@ async function deepseekCall(schema, system, content, maxTokens) {
 // media: [{ mime, data (base64) }], images or audio, for the providers that can read them (CAN).
 export async function structured(schema, system, content, maxTokens = 4000, media = []) {
   const p = provider();
-  if (!aiReady()) throw new Error(p === 'hub' ? 'The Study Hub AI needs this Study Desk linked with a code. Run setup.' : `No ${KEYS[p]} for provider "${p}". Pick another provider in the top bar, or add the key.`);
+  if (!aiReady()) throw new Error(`No ${KEYS[p]} for provider "${p}". Pick another provider in Settings, or add the key.`);
   for (const m of media) {
     const kind = m.mime.startsWith('audio/') ? 'audio' : 'image';
-    if (!CAN[p]?.[kind]) throw Object.assign(new Error(`${p} can't read ${kind === 'audio' ? 'recordings' : 'photos'}. Switch to ${kind === 'audio' ? 'Gemini' : 'Gemini or Claude'} in Settings, or type it.`), { status: 400 });
+    if (!CAN[p]?.[kind]) throw Object.assign(new Error(`${p} can't read ${kind === 'audio' ? 'recordings' : 'photos'}. Switch to Gemini in Settings, or type it.`), { status: 400 });
   }
-  if (p === 'hub') return (await hub('ai', { schema, system, content, maxTokens, media }, { timeout: 75000 })).result;
-  if (p === 'anthropic') return anthropicCall(schema, system, content, maxTokens, media);
   if (p === 'gemini') return geminiCall(schema, system, content, maxTokens, media);
   return deepseekCall(schema, system, content, maxTokens);
 }

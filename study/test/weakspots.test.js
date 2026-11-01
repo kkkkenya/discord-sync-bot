@@ -26,7 +26,7 @@ test('an unknown topic or no feedback flags nothing', () => {
   assert.deepEqual(teachFlags('EMM 302', "Mohr's circle", null).flagged, []);
 });
 
-const { reply } = await import('../server/bot.js');
+const { reply } = await import('../server/dm.js');
 const { parsePapers, pastePaper, predictFor } = await import('../server/weakspots.js');
 const { library } = await import('../server/ingest.js');
 

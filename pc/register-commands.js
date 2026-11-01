@@ -56,6 +56,9 @@ const COMMANDS = [
     { type: SUB, name: 'off', description: 'Stop check-in DMs' },
   ] },
   { name: 'streak', description: 'Your daily-problem streak and points' },
+  { name: 'announce', description: 'Post a short announcement to every Crux bell (admins)', default_member_permissions: '8', options: [
+    { type: STRING, name: 'text', description: 'One or two plain sentences', required: true, max_length: 280 },
+  ] },
   { name: 'leaderboard', description: 'Top daily-problem players' },
 
   // Study Hub Milestones (lib/logbook.js)

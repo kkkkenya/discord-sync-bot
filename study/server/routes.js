@@ -39,6 +39,7 @@ const state = () => {
 
 const routes = {
   'GET /api/state': () => state(),
+  'GET /api/me': (q, body, ctx) => ctx.user,
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.
   'GET /api/catalog': (q) => {
     const saved = data.settings.cohort || { course: 'EMM', year: 3, sem: 1 };

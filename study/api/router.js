@@ -1,7 +1,7 @@
 // The whole Crux API as one Vercel function: /api/* and /auth/* are rewritten here (study/vercel.json).
 // Each request loads the signed-in student's document, runs the route with it as `data`, and saves it once.
 import { db } from '../../lib/db.js';
-import { readCookie, verify } from '../../lib/session.js';
+import { authRoute, memberOf, readSession, RECHECK_MS, rememberUser, sessionCookie, tierFor } from '../server/auth.js';
 import { docStore } from '../server/doc-store.js';
 import { nairobiDay } from '../server/plan.js';
 import { dispatch } from '../server/routes.js';
@@ -11,15 +11,30 @@ const MAX_BODY = 14 * 1024 * 1024; // photos of working and voice teach-backs co
 const json = (body, status = 200) => Response.json(body ?? null, { status, headers: { 'Cache-Control': 'no-store' } });
 const fail = (message, status) => Object.assign(new Error(message), { status });
 
-export function makeRouter(docs) {
+// The tier rides in the cookie; once a day it's read again from the member's roles (joined, paid, or left).
+async function recheck(session, { db, member }) {
+  if (Date.now() - (session.checked || 0) < RECHECK_MS) return { user: session };
+  const m = await member(session.id);
+  const user = { id: session.id, name: m?.nick || session.name, tier: tierFor(m, session.id) };
+  await rememberUser(db, user).catch((e) => console.error('crux_users:', e.message));
+  return { user, cookie: sessionCookie(user) };
+}
+
+export function makeRouter(docs, deps = { db, member: memberOf }) {
   return async function handle(request) {
     const url = new URL(request.url);
+    const auth = url.searchParams.get('auth');
+    if (auth) return authRoute(auth, request, deps);
     const path = `/api/${url.searchParams.get('path') || ''}`;
     if (path === '/api/health') return json({ ok: true, version: VERSION });
     try {
-      const session = verify(readCookie(request, 'crux_session'));
+      const session = readSession(request);
       if (!session) throw fail('Sign in first.', 401);
-      const user = { id: session.id, name: session.name, tier: session.tier };
+      const { user: u, cookie } = await recheck(session, deps);
+      const user = { id: u.id, name: u.name, tier: u.tier };
+      const reply = (body, status) => { const r = json(body, status); if (cookie) r.headers.append('Set-Cookie', cookie); return r; };
+      if (user.tier === 'none') return reply({ error: 'no-access' }, 403);
+      if (path === '/api/me') return reply(user);
       let body = null;
       if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
         const text = await request.text();
@@ -31,7 +46,7 @@ export function makeRouter(docs) {
       const { rev, doc } = await docs.load(user.id);
       const { result, dirty } = await withDoc(doc, () => dispatch(request.method, path, query, body, { user, today: nairobiDay() }));
       if (dirty) await docs.save(user.id, rev, doc);
-      return json(result);
+      return reply(result);
     } catch (e) {
       if (!e.status) console.error(e);
       return json({ error: e.message }, e.status || 500);

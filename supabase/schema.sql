@@ -1,4 +1,5 @@
 -- Engineering Study Hub bot: run once in Supabase → SQL Editor (setup.bat can do it for you). Safe to run again.
+-- Crux (study/) keeps its tables in supabase/crux.sql.
 -- Only bot data lives here (file index, daily problems, streaks, groups). No member records beyond that.
 -- RLS is on with no policies, so the website's publishable key can't read or write these tables;
 -- the bot uses the service_role key, which bypasses RLS.

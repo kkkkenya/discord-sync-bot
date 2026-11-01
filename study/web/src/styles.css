@@ -559,3 +559,12 @@ label.button.disabled { opacity: 0.45; pointer-events: none; }
   border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 14px; font-family: var(--sans);
 }
 .thenlist { padding-left: 18px; margin: 4px 0; }
+
+/* Sign-in and no-access (Gate.jsx) */
+.gate { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px 16px; text-align: center; max-width: 420px; margin: 0 auto; }
+.gate h1 { margin: 0; font-size: 2rem; }
+.gate p { margin: 0; color: var(--muted); }
+.gate .button { display: inline-block; padding: 12px 20px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); text-decoration: none; font-weight: 600; transition: background 0.15s; }
+.gate .button:hover { background: var(--accent-hover); }
+.gate .button.ghost { background: var(--soft); color: var(--ink); }
+.gate-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }

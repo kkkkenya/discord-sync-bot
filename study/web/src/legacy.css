@@ -4,9 +4,9 @@
   --paper: var(--bg-grouped); --panel: var(--surface); --soft: var(--surface-2); --soft-hover: var(--surface-2);
   --ink: var(--text); --muted: var(--text-2); --line: var(--separator); --line-subtle: var(--separator);
   --accent: var(--link); --accent-ink: #ffffff; --accent-hover: var(--link); --accent-soft: color-mix(in srgb, var(--link) 12%, transparent);
-  --amber: var(--warn); --amber-bg: color-mix(in srgb, var(--warn) 12%, transparent); --amber-border: color-mix(in srgb, var(--warn) 30%, transparent);
-  --red: var(--bad); --red-bg: color-mix(in srgb, var(--bad) 10%, transparent);
-  --green: var(--good); --green-bg: color-mix(in srgb, var(--good) 12%, transparent);
+  --amber: var(--warn-text); --amber-bg: color-mix(in srgb, var(--warn) 12%, transparent); --amber-border: color-mix(in srgb, var(--warn) 30%, transparent);
+  --red: var(--bad-text); --red-bg: color-mix(in srgb, var(--bad) 10%, transparent);
+  --green: var(--good-text); --green-bg: color-mix(in srgb, var(--good) 12%, transparent);
   --shadow-brutal: var(--shadow); --shadow-brutal-lg: var(--shadow); --shadow-brutal-sm: var(--shadow);
   --shadow-brutal-accent: var(--shadow); --shadow-brutal-amber: var(--shadow);
   --sans: var(--font); --display: var(--font); --bar: 56px;
@@ -232,4 +232,5 @@ label.button.disabled { opacity: 0.45; pointer-events: none; }
 }
 .thenlist { padding-left: 18px; margin: 4px 0; }
 
+.badge { background: var(--surface-2); color: var(--text); border: 0; }
 }

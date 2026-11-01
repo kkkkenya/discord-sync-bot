@@ -3,12 +3,8 @@ import { api } from './api.js';
 import Analysis from './Analysis.jsx';
 import { Icon } from './icons.jsx';
 import Kit from './Kit.jsx';
-import Learn from './Learn.jsx';
 import Mock from './Mock.jsx';
-import Notes from './Notes.jsx';
-import Papers from './Papers.jsx';
 import Practice from './Practice.jsx';
-import Predictions from './Predictions.jsx';
 import Progress from './Progress.jsx';
 import Prompt from './Prompt.jsx';
 import { go as goTo, href, unitCode, unitSlug, useRoute } from './route.js';
@@ -16,6 +12,9 @@ import Settings from './Settings.jsx';
 import Teach from './Teach.jsx';
 import Today from './Today.jsx';
 import Units from './Units.jsx';
+import UnitNotes from './UnitNotes.jsx';
+import UnitPapers from './UnitPapers.jsx';
+import UnitTopics from './UnitTopics.jsx';
 
 const TABS = [
   { id: 'today', label: 'Today', icon: 'today' },
@@ -91,12 +90,10 @@ export default function App({ user }) {
         <nav className="segmented" aria-label={`${u.code} sections`}>
           {UNIT_TABS.map((t) => <a key={t.id} href={href('unit', unitSlug(u.code), t.id)} aria-current={tab === t.id ? 'page' : undefined}>{t.label}</a>)}
         </nav>
-        <div className="legacy">
-          {tab === 'topics' && <><Analysis {...props} unit={u.code} /><Learn {...props} unit={u.code} /></>}
-          {tab === 'papers' && <><Predictions {...props} unit={u.code} /><Papers {...props} unit={u.code} /></>}
-          {tab === 'notes' && <Notes {...props} unit={u.code} />}
-          {tab === 'sheet' && <Kit {...props} unit={u.code} />}
-        </div>
+        {tab === 'topics' && <UnitTopics {...props} unit={u.code} />}
+        {tab === 'papers' && <UnitPapers {...props} unit={u.code} />}
+        {tab === 'notes' && <UnitNotes {...props} unit={u.code} />}
+        {tab === 'sheet' && <div className="legacy sheet-tab"><Kit {...props} unit={u.code} /></div>}
       </>
     );
   } else if (page === 'units') {
@@ -104,7 +101,7 @@ export default function App({ user }) {
   } else if (page === 'practise') {
     content = <><header className="page-head"><h1>Practise</h1></header><div className="legacy"><Practice {...props} /><Teach {...props} /><Mock {...props} /></div></>;
   } else if (page === 'insights') {
-    content = <><header className="page-head"><h1>Insights</h1></header><div className="legacy"><Progress {...props} /><Prompt {...props} /></div></>;
+    content = <><header className="page-head"><h1>Insights</h1></header><div className="legacy"><Analysis {...props} /><Progress {...props} /><Prompt {...props} /></div></>;
   } else {
     content = <Today {...props} />;
   }

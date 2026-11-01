@@ -44,7 +44,7 @@ async function saveEntry(id, e, method, error = null) {
   if (!remote()) return saveLibrary();
   await db.upsert('crux_file_text', [{
     file_id: Number(id), unit_code: e.unit, name: e.name, paper: Boolean(e.paper), status: e.status, method, pages: e.pages || null,
-    chars: e.text.length, text: e.text || null, page_starts: e.pageStarts || null, error, updated_at: new Date().toISOString(),
+    chars: e.text.length, text: e.text.replace(/\u0000/g, '') || null, page_starts: e.pageStarts || null, error, updated_at: new Date().toISOString(), // Postgres text can't hold NUL
   }], 'file_id');
 }
 

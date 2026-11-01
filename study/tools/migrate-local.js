@@ -48,7 +48,7 @@ for (let i = 0; i < ids.length; i += 100) {
 }
 const rows = ids.filter((id) => known.has(id)).map((id) => {
   const e = lib[id];
-  const text = (e.text || '').trim();
+  const text = (e.text || '').replace(/\u0000/g, '').trim(); // some PDFs give NUL characters; Postgres text can't hold them
   return {
     file_id: Number(id), unit_code: e.unit || null, name: e.name || null, paper: Boolean(e.paper),
     status: text ? 'done' : 'new', method: text ? METHOD[extname(e.name || '').toLowerCase()] || 'text' : null,

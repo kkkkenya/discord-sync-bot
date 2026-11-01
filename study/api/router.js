@@ -15,7 +15,8 @@ const fail = (message, status) => Object.assign(new Error(message), { status });
 // The tier rides in the cookie; once a day it's read again from the member's roles (joined, paid, or left).
 async function recheck(session, { db, member }) {
   if (Date.now() - (session.checked || 0) < RECHECK_MS) return { user: session };
-  const m = await member(session.id);
+  let m;
+  try { m = await member(session.id); } catch (e) { console.error('role check:', e.message); return { user: session }; } // Discord down: keep the tier, try again next request
   const user = { id: session.id, name: m?.nick || session.name, tier: tierFor(m, session.id) };
   await rememberUser(db, user).catch((e) => console.error('crux_users:', e.message));
   return { user, cookie: sessionCookie(user) };

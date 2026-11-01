@@ -95,3 +95,10 @@ test('a day-old session reads the roles again and gets a fresh cookie', async ()
   assert.match(r.headers.get('set-cookie'), /crux_session=/);
   assert.deepEqual(seen, ['premium']);
 });
+
+test('if Discord is down during the daily role check, the member keeps their tier', async () => {
+  const deps = { db: { upsert: async () => [] }, member: async () => { throw new Error('discord 503'); } };
+  const r = await makeRouter(memoryDocs(), deps)(new Request('https://crux.test/api/router?path=me', { headers: { cookie: cookie('amina', { checked: Date.now() - 25 * 3600e3 }) } }));
+  assert.equal(r.status, 200);
+  assert.equal((await r.json()).tier, 'basic');
+});

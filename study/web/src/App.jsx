@@ -32,7 +32,7 @@ function Band({ n, label, note, children }) {
       <div className="band-head">
         <span className="band-tag">[ {n} / {label.toUpperCase()} ]</span>
         <span className="band-title">{label}</span>
-        <span className="band-note">/// {note}</span>
+        <span className="band-note">{note}</span>
       </div>
       {children}
     </div>
@@ -138,7 +138,7 @@ export default function App() {
 
         {/* Industrial Workspace Band Switcher: Prevents Overwhelming Scroll Clutter */}
         <div className="band-filter-bar">
-          <span className="filter-label">/// WORKSPACE FILTER:</span>
+          <span className="filter-label">WORKSPACE:</span>
           <div className="filter-pills">
             <button
               type="button"

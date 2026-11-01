@@ -136,24 +136,11 @@ export default function Nav({ s, go, refresh, unit, setUnit, onTour, onProblem }
 
   return (
     <header className="top" ref={bar} onMouseLeave={later} onMouseEnter={() => clearTimeout(timer.current)}>
-      <div className="ticker-wrap" aria-hidden="true">
-        <div className="ticker">
-          <span>/// STUDY DESK · ENGINEERING STUDY HUB</span>
-          <span>/// FOR ENGINEERS, BY ENGINEERS</span>
-          <span>/// STUDY · BUILD · LAUNCH</span>
-          <span>/// NAIROBI, KENYA</span>
-          <span>/// 450+ ENGINEERS &amp; COUNTING</span>
-          <span>/// STUDY DESK · ENGINEERING STUDY HUB</span>
-          <span>/// FOR ENGINEERS, BY ENGINEERS</span>
-          <span>/// STUDY · BUILD · LAUNCH</span>
-          <span>/// NAIROBI, KENYA</span>
-          <span>/// 450+ ENGINEERS &amp; COUNTING</span>
-        </div>
-      </div>
+      
       <div className="shell top-in">
         <button className="brand" onClick={() => visit('overview')} aria-label="Study Desk: back to the top">
-          <img src="/logo.png" alt="" className="brand-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          <span><b>STUDY DESK</b><small>Engineering Study Hub</small></span>
+          <img src="/favicon.png" alt="" className="brand-logo" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+          <span><b>Study Desk</b><small>v2026.10 · Localhost:5190</small></span>
         </button>
         <nav className="groups" aria-label="Sections">
           {GROUPS.map((g) => (

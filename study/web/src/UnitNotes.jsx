@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { api, prepareUnit } from './api.js';
-import Notes from './Notes.jsx';
 
 const status = (f) => (f.chars > 0 ? ['good', 'Read'] : f.synced ? ['warn', 'No text'] : [null, 'Not read']);
 
@@ -11,8 +10,21 @@ export default function UnitNotes(props) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(null); // { done, total } while reading
   const [problem, setProblem] = useState('');
+  const [mine, setMine] = useState([]);
+  const [making, setMaking] = useState('');
   const load = () => api('GET', `library?unit=${encodeURIComponent(unit)}`).then(setLib).catch((e) => setProblem(e.message));
-  useEffect(() => { load(); }, [unit]); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadMine = () => api('GET', `notes?unit=${encodeURIComponent(unit)}`).then(setMine).catch(() => setMine([]));
+  useEffect(() => { load(); loadMine(); }, [unit, props.s]); // eslint-disable-line react-hooks/exhaustive-deps
+  const remove = (n) => api('DELETE', `notes/${n.id}`).then(loadMine).catch((e) => setProblem(e.message));
+  // questions for the mock bank from one of your notes (needs the AI)
+  const makeQuestions = async (n) => {
+    setMaking(n.id); setProblem('');
+    try {
+      const r = await api('POST', 'notes', { unit, topic: n.title, noteId: n.id });
+      props.notify(`${r.questions} question${r.questions === 1 ? '' : 's'} added to the bank for timed papers.`);
+    } catch (e) { setProblem(e.message); }
+    setMaking('');
+  };
 
   const prepare = async () => {
     setBusy(true); setProblem('');
@@ -52,7 +64,20 @@ export default function UnitNotes(props) {
           })}
         </div>
       )}
-      <div className="legacy"><Notes {...props} /></div>
+      <div>
+        <h2 className="list-title">Your notes</h2>
+        {!mine.length ? <div className="card"><p className="row-sub">None for {unit} yet. Import them from Obsidian or Notion in Settings.</p></div> : (
+          <div className="list">
+            {mine.map((n) => (
+              <div key={n.id} className="list-row">
+                <span className="row-main"><span className="filename">{n.title}</span><span className="row-sub">{Math.max(1, Math.round(n.chars / 1000))}k characters · {n.source === 'notion' ? 'Notion' : n.source === 'obsidian' ? 'Obsidian' : 'File'}</span></span>
+                <button className="btn" disabled={Boolean(making) || !props.s.ai} onClick={() => makeQuestions(n)}>{making === n.id ? 'Writing…' : 'Make questions'}</button>
+                <button className="btn plain" onClick={() => remove(n)}>Delete</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </>
   );
 }

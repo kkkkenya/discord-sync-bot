@@ -54,6 +54,9 @@ export async function withDoc(doc, fn) {
   return { result, dirty: scope.dirty };
 }
 
+// The current request's scope ({ doc, dirty, notes? }), or undefined outside a request.
+export const requestScope = () => als.getStore();
+
 // Locally there is one document, loaded on first use. On Vercel (or with CRUX_STRICT=1) there is none, so `data`
 // used outside a request throws instead of quietly mixing up two students.
 const strict = () => Boolean(process.env.VERCEL) || process.env.CRUX_STRICT === '1';

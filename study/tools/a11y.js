@@ -12,6 +12,7 @@ for (const theme of ['light', 'dark']) {
   const page = await browser.newPage({ viewport: { width: 375, height: 812 }, colorScheme: theme });
   for (const r of routes) {
     await page.goto(`${base}/#/${r}`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1000); // let loading states settle
     await page.addScriptTag({ content: axe });
     const found = await page.evaluate(async () => (await window.axe.run()).violations.filter((v) => ['serious', 'critical'].includes(v.impact))
       .map((v) => `${v.impact} ${v.id}: ${v.nodes.length}× e.g. ${v.nodes[0].target.join(' ')}`));

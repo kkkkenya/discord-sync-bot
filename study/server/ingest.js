@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url';
 import { db, enc } from '../../lib/db.js';
 import { ocrPdf } from './ai.js';
 import { extract } from './extract.js';
+import { ownNotes } from './notes-store.js';
 
 // Same folder as study.json (STUDY_DATA_DIR overrides both).
 const DIR = process.env.STUDY_DATA_DIR ? pathToFileURL(`${process.env.STUDY_DATA_DIR.replace(/[\\/]$/, '')}/`) : new URL('../data/', import.meta.url);
@@ -50,11 +51,13 @@ async function saveEntry(id, e, method, error = null) {
 export const libraryMeta = () =>
   Object.fromEntries(Object.entries(library.files).map(([id, e]) => [id, { unit: e.unit, name: e.name, chars: e.chars, paper: e.paper }]));
 
-// Relevant material to ground an AI call: the unit's synced text, topic-matching files first, capped.
+// Relevant material to ground an AI call: the student's own notes for the unit first, then the unit's hub files,
+// topic-matching ones first within each, capped.
 export function contextFor(unit, topic, maxChars = 12000) {
-  const entries = Object.entries(library.files)
+  const own = ownNotes(unit).map((n) => ({ name: n.title, text: n.text, own: true }));
+  const entries = [...own, ...Object.entries(library.files)
     .map(([, e]) => e)
-    .filter((e) => e.unit === unit && e.text);
+    .filter((e) => e.unit === unit && e.text)];
   if (!entries.length) return '';
   const needle = (topic || '').trim().toLowerCase();
   const score = (e) => {
@@ -66,11 +69,11 @@ export function contextFor(unit, topic, maxChars = 12000) {
     if (words.some((w) => text.includes(w) || name.includes(w))) return 1;
     return 0;
   };
-  entries.sort((a, b) => score(b) - score(a));
+  entries.sort((a, b) => Number(Boolean(b.own)) - Number(Boolean(a.own)) || score(b) - score(a));
   let out = '';
   for (const e of entries) {
     if (out.length >= maxChars) break;
-    out += `\n\n--- ${e.name} (${e.paper ? 'past paper / CAT' : 'notes'}) ---\n${e.text}`;
+    out += `\n\n--- ${e.name} (${e.own ? 'my notes' : e.paper ? 'past paper / CAT' : 'notes'}) ---\n${e.text}`;
   }
   return out.slice(0, maxChars);
 }

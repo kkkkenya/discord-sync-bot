@@ -55,9 +55,9 @@ export function learnPath({ topic, subtopics = [], files = [], questions = [], m
       else ranges.push({ f, from: h.n, to: h.n, score: h.score, text: h.text });
     }
   }
-  ranges.sort((a, b) => b.score - a.score);
+  ranges.sort((a, b) => Number(Boolean(b.f.own)) - Number(Boolean(a.f.own)) || b.score - a.score); // your own notes first
   const ref = (r) => ({
-    fileId: r.f.id, name: r.f.name, url: r.f.url || null, local: Boolean(r.f.local),
+    fileId: r.f.id, name: r.f.name, url: r.f.url || null, local: Boolean(r.f.local), own: Boolean(r.f.own),
     pages: r.from ? [r.from, r.to] : null,
     find: r.from ? null : snippetOf(r.text, terms, phrase).slice(0, 60).replace(/\s+\S*$/, ''),
     snippet: snippetOf(r.text, terms, phrase),

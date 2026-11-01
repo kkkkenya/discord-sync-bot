@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
+import ImportNotes from './ImportNotes.jsx';
 
 const TIER = { owner: 'Owner', premium: 'Premium', basic: 'Basic', trial: 'Free trial' };
 
 // Settings: a full-screen sheet on phones, a side panel from 768px. Esc or the scrim closes it.
-export default function Settings({ s, user, refresh, onClose, onProblem }) {
+export default function Settings({ s, user, unit, refresh, notify, onClose, onProblem }) {
   useEffect(() => {
     const esc = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', esc);
@@ -42,6 +43,7 @@ export default function Settings({ s, user, refresh, onClose, onProblem }) {
             <span className="hint">{s.ai ? 'Ready.' : `Not available right now. Pick the other one.`}</span>
           </label>
         </div>
+        {s.data.units.length > 0 && <ImportNotes s={s} unit={unit} refresh={refresh} notify={notify} onProblem={onProblem} />}
         <div className="card">
           {user && <><p><b>{user.name}</b></p><p className="row-sub">{TIER[user.tier] || user.tier}</p></>}
           <div className="actions start">

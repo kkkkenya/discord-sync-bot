@@ -18,6 +18,7 @@ import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { buildPrompt } from './prompt.js';
 import { nextActions } from './next.js';
 import { insights } from './insights.js';
+import { deleteNote, importNotes, listNotes, loadNotes, ownNotes } from './notes-store.js';
 import { KITS, KIT_FOR, makeKitFor } from './kit.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, flagCheckpoint, markBroke } from './practice.js';
@@ -44,7 +45,10 @@ const routes = {
   'GET /api/state': () => state(),
   'GET /api/me': (q, body, ctx) => ctx.user,
   // Everything Crux keeps about you, as one JSON file (Settings → Export my data).
-  'GET /api/export': (q, body, ctx) => ({ exportedAt: new Date().toISOString(), user: ctx?.user, doc: JSON.parse(JSON.stringify(data)) }),
+  'GET /api/export': async (q, body, ctx) => ({ exportedAt: new Date().toISOString(), user: ctx?.user, doc: JSON.parse(JSON.stringify(data)), notes: await listNotes(ctx?.user?.id) }),
+  // Imported notes (Obsidian, Notion): parsed in the browser, saved per unit and title.
+  'GET /api/notes': (q, body, ctx) => listNotes(ctx.user.id, q.get('unit')),
+  'POST /api/notes/import': (q, { notes } = {}, ctx) => importNotes(ctx.user.id, notes, data.units.map((u) => u.code)),
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.
   'GET /api/catalog': (q) => {
     const saved = data.settings.cohort || { course: 'EMM', year: 3, sem: 1 };
@@ -275,8 +279,9 @@ const routes = {
     save();
     return state();
   },
-  // Notes → CAT questions for the mock bank (requires the AI key).
-  'POST /api/notes': async (q, { unit, topic, text }) => {
+  // Notes → CAT questions for the timed-paper bank: pasted text, or one of your imported notes (noteId).
+  'POST /api/notes': async (q, { unit, topic, text: pasted, noteId }) => {
+    const text = pasted || ownNotes(unit).find((n) => n.id === noteId)?.text;
     if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Pick another provider in the top bar, or add the key.'), { status: 400 });
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     if (!topic?.trim() || !text?.trim()) throw Object.assign(new Error('A topic and some notes are needed.'), { status: 400 });
@@ -379,8 +384,15 @@ const CHECKS = {
 
 // One request: method + path → a handler (query, body, ctx). ctx = { user: { id, name, tier }, today }.
 // Errors carry .status; the dev server and the Vercel router turn them into { error }.
+// Routes that ground their work in the student's own notes: those notes are loaded into the request first.
+const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints))/;
+
 export async function dispatch(method, pathname, query, body, ctx) {
   await ensureLibrary([...data.units.map((u) => u.code), query?.get?.('unit'), body?.unit]); // shared file text, cached
+  const unitHere = query?.get?.('unit') || body?.unit || data.topics.find((t) => t.id === (query?.get?.('topicId') || body?.topicId))?.unit;
+  if (READS_NOTES.test(pathname) && ctx?.user) await loadNotes(ctx.user.id, unitHere);
+  const note = method === 'DELETE' && pathname.match(/^\/api\/notes\/([\w-]+)$/);
+  if (note) return { removed: await deleteNote(ctx.user.id, note[1]) };
   const route = routes[`${method} ${pathname}`];
   if (route) return route(query, body, ctx);
   const submit = pathname.match(/^\/api\/mocks\/([\w-]+)\/submit$/);

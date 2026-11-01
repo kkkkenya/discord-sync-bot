@@ -164,7 +164,7 @@ export default function App({ user }) {
         </nav>
       )}
       {deeper && <GoDeeper s={s} target={deeper} onClose={() => setDeeper(null)} />}
-      {settingsOpen && <Settings s={s} user={user} refresh={refresh} onProblem={setProblem} onClose={() => (history.length > 1 ? history.back() : goTo(href('today')))} />}
+      {settingsOpen && <Settings s={s} user={user} unit={unit} notify={notify} refresh={refresh} onProblem={setProblem} onClose={() => (history.length > 1 ? history.back() : goTo(href('today')))} />}
       {toast && (
         <div className="toast" role="status">
           <span>{toast.text}</span>

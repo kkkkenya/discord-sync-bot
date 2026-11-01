@@ -43,6 +43,8 @@ const state = () => {
 const routes = {
   'GET /api/state': () => state(),
   'GET /api/me': (q, body, ctx) => ctx.user,
+  // Everything Crux keeps about you, as one JSON file (Settings → Export my data).
+  'GET /api/export': (q, body, ctx) => ({ exportedAt: new Date().toISOString(), user: ctx?.user, doc: JSON.parse(JSON.stringify(data)) }),
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.
   'GET /api/catalog': (q) => {
     const saved = data.settings.cohort || { course: 'EMM', year: 3, sem: 1 };

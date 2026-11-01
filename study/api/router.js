@@ -2,6 +2,7 @@
 // Each request loads the signed-in student's document, runs the route with it as `data`, and saves it once.
 import { db } from '../../lib/db.js';
 import { authRoute, memberOf, readSession, RECHECK_MS, rememberUser, sessionCookie, tierFor } from '../server/auth.js';
+import { runBackup, supabaseStorage } from '../server/backup.js';
 import { docStore } from '../server/doc-store.js';
 import { nairobiDay } from '../server/plan.js';
 import { dispatch } from '../server/routes.js';
@@ -27,6 +28,10 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
     if (auth) return authRoute(auth, request, deps);
     const path = `/api/${url.searchParams.get('path') || ''}`;
     if (path === '/api/health') return json({ ok: true, version: VERSION });
+    if (path === '/api/cron/backup') { // Vercel's daily cron (vercel.json) sends the CRON_SECRET
+      if (!process.env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return json({ error: 'Not allowed.' }, 401);
+      return json(await runBackup({ db: deps.db, storage: deps.storage || supabaseStorage }));
+    }
     try {
       const session = readSession(request);
       if (!session) throw fail('Sign in first.', 401);

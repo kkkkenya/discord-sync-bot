@@ -12,6 +12,13 @@ export default function Settings({ s, user, refresh, onClose, onProblem }) {
     document.body.style.overflow = 'hidden';
     return () => { document.removeEventListener('keydown', esc); document.body.style.overflow = ''; };
   }, [onClose]);
+  // the offline copy of your data stays on this device until you sign out
+  const forget = () => { try { caches?.keys().then((keys) => keys.forEach((k) => caches.delete(k))); } catch { /* no cache */ } };
+  const exportData = () => api('GET', 'export').then((out) => {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' }));
+    Object.assign(document.createElement('a'), { href: url, download: `crux-${s.today}.json` }).click();
+    URL.revokeObjectURL(url);
+  }).catch((e) => onProblem(e.message));
   const setting = (body) => api('POST', 'settings', body).then(refresh).catch((e) => onProblem(e.message));
   return (
     <>
@@ -35,13 +42,13 @@ export default function Settings({ s, user, refresh, onClose, onProblem }) {
             <span className="hint">{s.ai ? 'Ready.' : `Not available right now. Pick the other one.`}</span>
           </label>
         </div>
-        {user && (
-          <div className="card">
-            <p><b>{user.name}</b></p>
-            <p className="hint">{TIER[user.tier] || user.tier}</p>
-            <a className="btn" href="/auth/logout">Sign out</a>
+        <div className="card">
+          {user && <><p><b>{user.name}</b></p><p className="row-sub">{TIER[user.tier] || user.tier}</p></>}
+          <div className="actions start">
+            <button className="btn" onClick={exportData}>Export my data</button>
+            <a className="btn" href="/auth/logout" onClick={forget}>Sign out</a>
           </div>
-        )}
+        </div>
       </div>
     </>
   );

@@ -1,7 +1,23 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api/router?path=:path*" },
-    { "source": "/auth/:action", "destination": "/api/router?auth=:action" }
+    {
+      "source": "/api/:path*",
+      "destination": "/api/router?path=:path*"
+    },
+    {
+      "source": "/auth/:action",
+      "destination": "/api/router?auth=:action"
+    }
   ],
-  "functions": { "api/router.js": { "maxDuration": 300 } }
+  "functions": {
+    "api/router.js": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/backup",
+      "schedule": "0 23 * * *"
+    }
+  ]
 }

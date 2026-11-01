@@ -50,6 +50,20 @@ export default function App({ user }) {
   // one current unit for every screen, remembered in this browser
   const [unitPick, setUnitPick] = useState(() => { try { return localStorage.getItem('study-unit') || ''; } catch { return ''; } });
   const setUnit = useCallback((code) => { setUnitPick(code); try { localStorage.setItem('study-unit', code); } catch { /* private window */ } }, []);
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(navigator.onLine);
+    window.addEventListener('online', on); window.addEventListener('offline', on);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', on); };
+  }, []);
+  // once per new version: a new build only starts when Crux is opened again, so this is the moment to say so
+  useEffect(() => {
+    try {
+      const last = localStorage.getItem('crux-version');
+      if (last && last !== __CRUX_VERSION__) notify('Crux was updated.');
+      localStorage.setItem('crux-version', __CRUX_VERSION__);
+    } catch { /* private window */ }
+  }, [notify]);
   const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(x); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => {
@@ -139,6 +153,7 @@ export default function App({ user }) {
           {TABS.map((t) => <a key={t.id} href={href(t.id)} aria-current={current(t.id)}><Icon name={t.icon} />{t.label}</a>)}
         </nav>}
         <main className="main" id="main" tabIndex={-1}>
+          {!online && <p className="notice" role="status">Offline. You're seeing your last saved data, and changes won't save until you're back.</p>}
           {problem && <p className="notice bad" role="alert">{problem} <button className="btn plain" onClick={refresh}>Try again</button></p>}
           {content}
         </main>

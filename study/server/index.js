@@ -16,7 +16,7 @@ const { nairobiDay } = await import('./plan.js');
 
 const PORT = Number(process.env.PORT) || 5190;
 const DIST = new URL('../dist/', import.meta.url);
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
 const user = { id: process.env.OWNER_ID || 'local', name: 'You', tier: 'owner' };
 
 createServer(async (req, res) => {

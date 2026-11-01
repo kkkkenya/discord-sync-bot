@@ -107,6 +107,7 @@ env.SUPABASE_URL ||= pc.SUPABASE_URL;
 env.SUPABASE_SERVICE_KEY ||= pc.SUPABASE_SERVICE_KEY;
 env.GEMINI_API_KEY ||= community.GEMINI_API_KEY;
 env.CRUX_SESSION_SECRET ||= randomBytes(32).toString('base64url');
+env.CRON_SECRET ||= randomBytes(24).toString('base64url'); // Vercel's cron sends it to /api/cron/backup
 
 console.log(dim('\n1. Your Discord user ID (Discord → Settings → Advanced → Developer Mode, then right-click your name → Copy User ID).'));
 env.OWNER_ID = await ask('Your Discord user ID', { current: env.OWNER_ID });
@@ -146,7 +147,7 @@ if (env.GEMINI_API_KEY) console.log(await checks.gemini(env.GEMINI_API_KEY));
 env.DEEPSEEK_API_KEY = await ask('DeepSeek API key (optional)', { secret: true, current: env.DEEPSEEK_API_KEY });
 if (env.DEEPSEEK_API_KEY) console.log(await checks.deepseek(env.DEEPSEEK_API_KEY));
 
-const KEYS = ['OWNER_ID', 'DISCORD_TOKEN', 'CRUX_DISCORD_CLIENT_ID', 'CRUX_DISCORD_CLIENT_SECRET', 'CRUX_SESSION_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'];
+const KEYS = ['OWNER_ID', 'DISCORD_TOKEN', 'CRUX_DISCORD_CLIENT_ID', 'CRUX_DISCORD_CLIENT_SECRET', 'CRUX_SESSION_SECRET', 'CRON_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'];
 writeFileSync(ENV, ['# Crux settings. Made by setup-web.js; run it again to change anything. Git-ignored: never commit or share it.',
   ...KEYS.map((k) => `${k}=${env[k] || ''}`), `PORT=${env.PORT || 5190}`, ''].join('\n'));
 console.log(green('\n✓ Saved study/.env'));

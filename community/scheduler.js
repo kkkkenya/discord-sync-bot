@@ -8,7 +8,7 @@ config({ path: new URL('../pc/.env', import.meta.url), quiet: true }); // Supaba
 
 const { SCHEDULE } = await import('./src/config.js');
 const { JOBS } = await import('./src/posts.js');
-const { load, nairobiDay, nairobiMinutes, store } = await import('./src/rest.js');
+const { claim, load, nairobiDay, nairobiMinutes, release, store } = await import('./src/rest.js');
 const { dueJobs } = await import('./src/due.js');
 
 const missingKeys = ['COMMUNITY_DISCORD_TOKEN', 'GEMINI_API_KEY', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY'].filter((k) => !process.env[k]);
@@ -19,12 +19,16 @@ const due = dueJobs(SCHEDULE, done, day, nairobiMinutes(), { now: process.argv.i
 const sent = [], waiting = [];
 let failed = false;
 for (const job of due) {
+  const key = `claim:${job}:${day}`;
+  if (!await claim(key)) continue; // another run has it
   try {
-    if (await JOBS[job]() === false) { waiting.push(job); continue; } // not ready yet: the next run tries again
-    done[job] = day;
-    await store('done', done);
+    if (await JOBS[job]() === false) { await release(key); waiting.push(job); continue; } // not ready: the next run tries again
+    const latest = await load('done', {}); // re-read: another run may have finished a different job meanwhile
+    latest[job] = day;
+    await store('done', latest);
     sent.push(job);
   } catch (e) {
+    await release(key).catch(() => {});
     failed = true;
     console.error(`${job} failed: ${e.message}`); // left undone: the next run tries again
   }

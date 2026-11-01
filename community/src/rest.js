@@ -39,3 +39,17 @@ export const nairobiMinutes = (d = new Date()) => {
   const [h, m] = d.toLocaleTimeString('en-GB', { timeZone: 'Africa/Nairobi', hour12: false }).split(':').map(Number);
   return h * 60 + m;
 };
+
+// Claims a job for today so two runs at once (GitHub and the PC) can't both post it. True for the one run whose
+// insert lands; release() hands it back when posting fails, so a later run can try again.
+export async function claim(key) {
+  const r = await sb('community_state?on_conflict=key', {
+    method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=representation' },
+    body: JSON.stringify([{ key, value: { at: new Date().toISOString() }, updated_at: new Date().toISOString() }]),
+  });
+  if (!r.ok) throw new Error(`Supabase ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return (await r.json()).length === 1;
+}
+export async function release(key) {
+  await sb(`community_state?key=eq.${encodeURIComponent(key)}`, { method: 'DELETE' });
+}

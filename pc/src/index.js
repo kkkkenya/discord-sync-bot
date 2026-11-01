@@ -2,7 +2,7 @@
 // Vercel answers buttons and slash commands; this process holds the gateway connection for everything that
 // needs to see the server live or run on a timer.
 //   npm start            run the bot
-//   npm run dry-run      show where every file in WATCH_DIRS would go, without uploading or changing anything
+//   npm run dry-run      show where every file in Hub Dumper and WATCH_DIRS would go, without uploading or changing anything
 //   npm run preview      the same, offline, no token needed (src/preview.js)
 import './env.js';
 import { readFileSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -107,9 +107,5 @@ client.once(Events.ClientReady, async () => {
 });
 
 client.on(Events.Error, (e) => console.error('Discord error:', e.message));
-let watchErrors = 0; // Google Drive disconnecting makes every watched folder error at once; the uploader's sweep covers it
-process.on('unhandledRejection', (e) => {
-  if (e?.syscall === 'watch') { if (watchErrors++ === 0) console.error('folder watching interrupted (Google Drive disconnected?); the 30-minute sweep catches anything missed'); return; }
-  console.error('Unhandled:', e);
-});
+process.on('unhandledRejection', (e) => console.error('Unhandled:', e));
 client.login(process.env.DISCORD_TOKEN);

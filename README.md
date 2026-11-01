@@ -33,8 +33,15 @@ access to `#to-sort`, and indexes every file already on the server.
 
 ## How the uploader works
 
-**Which folders.** `WATCH_DIRS` in `pc/.env` (separated by `;`). Drive shortcuts (`.lnk`) inside those folders are
-followed, so one folder of shortcuts to shared course folders is enough. A shortcut added later is picked up too.
+**Which folders.** The bot makes `G:\My Drive\Hub Dumper` (`DUMPER_DIR` in `pc/.env`) with:
+- `Drop`: put files here, from the PC or the phone (Drive app → **+** → Upload). Posted files move to `Done\YYYY-MM`;
+  a file that fails 5 times moves to `Problems` with a note.
+- `Sources`: put shortcuts to shared folders here (phone: open the folder → **⋮** → Add shortcut). Picked up within
+  10 minutes.
+
+The folders in `WATCH_DIRS` (separated by `;`) are scanned too, with the shortcuts inside them. The bot checks `Drop`
+every minute and everything every 10 minutes, and straight after the laptop wakes. It walks the folders instead of
+watching them, because watching breaks on Google Drive.
 
 **Sorting a file**, working backwards from the file:
 1. A unit code (like `EMM 305`) in the **file name**, then in **each folder above it, nearest first**, so

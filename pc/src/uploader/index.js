@@ -1,18 +1,18 @@
-// Watches the folders in WATCH_DIRS and follows the Drive shortcuts (.lnk) inside them, so a folder of shortcuts
-// to shared course folders works. Every file that appears, including everything already there on first start,
-// is sorted and uploaded once:
+// Scans the Hub Dumper folder in Drive (Drop, plus the shared folders shortcut into Sources) and the folders in
+// WATCH_DIRS with the shortcuts inside them (scanner.js). Every file that appears, including everything already
+// there on the first run, is sorted and uploaded once:
 //   unit code found -> that unit's post (created if missing), forwarded to its other-year post too
 //   book, no code   -> the best topic shelf
 //   anything else   -> #to-sort with the Sort buttons, and reps and admins get a ping
-// Files too big for Discord are compressed or split into parts (shrink.js). Files stay where they are;
-// the sha256 of each one is kept in Supabase so nothing is uploaded twice.
+// Files too big for Discord are compressed or split into parts (shrink.js). Files stay where they are, except Drop
+// files, which move to Done (or Problems). The sha256 of each one is kept in Supabase so nothing is uploaded twice.
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createReadStream, existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { lookup } from 'node:dns/promises';
-import { open, readdir, stat } from 'node:fs/promises';
-import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
-import chokidar from 'chokidar';
+import { open, stat } from 'node:fs/promises';
+import { basename, dirname, extname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CHANNELS, SORTER_ROLE_MATCH } from '../../../lib/config.js';
 import { db } from '../../../lib/db.js';
 import { sleep } from '../../../lib/discord.js';
@@ -20,24 +20,13 @@ import { forwardTo } from '../../../lib/sorting.js';
 import { save, state } from '../state.js';
 import { classify } from './classify.js';
 import { fingerprint, onServer } from './existing.js';
+import { dumperFolders, donePath, loadIndex, monthOf, resolveSources, saveIndex, scan, skip, under, update } from './scanner.js';
 import { mb, PIECES_HELP, shrink } from './shrink.js';
 
-const SKIP_EXT = new Set(['.tmp', '.crdownload', '.part', '.partial', '.ini', '.lnk', '.db', '.ds_store',
-  '.gdoc', '.gsheet', '.gslides', '.gform', '.gdraw', '.gmap', '.gsite', '.gjam']); // .g* are Drive links, not files
 const ICON = { paper: '📝', notes: '📒', slides: '📊', book: '📚', other: '📄' };
 const LABEL = { paper: 'Past paper', notes: 'Notes', slides: 'Slides', book: 'Book', other: 'File' };
 const LIMIT_BY_TIER = [10, 10, 50, 100]; // MB a bot can upload, by server boost level
 const NONE = { parse: [] };
-
-// SKIP_FOLDERS in pc/.env: folder names (separated by ;) to leave out wherever they appear.
-const skipFolders = () => new Set((process.env.SKIP_FOLDERS || '').split(';').map((s) => s.trim().toLowerCase()).filter(Boolean));
-const skip = (p) => {
-  const name = basename(p);
-  const folders = skipFolders();
-  return name.startsWith('~$') || name.startsWith('.') || SKIP_EXT.has(extname(name).toLowerCase())
-    || p.split(sep).some((part) => part === 'node_modules' || part === '.git' || part === '$RECYCLE.BIN' || folders.has(part.toLowerCase()));
-};
-const under = (child, parent) => child.toLowerCase().startsWith(parent.toLowerCase() + sep); // Windows paths ignore case
 
 // Files with no extension ("Photo from Amos (4)", a phone export) get one from their first bytes, so Discord
 // shows them properly.
@@ -72,25 +61,17 @@ function shortcutTargets(paths) {
 }
 const isFolder = (p) => { try { return statSync(p).isDirectory(); } catch { return false; } };
 
-async function findRoots(dirs) {
-  const found = [...dirs];
-  for (const d of dirs) {
-    const links = (await readdir(d).catch(() => [])).filter((n) => n.toLowerCase().endsWith('.lnk')).map((n) => join(d, n));
-    for (const t of await shortcutTargets(links)) if (isFolder(t)) found.push(resolve(t));
-  }
-  const unique = [...new Map(found.map((r) => [r.toLowerCase(), r])).values()].filter((r) => !skip(r)); // SKIP_FOLDERS
-  return unique.filter((r) => !unique.some((o) => o !== r && under(r, o))); // a folder inside another is watched once
-}
-
 export async function startUploader(ctx) {
   const dirs = (process.env.WATCH_DIRS || '').split(';').map((d) => d.trim()).filter(Boolean).map((d) => resolve(d));
-  if (!dirs.length) { ctx.log('⚠️ No WATCH_DIRS set in pc/.env, so the uploader is off.'); return; }
-  // Right after Windows starts, Google Drive may not have mounted G: yet: missing folders are checked every
-  // minute and picked up when they appear (a warning only if they're still missing after 30 minutes).
-  let missing = dirs.filter((d) => !existsSync(d));
+  const home = resolve(process.env.DUMPER_DIR || 'G:\\My Drive\\Hub Dumper');
+  let dumper = dumperFolders(home, { create: !ctx.dry });
+  const findRoots = () => resolveSources({ watchDirs: dirs, sourcesDir: dumper.sources, dropDir: dumper.drop }, shortcutTargets, { isFolder, skip });
+  // Right after Windows starts, Google Drive may not have mounted G: yet: missing folders are scanned again every
+  // 10 minutes (a warning only if they're still missing after 30 minutes).
+  let roots = await findRoots();
+  const missing = roots.filter((d) => !existsSync(d));
   if (missing.length) console.log(`Waiting for ${missing.join(', ')} (Google Drive may still be starting)`);
-  const roots = await findRoots(dirs.filter((d) => existsSync(d)));
-  console.log(`Watching ${roots.length} folder${roots.length === 1 ? '' : 's'}:\n${roots.map((r) => `  ${r}`).join('\n')}`);
+  console.log(`Scanning ${roots.length} folder${roots.length === 1 ? '' : 's'}:\n${roots.map((r) => `  ${r}`).join('\n')}`);
 
   const maxBytes = LIMIT_BY_TIER[ctx.guild.premiumTier || 0] * 1024 * 1024;
   const seen = new Set();
@@ -146,6 +127,22 @@ export async function startUploader(ctx) {
   async function handle(path) {
     const mark = {};
     try { await handleFile(path, mark); } catch (e) { if (mark.key) seen.delete(mark.key); throw e; }
+    return mark;
+  }
+
+  // A Drop file moves out once it's posted (Done\YYYY-MM) or has failed for good (Problems, with a note).
+  function settleDrop(path, problem) {
+    if (ctx.dry || !under(path, dumper.drop)) return;
+    try {
+      const dest = problem ? donePath(dumper.problems, basename(path), '') : donePath(dumper.done, basename(path), monthOf());
+      mkdirSync(dirname(dest), { recursive: true });
+      renameSync(path, dest);
+      if (problem) writeFileSync(`${dest}.txt`, `${basename(path)} wasn't posted: ${problem}\r\n`);
+      delete index[path];
+      saveSoon();
+    } catch (e) {
+      console.error(`couldn't move ${basename(path)} out of Drop: ${e.message}`);
+    }
   }
 
   async function handleFile(path, mark) {
@@ -153,7 +150,7 @@ export async function startUploader(ctx) {
     const s = await stat(path);
     if (!s.isFile() || !s.size) return;
     const fp = fingerprint(s.size, basename(path));
-    if (state.unplaceable?.[fp]) return; // couldn't be made small enough last time either
+    if (state.unplaceable?.[fp]) { mark.problem = "couldn't be made small enough for Discord"; return; } // last time either
 
     // no duplicates, cheapest check first:
     // 1. already on the server (old uploads, files posted by hand, or uploaded by this bot before)
@@ -239,6 +236,7 @@ export async function startUploader(ctx) {
     } catch (e) {
       if (!/limit/.test(e.message)) throw e;
       report.tooBig.push(`${info.rel} (${mb(s.size)}): ${e.message}`);
+      mark.problem = `too big for Discord, even compressed or split (${e.message})`;
       (state.unplaceable ||= {})[fp] = info.rel; // don't retry on every start
       save();
     }
@@ -310,7 +308,7 @@ export async function startUploader(ctx) {
   async function untilBack() {
     for (;;) {
       const net = await lookup('discord.com').then(() => true, () => false);
-      if (net && roots.every((r) => existsSync(r))) return;
+      if (net && existsSync(dirname(home))) return; // Drive is mounted again
       await sleep(30000);
     }
   }
@@ -318,7 +316,7 @@ export async function startUploader(ctx) {
   const queued = new Set();    // waiting in the queue
   const finished = new Set();  // uploaded, skipped, or failed for good this run
   const enqueue = (path) => {
-    if (queued.has(path) || finished.has(path)) return; // the watcher can report a file twice after Drive comes back
+    if (queued.has(path) || finished.has(path)) return; // a scan can offer a file that's still in the queue
     queued.add(path);
     pending++;
     queue = queue
@@ -327,10 +325,12 @@ export async function startUploader(ctx) {
           await untilBack();
           ctx.log(`🔌 The internet and Google Drive are back (down about ${Math.max(1, Math.round((Date.now() - down) / 60000))} min). Carrying on with the uploads.`);
           down = 0;
-          sweepSoon(); // folders may have changed while Drive was away
+          if (!ctx.dry) scanNow(true).catch((e) => console.error('scan:', e.message)); // folders may have changed while Drive was away
         }
-        await handle(path);
+        const mark = await handle(path);
         finished.add(path);
+        if (index[path]) { index[path].handled = true; saveSoon(); }
+        settleDrop(path, mark.problem);
       })
       .catch((e) => {
         const n = (tries.get(path) || 0) + 1;
@@ -341,72 +341,73 @@ export async function startUploader(ctx) {
           enqueue(path); // again, once they're back
           return;
         }
+        if (under(path, dumper.drop) && n < 5) { console.error(`upload failed (try ${n} of 5, again next scan): ${path}: ${e.message}`); return; }
         finished.add(path);
         report.failed.push(`${path}: ${e.message}`);
         console.error(`upload failed: ${path}:`, e);
+        settleDrop(path, e.message);
       })
       .then(() => sleep(ctx.dry ? 0 : 1200)) // stay well under Discord's upload rate limits
       .finally(() => { queued.delete(path); if (--pending === 0 && ready) done(); });
   };
 
-  // Every 30 minutes (and soon after an outage) walk the folders for files the watcher missed: when Google Drive
-  // disconnects, Windows stops telling the watcher about changes.
-  async function walk(dir, out) {
-    for (const entry of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
-      const p = join(dir, entry.name);
-      if (skip(p)) continue;
-      if (entry.isDirectory()) await walk(p, out);
-      else if (entry.isFile()) out.push(p);
+  // ── scanning: Drop every minute, everything every 10 minutes and straight after the laptop wakes ──
+  const INDEX_FILE = fileURLToPath(new URL('../../data/scan-index.json', import.meta.url));
+  const saved = ctx.dry ? null : loadIndex(INDEX_FILE);
+  const index = saved || {};
+  let seed = !saved; // first run with the scanner: what's already there counts as settled
+  let saveTimer;
+  const saveSoon = () => { if (ctx.dry) return; clearTimeout(saveTimer); saveTimer = setTimeout(() => { try { saveIndex(INDEX_FILE, index); } catch (e) { console.error(`scan index: ${e.message}`); } }, 2000); };
+
+  if (ctx.dry) { // every file once, wherever it stands
+    const { files } = await scan(roots, skip);
+    for (const p of files.keys()) enqueue(p);
+    ready = true;
+    if (pending === 0) done();
+    return;
+  }
+
+  let scanning = false;
+  let missingSince = missing.length ? Date.now() : 0;
+  async function scanNow(full) {
+    if (scanning) return;
+    scanning = true;
+    try {
+      if (full) {
+        dumper = dumperFolders(home);
+        const next = await findRoots();
+        for (const r of next) if (!roots.some((o) => o.toLowerCase() === r.toLowerCase())) ctx.log(`📂 Now also watching ${basename(r)}.`);
+        for (const r of roots) if (!next.some((o) => o.toLowerCase() === r.toLowerCase())) console.log(`No longer watching ${r} (shortcut removed).`);
+        roots = next;
+      }
+      const targets = full ? roots : [dumper.drop];
+      const started = Date.now();
+      const result = await scan(targets, skip);
+      const fresh = update(index, result, targets, Date.now(), { seed: full && seed });
+      if (full) {
+        seed = false;
+        const secs = Math.round((Date.now() - started) / 1000);
+        console.log(`scan: ${result.files.size} files in ${targets.length} folders, ${secs}s${fresh.length ? `, ${fresh.length} to check` : ''}`);
+        if (secs > 120) ctx.log(`🐢 A full scan of the upload folders took ${secs}s. Too many files in WATCH_DIRS or Sources?`);
+        if (!result.missing.length) missingSince = 0;
+        else if (missingSince && Date.now() - missingSince > 30 * 60e3) {
+          ctx.log(`⚠️ These folders still don't exist after 30 minutes: ${result.missing.join(', ')}. Is Google Drive running?`);
+          missingSince = 0;
+        }
+      }
+      saveSoon();
+      for (const p of fresh) enqueue(p);
+    } finally {
+      scanning = false;
     }
-    return out;
-  }
-  async function sweep() {
-    if (down || !ready) return;
-    let added = 0;
-    for (const r of [...roots]) for (const p of await walk(r, [])) if (!queued.has(p) && !finished.has(p)) { enqueue(p); added++; }
-    if (added) console.log(`sweep: queued ${added} file${added === 1 ? '' : 's'} the watcher missed`);
-  }
-  let sweepTimer;
-  const sweepSoon = () => { clearTimeout(sweepTimer); sweepTimer = setTimeout(() => sweep().catch((e) => console.error('sweep:', e.message)), 2 * 60 * 1000); };
-  if (!ctx.dry) setInterval(() => sweep().catch((e) => console.error('sweep:', e.message)), 30 * 60 * 1000);
-
-  const watcher = chokidar.watch(roots, {
-    ignored: (p) => skip(p),
-    awaitWriteFinish: { stabilityThreshold: 5000, pollInterval: 500 }, // wait until a copy or Drive sync finishes
-    ignorePermissionErrors: true,
-  });
-  watcher.on('add', enqueue).on('error', (e) => console.error(`watcher: ${e.message}`)) // Drive disconnects show up here; the sweep covers them
-    .on('ready', () => { ready = true; if (pending === 0) done(); });
-
-  if (missing.length && !ctx.dry) {
-    const since = Date.now();
-    const timer = setInterval(async () => {
-      const appeared = missing.filter((d) => existsSync(d));
-      if (appeared.length) {
-        missing = missing.filter((d) => !appeared.includes(d));
-        const fresh = (await findRoots(appeared)).filter((r) => !roots.some((o) => o.toLowerCase() === r.toLowerCase() || under(r, o)));
-        roots.push(...fresh);
-        watcher.add(fresh);
-        console.log(`Now watching ${fresh.length} more folder${fresh.length === 1 ? '' : 's'}: ${fresh.join(', ')}`);
-      }
-      if (!missing.length) clearInterval(timer);
-      else if (Date.now() - since > 30 * 60 * 1000) {
-        ctx.log(`⚠️ These WATCH_DIRS still don't exist after 30 minutes: ${missing.join(', ')}. Is Google Drive running?`);
-        clearInterval(timer);
-      }
-    }, 60 * 1000);
   }
 
-  // a shortcut added later to a WATCH_DIRS folder starts being watched too
-  if (!ctx.dry) {
-    chokidar.watch(dirs, { depth: 0, ignoreInitial: true }).on('add', async (p) => {
-      if (!p.toLowerCase().endsWith('.lnk')) return;
-      const [target] = await shortcutTargets([p]);
-      if (target && isFolder(target) && !roots.some((r) => r.toLowerCase() === target.toLowerCase() || under(target, r))) {
-        roots.push(resolve(target));
-        watcher.add(target);
-        ctx.log(`📂 Now also watching ${basename(target)} (new shortcut in ${basename(dirname(p))}).`);
-      }
-    });
-  }
+  await scanNow(true);
+  ready = true;
+  if (pending === 0) done();
+  const rescan = (full) => () => { if (!down) scanNow(full).catch((e) => console.error('scan:', e.message)); };
+  setInterval(rescan(false), 60e3);
+  setInterval(rescan(true), 10 * 60e3);
+  let tick = Date.now(); // a long gap between ticks means the laptop slept
+  setInterval(() => { const gap = Date.now() - tick; tick = Date.now(); if (gap > 90e3) rescan(true)(); }, 15e3);
 }

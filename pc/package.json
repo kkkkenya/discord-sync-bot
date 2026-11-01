@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "description": "Engineering Study Hub, always-on half: file uploader (PC + Google Drive folders), welcome guide, digest, nudges.",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "setup": "node setup-keys.js",
     "start": "node src/index.js",
@@ -11,11 +13,11 @@
     "preview": "node src/preview.js",
     "dry-run": "node src/index.js --dry-run",
     "shrink": "node shrink.js",
-    "units": "node make-units.js"
+    "units": "node make-units.js",
+    "test": "node --test \"test/*.test.js\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
-    "chokidar": "^4.0.3",
     "discord.js": "^14.16.3",
     "dotenv": "^16.4.7",
     "jszip": "^3.10.1",

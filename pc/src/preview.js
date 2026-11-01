@@ -1,4 +1,4 @@
-// Offline preview: where every file in WATCH_DIRS would go, using the saved post list (lib/threads.json).
+// Offline preview: where every file in Hub Dumper and WATCH_DIRS would go, using the saved post list (lib/threads.json).
 // Needs no token and posts nothing. `npm run dry-run` does the same against the live server.
 import { config } from 'dotenv';
 import THREADS from '../../lib/threads.json' with { type: 'json' };

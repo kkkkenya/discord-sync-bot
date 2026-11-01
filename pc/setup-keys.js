@@ -7,6 +7,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { APP_ID, FEATURES, GUILD_ID } from '../lib/config.js';
 
 const ENV = new URL('./.env', import.meta.url);
+const DUMPER_DEFAULT = 'G:\\My Drive\\Hub Dumper';
 const SCHEMA = new URL('../supabase/schema.sql', import.meta.url);
 const VERCEL = { project: 'prj_mnHQAPnzdEo3n77H5wwKSjVegwcP', team: 'team_JEJX6rJON0objLeKGaREgeT1', name: 'discord-sync-bot' };
 const REQUIRED = ['DISCORD_TOKEN', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', ...(FEATURES.dailyProblems ? ['ANTHROPIC_API_KEY'] : [])];
@@ -188,7 +189,9 @@ function save(env) {
     `SUPABASE_SERVICE_KEY=${env.SUPABASE_SERVICE_KEY || ''}`,
     `ANTHROPIC_API_KEY=${env.ANTHROPIC_API_KEY || ''}`,
     '',
-    '# Folders of notes, past papers and books, separated by ;  Drive shortcuts (.lnk) inside them are followed.',
+    "# The bot's folder in Drive: Drop (files in), Sources (shortcuts to shared folders), Done, Problems.",
+    `DUMPER_DIR=${env.DUMPER_DIR || DUMPER_DEFAULT}`,
+    '# More folders to scan, separated by ;  Drive shortcuts (.lnk) inside them are followed. Optional.',
     `WATCH_DIRS=${env.WATCH_DIRS || ''}`,
     '# Folder names to leave out wherever they appear, separated by ;',
     `SKIP_FOLDERS=${env.SKIP_FOLDERS || ''}`,
@@ -223,9 +226,10 @@ if (FEATURES.dailyProblems) {
   env.ANTHROPIC_API_KEY = await askChecked('Anthropic API key', { secret: true, current: env.ANTHROPIC_API_KEY }, checkAnthropic);
 }
 
-console.log(dim('\nFolders to upload from, separated by ; (not the folder with the bot\'s code).'));
-env.WATCH_DIRS = await ask('Watch folders', { current: env.WATCH_DIRS });
-console.log(checkFolders(env.WATCH_DIRS));
+console.log(dim('\nFiles go in Hub Dumper\\Drop, shared folders as shortcuts in Hub Dumper\\Sources.'));
+env.DUMPER_DIR = await ask('Hub Dumper folder', { current: env.DUMPER_DIR || DUMPER_DEFAULT });
+env.WATCH_DIRS = await ask('More folders to scan, separated by ; (optional)', { current: env.WATCH_DIRS });
+if (env.WATCH_DIRS) console.log(checkFolders(env.WATCH_DIRS));
 
 save(env);
 console.log(green('\n✓ Saved pc/.env'));

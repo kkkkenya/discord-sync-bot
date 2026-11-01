@@ -4,7 +4,7 @@ import { coach, coachReady } from './coach.js';
 import { aiReady, canRead, clamp, provider } from './ai.js';
 import { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics, suggestTopics, transcribe } from './brain.js';
 import { checkMedia, saveUpload } from './uploads.js';
-import { LOCAL_TYPES, addLocalFile, contextFor, ingestFile, library, libraryMeta, localFiles, outlineContext, removeLocalFile } from './ingest.js';
+import { LOCAL_TYPES, addLocalFile, contextFor, ensureLibrary, library, libraryMeta, localFiles, outlineContext, prepareUnit, remote, removeLocalFile } from './ingest.js';
 import { ALL_UNITS, calendar, filesFor, nextAssessment } from './library.js';
 import { COURSES, cohortUnits, courses, validCohort } from './cohort.js';
 import { ERROR_TYPES, STAGES, TBA } from './defs.js';
@@ -59,20 +59,20 @@ const routes = {
     });
     return { note, files: merged };
   },
-  // Download + extract every file for a unit into the context library. Skips files already synced. Then reads the
-  // unit's past papers into questions (no AI), so Predict is ready without another click.
-  'POST /api/library/ingest': async (q, { unit }) => {
+  // Reads a unit's files into the shared library (scans through OCR), about 45 seconds at a time: the app calls again
+  // while `pending` > 0. Then reads the unit's past papers into questions (no AI), so Predict is ready.
+  'POST /api/library/prepare': async (q, { unit }) => {
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     const { files, note } = await filesFor(unit);
-    if (note) return { note, files: [] };
-    const results = [];
-    for (const f of files) results.push(await ingestFile(f, unit));
-    return { files: results, parsed: parsePapers(unit) };
+    if (note) return { note, files: [], done: 0, total: 0, pending: 0 };
+    const { results, ...progress } = await prepareUnit(files, unit);
+    return { files: results, ...progress, parsed: parsePapers(unit) };
   },
   // A file from this computer: { unit, name, file: { data (base64) } }. Kept in the library, then the unit's papers are
   // read again, so a tutorial's questions (and its printed answers, as keys) show up straight away.
   'POST /api/library/upload': async (q, { unit, name, file }) => {
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    if (remote()) throw Object.assign(new Error("Adding files from your device isn't ready on the web yet. Drop them in the Hub Dumper folder instead."), { status: 400 });
     if (!LOCAL_TYPES.test(String(name || '')) || !file?.data) throw Object.assign(new Error('Add a PDF, Word (.docx), PowerPoint (.pptx) or text file.'), { status: 400 });
     const added = await addLocalFile(unit, String(name), Buffer.from(file.data, 'base64'));
     if (!added.chars) return { ...added, note: 'No text could be read from it (a scan or picture). Paste its questions in Predict instead.' };
@@ -372,6 +372,7 @@ const CHECKS = {
 // One request: method + path → a handler (query, body, ctx). ctx = { user: { id, name, tier }, today }.
 // Errors carry .status; the dev server and the Vercel router turn them into { error }.
 export async function dispatch(method, pathname, query, body, ctx) {
+  await ensureLibrary([...data.units.map((u) => u.code), query?.get?.('unit'), body?.unit]); // shared file text, cached
   const route = routes[`${method} ${pathname}`];
   if (route) return route(query, body, ctx);
   const submit = pathname.match(/^\/api\/mocks\/([\w-]+)\/submit$/);

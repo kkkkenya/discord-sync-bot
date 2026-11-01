@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api, daysUntil, markUndatedTba } from './api.js';
+import { api, daysUntil, markUndatedTba, prepareUnit } from './api.js';
 import Busy from './Busy.jsx';
 
 
@@ -101,7 +101,7 @@ function SyncAll({ s }) {
     for (const [i, u] of s.data.units.entries()) {
       setLines([...out, `Syncing ${u.code} (${i + 1}/${s.data.units.length})…`]);
       try {
-        const r = await api('POST', 'library/ingest', { unit: u.code });
+        const r = await prepareUnit(u.code, (p) => setLines([...out, `Reading ${u.code} (${i + 1}/${s.data.units.length}): ${p.done ?? 0} of ${p.total ?? '?'} files…`]));
         if (r.note) { out.push(`${u.code}: ${r.note}`); continue; }
         const text = r.files.filter((f) => f.chars > 0).length;
         const failed = r.files.filter((f) => f.error && !/scanned/.test(f.error)).length;
@@ -133,9 +133,10 @@ function Library({ code, go, refresh }) {
   useEffect(() => { load(); }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [read, setRead] = useState(null); // past-paper questions read after the last sync
+  const [progress, setProgress] = useState('');
   const sync = async () => {
     setBusy(true);
-    try { const r = await api('POST', 'library/ingest', { unit: code }); setRead(r.parsed?.questions ?? null); await load(); }
+    try { const r = await prepareUnit(code, (p) => setProgress(p.total ? `${p.done} of ${p.total} files read` : '')); setRead(r.parsed?.questions ?? null); await load(); }
     catch (e) { setLib((x) => ({ ...(x || { files: [] }), note: e.message })); }
     setBusy(false);
   };
@@ -176,7 +177,7 @@ function Library({ code, go, refresh }) {
   return (
     <div className="library">
       <div className="row">
-        <button className="ghost" onClick={sync} disabled={busy || !lib.files.length}>{busy ? 'Syncing…' : `Sync files (${synced}/${lib.files.length})`}</button>
+        <button className="ghost" onClick={sync} disabled={busy || !lib.files.length}>{busy ? (progress || 'Reading…') : `Read files (${synced}/${lib.files.length})`}</button>
         <input className="grow" placeholder="Search synced material…" aria-label={`Search ${code} synced material`} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <div className="row wrap small">

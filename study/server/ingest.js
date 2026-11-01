@@ -1,8 +1,11 @@
-// The context library: downloads a unit's files from Discord, extracts their text, and caches it in
-// study/data/library.json (separate from study.json so the daily store stays small). fileId -> entry.
+// The context library: downloads a unit's files from Discord, extracts their text (Gemini reads scanned PDFs), and
+// keeps it. Hub files are the same for every student, so the text is shared: in production it lives in Supabase
+// (crux_file_text) and each instance caches it per unit; locally it's study/data/library.json. fileId -> entry.
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { db, enc } from '../../lib/db.js';
+import { ocrPdf } from './ai.js';
 import { extract } from './extract.js';
 
 // Same folder as study.json (STUDY_DATA_DIR overrides both).
@@ -17,6 +20,31 @@ export function saveLibrary() {
   const tmp = new URL('library.json.tmp', DIR);
   writeFileSync(tmp, JSON.stringify(library, null, 1));
   renameSync(tmp, FILE);
+}
+
+// Production keeps file text in Supabase; locally (dev, tests) it's library.json. CRUX_REMOTE_LIBRARY=1 tries Supabase locally.
+export const remote = () => Boolean(process.env.VERCEL) || process.env.CRUX_REMOTE_LIBRARY === '1';
+const loadedAt = new Map(); // unit → when its text was loaded into library.files on this instance
+const TTL = 10 * 60e3;
+const entryOf = (r) => ({ unit: r.unit_code, name: r.name, paper: r.paper, pages: r.pages || 0, chars: r.chars || 0, text: r.text || '', status: r.status, method: r.method, at: r.updated_at, ...(r.page_starts && { pageStarts: r.page_starts }) });
+
+// Before a request runs: the text of these units' files, from Supabase (no-op locally).
+export async function ensureLibrary(units) {
+  const stale = [...new Set(units.filter(Boolean))].filter((u) => !(Date.now() - (loadedAt.get(u) || 0) < TTL));
+  if (!remote() || !stale.length) return;
+  const rows = await db.select('crux_file_text', `unit_code=in.(${stale.map((u) => `"${enc(u)}"`).join(',')})&select=file_id,unit_code,name,paper,pages,chars,text,status,method,page_starts,updated_at`);
+  for (const [id, e] of Object.entries(library.files)) if (stale.includes(e.unit)) delete library.files[id];
+  for (const row of rows) library.files[row.file_id] = entryOf(row);
+  for (const u of stale) loadedAt.set(u, Date.now());
+}
+
+async function saveEntry(id, e, method, error = null) {
+  library.files[id] = e;
+  if (!remote()) return saveLibrary();
+  await db.upsert('crux_file_text', [{
+    file_id: Number(id), unit_code: e.unit, name: e.name, paper: Boolean(e.paper), status: e.status, method, pages: e.pages || null,
+    chars: e.text.length, text: e.text || null, page_starts: e.pageStarts || null, error, updated_at: new Date().toISOString(),
+  }], 'file_id');
 }
 
 export const libraryMeta = () =>
@@ -102,29 +130,83 @@ async function messageFor(channelId, messageId) {
   return r.json();
 }
 
-// A forwarded message keeps its files in message_snapshots, not in attachments.
-export const attachmentOf = (msg) => msg.attachments?.[0] || msg.message_snapshots?.[0]?.message?.attachments?.[0] || null;
+// A forwarded message keeps its files in message_snapshots, not in attachments. With several files, the one whose
+// name matches (Discord swaps spaces for underscores), else the first.
+const plain = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9.]/g, '');
+export function attachmentOf(msg, name) {
+  const all = msg.attachments?.length ? msg.attachments : msg.message_snapshots?.[0]?.message?.attachments || [];
+  return all.find((a) => plain(a.filename) === plain(name)) || all[0] || null;
+}
 
-// Ingest one file record (from library.js filesFor) into the cache. Returns { id, name, chars, cached, error }.
-// A file with no extractable text (a scanned paper) is still recorded, so it isn't re-downloaded every sync.
+// Gemini reads scanned PDFs once for everyone. The free quota is shared, so at most OCR_PER_DAY a day across all
+// students; files over it wait as 'queued' and are read on a later day.
+const OCR_PER_DAY = 200;
+const OCR_MAX_BYTES = 20 * 1024 * 1024; // Gemini's inline limit
+const scanned = (text, pages) => pages > 0 && text.length / pages < 100;
+async function ocrAllowed() {
+  if (!remote()) return true;
+  const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
+  return (await db.rpc('crux_bump', { p_user: 'global', p_day: day, p_kind: 'ocr', p_limit: OCR_PER_DAY })) !== null;
+}
+
+// A file still to read: never read, waiting for OCR, a scan read before OCR existed, failed more than a day ago, or
+// read before page numbers were kept (PDFs and slides are read again once, so "Learn a topic" can cite pages).
+export const needsReading = (f, e = library.files[f.id]) => !e || ['new', 'queued'].includes(e.status) || (!e.status && !e.text)
+  || (e.status === 'error' && Date.now() - Date.parse(e.at || 0) > 864e5)
+  || (e.text && !e.pageStarts && e.method !== 'ocr' && /\.(pdf|pptx)$/i.test(f.name));
+
+// Ingest one file record (from library.js filesFor) into the library. Returns { id, name, chars, cached, error }.
+// A file with no text even after OCR is still recorded, so it isn't downloaded again every time.
 export async function ingestFile(f, unitCode) {
   const existing = library.files[f.id];
-  // synced before page numbers were kept: read a PDF or slide deck again once, so "Learn a topic" can cite pages
-  const needsPages = existing?.text && !existing.pageStarts && /\.(pdf|pptx)$/i.test(f.name);
-  if (existing && !needsPages) return { id: f.id, name: f.name, chars: existing.text?.length || 0, cached: true };
+  if (!needsReading(f, existing)) return { id: f.id, name: f.name, chars: existing.text?.length || 0, cached: true };
+  const failed = async (error) => {
+    if (existing?.text) return { id: f.id, name: f.name, chars: existing.text.length, error }; // keep what was read before
+    await saveEntry(f.id, { unit: unitCode, name: f.name, kind: f.kind, paper: f.paper, pages: 0, at: new Date().toISOString(), chars: 0, text: '', status: 'error' }, 'none', error);
+    return { id: f.id, name: f.name, error };
+  };
   let att;
   try {
-    const msg = await messageFor(f.channel_id, f.message_id);
-    att = attachmentOf(msg);
+    att = attachmentOf(await messageFor(f.channel_id, f.message_id), f.name);
   } catch (e) {
-    return { id: f.id, name: f.name, error: e.message };
+    return failed(e.message);
   }
-  if (!att) return { id: f.id, name: f.name, error: 'no attachment' };
+  if (!att) return failed('no attachment');
   const dl = await fetch(att.url);
-  if (!dl.ok) return { id: f.id, name: f.name, error: `download ${dl.status}` };
+  if (!dl.ok) return failed(`download ${dl.status}`);
   const buf = Buffer.from(await dl.arrayBuffer());
-  const { pages, text, pageStarts } = await extract(buf, att.filename);
-  library.files[f.id] = { unit: unitCode, name: f.name, kind: f.kind, paper: f.paper, pages, at: new Date().toISOString(), chars: text.length, text, ...(pageStarts && { pageStarts }) };
-  saveLibrary();
-  return { id: f.id, name: f.name, chars: text.length, error: text.length ? null : 'no text (scanned?)' };
+  let { pages, text, pageStarts } = await extract(buf, att.filename);
+  const ext = (att.filename.split('.').pop() || '').toLowerCase();
+  let method = { pdf: 'pdf', docx: 'docx', pptx: 'pptx' }[ext] || (text ? 'text' : 'none');
+  let status = 'done';
+  let error = null;
+  if (ext === 'pdf' && scanned(text, pages) && process.env.GEMINI_API_KEY) {
+    if (buf.length > OCR_MAX_BYTES) error = 'too big to read as a scan (over 20 MB)';
+    else if (!(await ocrAllowed())) status = 'queued';
+    else {
+      try {
+        const out = await ocrPdf(buf);
+        if (out.text.length > text.length) { text = out.text; pageStarts = undefined; method = 'ocr'; }
+      } catch (e) {
+        error = `OCR failed: ${e.message}`;
+      }
+    }
+  }
+  if (!text && status === 'done') method = 'none';
+  const entry = { unit: unitCode, name: f.name, kind: f.kind, paper: f.paper, pages, at: new Date().toISOString(), chars: text.length, text, status, method, ...(pageStarts && { pageStarts }) };
+  await saveEntry(f.id, entry, method, error);
+  return { id: f.id, name: f.name, chars: text.length, method, error: error || (status === 'queued' ? 'waiting for tomorrow\'s OCR' : text.length ? null : 'no text (scanned?)') };
+}
+
+// Reads a unit's unread files for up to `budgetMs` (Vercel cuts a request off), so the app calls again until
+// nothing is pending. One broken file is recorded with its error and the rest carry on.
+export async function prepareUnit(files, unitCode, budgetMs = 45e3) {
+  const started = Date.now();
+  const results = [];
+  for (const f of files.filter((x) => needsReading(x))) {
+    if (Date.now() - started > budgetMs) break;
+    results.push(await ingestFile(f, unitCode).catch((e) => ({ id: f.id, name: f.name, error: e.message })));
+  }
+  const pending = files.filter((x) => needsReading(x) && library.files[x.id]?.status !== 'queued').length;
+  return { results, total: files.length, done: files.length - files.filter((x) => needsReading(x)).length, pending };
 }

@@ -29,12 +29,13 @@ create table if not exists crux_file_text (
   file_id    bigint primary key references files (id) on delete cascade,
   unit_code  text,
   name       text,
+  paper      boolean not null default false,          -- a past paper, CAT or tutorial
   status     text not null default 'new' check (status in ('new', 'queued', 'done', 'error')),
   method     text check (method in ('pdf', 'ocr', 'docx', 'pptx', 'text', 'none')),
   pages      integer,
   chars      integer,
   text       text,
-  questions  jsonb,                                  -- parsed past-paper questions, shared by everyone
+  page_starts integer[],                             -- where each page starts in text (for "read pages 3-5")
   error      text,
   updated_at timestamptz not null default now()
 );

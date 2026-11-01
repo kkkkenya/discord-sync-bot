@@ -37,3 +37,16 @@ export async function markUndatedTba(units) {
 
 export const daysUntil = (today, day) => Math.round((new Date(`${day}T12:00:00Z`) - new Date(`${today}T12:00:00Z`)) / 86400000);
 export const pct = (p) => Math.round((p.score / p.outOf) * 100);
+
+// Reads a unit's files into the library, calling again every 3 seconds while some are left (each call runs about
+// 45 seconds). onProgress({ done, total }) after each call. Returns the last answer, with every file's result.
+export async function prepareUnit(unit, onProgress = () => {}) {
+  const files = [];
+  for (;;) {
+    const r = await api('POST', 'library/prepare', { unit });
+    files.push(...(r.files || []));
+    onProgress(r);
+    if (r.note || !r.pending) return { ...r, files };
+    await new Promise((ok) => setTimeout(ok, 3000));
+  }
+}

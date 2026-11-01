@@ -69,7 +69,7 @@ async function geminiCall(schema, system, content, maxTokens, media = []) {
   // Busy/hung servers are common and short-lived: one go on the primary, then straight to the lighter model, so a
   // failure shows in about a minute rather than two.
   let last;
-  for (const [n, m] of [model(), GEMINI_FALLBACK].entries()) {
+  for (const [n, m] of [provider() === 'gemini' ? model() : MODELS.gemini, GEMINI_FALLBACK].entries()) { // OCR uses Gemini whatever the provider
     if (n) await sleep(4000 * n);
     try { return await run(m); } catch (e) { last = e; if (!e.retryable) throw e; }
   }
@@ -138,6 +138,14 @@ async function deepseekCall(schema, system, content, maxTokens) {
     return obj;
   }
   throw new Error(`DeepSeek returned invalid JSON after retries: ${last}`);
+}
+
+// A scanned PDF read by Gemini, whichever provider the student picked: the shared library is read once for everyone.
+export async function ocrPdf(buf) {
+  const system = 'You transcribe scanned university exam papers, tutorials and notes. Copy every word, number and equation exactly as printed, in reading order. Write maths in plain text (x^2, sqrt(), integral from a to b). Keep question numbers, part letters and marks like (5 marks). Do not solve, summarise or add anything.';
+  const out = await geminiCall({ type: 'object', properties: { text: { type: 'string' } }, required: ['text'] }, system,
+    'Transcribe this document.', 16000, [{ mime: 'application/pdf', data: buf.toString('base64') }]);
+  return { text: String(out.text || '').replace(/\s+/g, ' ').trim() };
 }
 
 // media: [{ mime, data (base64) }], images or audio, for the providers that can read them (CAN).

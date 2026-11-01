@@ -51,9 +51,9 @@ test('dates accept a day, TBA or nothing; TBA never counts down to the KU calend
 });
 
 test('sync explains itself without Supabase keys', async () => {
-  const { body } = await srv.call('POST', 'library/ingest', { unit: 'EMM 302' });
+  const { body } = await srv.call('POST', 'library/prepare', { unit: 'EMM 302' });
   assert.match(body.note, /Supabase/);
-  assert.equal((await srv.call('POST', 'library/ingest', { unit: 'XYZ 999' })).status, 400);
+  assert.equal((await srv.call('POST', 'library/prepare', { unit: 'XYZ 999' })).status, 400);
 });
 
 test('everything is on disk', () => {

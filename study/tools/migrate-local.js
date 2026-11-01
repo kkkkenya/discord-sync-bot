@@ -50,9 +50,9 @@ const rows = ids.filter((id) => known.has(id)).map((id) => {
   const e = lib[id];
   const text = (e.text || '').trim();
   return {
-    file_id: Number(id), unit_code: e.unit || null, name: e.name || null,
+    file_id: Number(id), unit_code: e.unit || null, name: e.name || null, paper: Boolean(e.paper),
     status: text ? 'done' : 'new', method: text ? METHOD[extname(e.name || '').toLowerCase()] || 'text' : null,
-    pages: e.pages || null, chars: text.length, text: text || null, updated_at: new Date().toISOString(),
+    pages: e.pages || null, chars: text.length, text: text || null, page_starts: e.pageStarts || null, updated_at: new Date().toISOString(),
   };
 });
 for (let i = 0; i < rows.length; i += 25) await db.upsert('crux_file_text', rows.slice(i, i + 25), 'file_id');

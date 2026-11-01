@@ -90,7 +90,7 @@ function useIndicator(ref, page, vertical) {
 
 // The nav. Phones: glass top bar (unit, search, bell, account) and a floating tab pill. 768px+: a floating rail.
 // Search and the bell open a glass panel; Esc or a tap elsewhere closes it.
-export default function Nav({ s, unit, setUnit, page }) {
+export default function Nav({ s, unit, setUnit, page, tab }) {
   const wide = useWide();
   const unitTitle = s.data.units.find((u) => u.code === unit)?.title || '';
   const [open, setOpen] = useState(null); // 'unit' | 'search' | 'bell'
@@ -98,6 +98,8 @@ export default function Nav({ s, unit, setUnit, page }) {
   const pill = useRef(null), rail = useRef(null);
   useIndicator(pill, page, false);
   useIndicator(rail, page, true);
+  // picking a unit keeps you where you are: a unit page moves to the same tab of the new unit, other pages just follow it
+  const pickUnit = (code) => { setUnit(code); setOpen(null); if (page === 'unit') go(href('unit', unitSlug(code), tab || 'topics')); };
   const toggle = (what) => { setOpen((o) => (o === what ? null : what)); setQuery(''); };
   useEffect(() => { setOpen(null); }, [page, unit]);
   useEffect(() => {
@@ -193,11 +195,11 @@ export default function Nav({ s, unit, setUnit, page }) {
         <div className="panel glass" role="dialog" aria-label="Your units">
           <h2>Your units</h2>
           {units.map((u) => (
-            <a key={u.code} className="row" href={href('unit', unitSlug(u.code), 'topics')} aria-current={u.code === unit ? 'true' : undefined} onClick={() => setUnit(u.code)}>
+            <button key={u.code} type="button" className="row" aria-current={u.code === unit ? 'true' : undefined} onClick={() => pickUnit(u.code)}>
               <span className={`dot ${u.stage?.id || ''}`} aria-hidden="true" />
               <span className="row-main"><b className="num">{u.code}</b><span className="row-sub">{u.title}</span></span>
               <span className="row-sub num">{daysText(u.days)}</span>
-            </a>
+            </button>
           ))}
           <a className="row" href={href('units')}><span className="row-main">Add or change units</span><Icon name="chevron" /></a>
         </div>

@@ -18,46 +18,78 @@ const setIn = (obj, [k, ...rest], value) => {
 // text you can correct in place while editing (saved when you click away)
 // text you can correct in place while editing (saved when you click away); typeset maths when not editing
 function Field({ value, path, edit, save, as: Tag = 'span', className = '' }) {
-  if (!edit) return <Tag className={`kfield ${className}`}><Rich text={value} as="span" /></Tag>;
+  if (!edit) return <Rich text={value} as={Tag === 'span' ? 'span' : 'div'} className={`kfield ${className}`} />;
   return (
     <Tag className={`kfield ${className}`} contentEditable={edit} suppressContentEditableWarning spellCheck={false}
       onBlur={(e) => { const v = e.currentTarget.innerText.trim(); if (edit && v !== value) save(path, v); }}>{value}</Tag>
   );
 }
 
+// A hidden answer or step: tap to show it, tap again to hide. Always open while editing or with "Show all answers".
+function Reveal({ label = 'Show answer', open, children }) {
+  const [shown, setShown] = useState(false);
+  if (open || shown) {
+    return (
+      <div className="reveal">
+        {children}
+        {!open && <button type="button" className="btn plain reveal-hide" onClick={() => setShown(false)}>Hide</button>}
+      </div>
+    );
+  }
+  return <button type="button" className="reveal-btn" onClick={() => setShown(true)}>{label}</button>;
+}
+
+// a problem in its own box and an answer in its own box, editable in place
+const Problem = ({ children, label = 'Problem' }) => <div className="qbox"><span className="qbox-label">{label}</span>{children}</div>;
+const Answer = ({ children, label = 'Answer' }) => <div className="abox key"><span className="qbox-label">{label}</span>{children}</div>;
+const Part = ({ n, title, children }) => <section className="kit-part"><p className="kit-n num">Part {n}</p><h4>{title}</h4>{children}</section>;
+
 function Ladder({ c, edit, save, reveal }) {
-  const f = (path, as, className) => <Field value={path.reduce((o, k) => o?.[k], c) || ''} path={path} edit={edit} save={save} as={as} className={className} />;
+  const f = (path, as = 'div', className) => <Field value={path.reduce((o, k) => o?.[k], c) || ''} path={path} edit={edit} save={save} as={as} className={className} />;
+  const open = reveal || edit;
   return (
     <>
-      <h4>1 · Worked example</h4>
-      {f(['worked', 'problem'], 'p')}
-      <ol>{c.worked.steps.map((_, i) => <li key={i}>{f(['worked', 'steps', i])}</li>)}</ol>
-      <p><b>Answer:</b> {f(['worked', 'answer'])}</p>
-      <h4>2 · Your turn, with help</h4>
-      {f(['faded', 'problem'], 'p')}
-      <ol>{c.faded.steps.map((st, i) => <li key={i} className={st.blank && !reveal ? 'blank' : ''}>{st.blank && !reveal ? <>{f(['faded', 'steps', i, 'hint'])} <span className="gap">fill this in</span></> : f(['faded', 'steps', i, 'text'])}</li>)}</ol>
-      {reveal && <p><b>Answer:</b> {f(['faded', 'answer'])}</p>}
-      <h4>3 · On your own</h4>
-      {f(['solo', 'problem'], 'p')}
-      {reveal && <p><b>Answer:</b> {f(['solo', 'answer'])}</p>}
-      <h4>Teach it back</h4>
-      <ul>{c.teachPrompts.map((_, i) => <li key={i}>{f(['teachPrompts', i])}</li>)}</ul>
+      <Part n={1} title="Worked example">
+        <Problem>{f(['worked', 'problem'])}</Problem>
+        <ol className="kit-steps">{c.worked.steps.map((_, i) => <li key={i}>{f(['worked', 'steps', i])}</li>)}</ol>
+        <Answer>{f(['worked', 'answer'])}</Answer>
+      </Part>
+      <Part n={2} title="Your turn, with help">
+        <Problem>{f(['faded', 'problem'])}</Problem>
+        <ol className="kit-steps">
+          {c.faded.steps.map((st, i) => (
+            <li key={i} className={st.blank ? 'blank' : ''}>
+              {st.blank ? <>{f(['faded', 'steps', i, 'hint'])}<Reveal label="Show this step" open={open}>{f(['faded', 'steps', i, 'text'])}</Reveal></> : f(['faded', 'steps', i, 'text'])}
+            </li>
+          ))}
+        </ol>
+        <Reveal open={open}><Answer>{f(['faded', 'answer'])}</Answer></Reveal>
+      </Part>
+      <Part n={3} title="On your own">
+        <Problem>{f(['solo', 'problem'])}</Problem>
+        <Reveal open={open}><Answer>{f(['solo', 'answer'])}</Answer></Reveal>
+      </Part>
+      <section className="kit-part">
+        <h4>Teach it back</h4>
+        <ul className="kit-steps">{c.teachPrompts.map((_, i) => <li key={i}>{f(['teachPrompts', i])}</li>)}</ul>
+      </section>
     </>
   );
 }
 
 function Recipes({ c, edit, save, reveal }) {
   return c.recipes.map((r, i) => {
-    const f = (k, as) => <Field value={r[k]} path={['recipes', i, k]} edit={edit} save={save} as={as} />;
+    const f = (k, as = 'div') => <Field value={r[k]} path={['recipes', i, k]} edit={edit} save={save} as={as} />;
     return (
-      <div key={i} className="recipe">
-        <h4>{f('name')}</h4>
-        <p className="small"><b>Spot it:</b> {f('when')}</p>
-        <ol>{r.steps.map((_, j) => <li key={j}><Field value={r.steps[j]} path={['recipes', i, 'steps', j]} edit={edit} save={save} /></li>)}</ol>
-        <p className="small"><b>Shortcut:</b> {f('shortcut')}</p>
-        <p className="small warm"><b>Trap:</b> {f('trap')}</p>
-        {reveal !== null && <p className="small"><b>Try it:</b> {f('tryIt')}</p>}
-      </div>
+      <section key={i} className="kit-part recipe">
+        <p className="kit-n num">Recipe {i + 1}</p>
+        <h4>{f('name', 'span')}</h4>
+        <div className="kit-line"><b className="md-label">Spot it:</b> {f('when', 'span')}</div>
+        <ol className="kit-steps">{r.steps.map((_, j) => <li key={j}><Field value={r.steps[j]} path={['recipes', i, 'steps', j]} edit={edit} save={save} as="div" /></li>)}</ol>
+        <div className="rich"><div className="md-note tip"><b className="md-label">Shortcut:</b> {f('shortcut', 'span')}</div></div>
+        <div className="rich"><div className="md-note warn"><b className="md-label">Trap:</b> {f('trap', 'span')}</div></div>
+        {r.tryIt && <Problem label="Try it">{f('tryIt')}</Problem>}
+      </section>
     );
   });
 }
@@ -185,7 +217,7 @@ export default function Kit({ s, unit, refresh, go, focus, notify }) {
           <p className="eyebrow num">{unit} · {s.kits.names[shown.kind].name}{shown.topicId ? ` · ${topicName(shown.topicId) || ''}` : ''} · {shown.at.slice(0, 10)}{shown.edited ? ' · edited' : ''}{shown.shared ? ' · from your class' : ''}</p>
           {shown.content.title && <h3><Field value={shown.content.title} path={['title']} edit={edit} save={save(shown)} /></h3>}
           <div className="kit-tools toolbar">
-            {shown.kind !== 'sheet' && <button type="button" className="btn" onClick={() => setReveal(!reveal)}>{reveal ? 'Hide answers' : 'Show answers'}</button>}
+            {shown.kind !== 'sheet' && <button type="button" className="btn" onClick={() => setReveal(!reveal)}>{reveal ? 'Hide all answers' : 'Show all answers'}</button>}
             <button type="button" className="btn" onClick={() => setEdit(!edit)} aria-pressed={edit}>{edit ? 'Done editing' : 'Edit'}</button>
             <button type="button" className="btn" onClick={() => printKit(shown.id)}>{shown.kind === 'sheet' ? 'Print on one page' : 'Print'}</button>
             {shown.shared && <button type="button" className="btn plain" disabled={busy} onClick={() => make(true)}>Make a fresh one</button>}

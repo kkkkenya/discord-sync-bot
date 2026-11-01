@@ -27,6 +27,7 @@ export default function Mock({ s, unit, refresh, focus, go, notify }) {
   const duration = useRef(0);
 
   const [predicted, setPredicted] = useState(false);
+  useEffect(() => { if (!mock) { setResult(null); setError(''); setSelfEarned([]); } }, [unit]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (focus?.section !== 'mock') return;
     setPredicted(Boolean(focus.predicted));

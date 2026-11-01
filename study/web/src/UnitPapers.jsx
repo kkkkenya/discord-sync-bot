@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Rich from './Rich.jsx';
 import { api } from './api.js';
 
 const KINDS = [{ id: 'focus', label: 'Focus' }, { id: 'exclude', label: 'Skip' }, { id: 'note', label: 'Note' }];
@@ -91,7 +92,7 @@ export default function UnitPapers({ s, unit, refresh, go, notify }) {
               <div key={q.id} className="list-row q">
                 <span className="row-main">
                   <span className="row-sub">{[q.source, q.year, q.type, q.marks && `${q.marks} marks`].filter(Boolean).join(' · ')}</span>
-                  <span className="qtext">{q.text}</span>
+                  <Rich text={q.text} as="span" className="qtext" />
                 </span>
                 <button className="btn" onClick={() => go('practice', { unit, questionId: q.id })}>Practise</button>
               </div>

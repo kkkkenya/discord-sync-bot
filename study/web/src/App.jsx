@@ -196,7 +196,7 @@ export default function App({ user }) {
       <a className="skip" href="#main">Skip to content</a>
       {bare ? (
         <header className="bare-head"><span className="wordmark">Crux</span><a className="navbtn" href={href('settings')} aria-label="Settings"><Icon name="settings" /></a></header>
-      ) : <Nav s={s} unit={unit} setUnit={setUnit} page={page} />}
+      ) : <Nav s={s} unit={unit} setUnit={setUnit} page={page} tab={route.rest[1]} />}
       <main className={bare ? 'main bare' : 'main'} id="main" tabIndex={-1}>
           {!online && <p className="notice" role="status">Offline. You're seeing your last saved data. Changes that don't need AI are kept on this device and sent when you're back.</p>}
           {queued > 0 && <p className="notice" role="status"><span className="num">{queued}</span> change{queued === 1 ? '' : 's'} waiting to sync.</p>}

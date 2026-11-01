@@ -58,6 +58,7 @@ export default function Insights({ s, go, deeper }) {
 
       <div className="card">
         <h2>Questions tried</h2>
+        {!d.trend.some((x) => x.tried) ? <p className="row-sub">None in the last 14 days. Each question you check shows up here as a bar.</p> : <>
         <div className="trend" role="img" aria-label={`Questions tried per day for 14 days: ${d.trend.map((x) => x.tried).join(', ')}`}>
           {d.trend.map((x) => (
             <span key={x.day} className="col" title={`${x.day}: ${x.tried} tried, ${x.right} right`}>
@@ -66,6 +67,7 @@ export default function Insights({ s, go, deeper }) {
           ))}
         </div>
         <p className="row-sub">Last 14 days. The darker part is right answers.</p>
+        </>}
       </div>
     </>
   );

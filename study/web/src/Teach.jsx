@@ -49,6 +49,7 @@ export default function Teach({ s, unit, refresh, focus, go }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
 
+  useEffect(() => { setTopic(''); setText(''); setResult(null); }, [unit]);
   useEffect(() => {
     if (focus?.section !== 'teach') return;
     if (focus.topic) setTopic(focus.topic);

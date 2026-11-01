@@ -142,7 +142,9 @@ export function attachmentOf(msg, name) {
 // students; files over it wait as 'queued' and are read on a later day.
 const OCR_PER_DAY = 200;
 const OCR_MAX_BYTES = 20 * 1024 * 1024; // Gemini's inline limit
-const scanned = (text, pages) => pages > 0 && text.length / pages < 100;
+// Under 100 characters a page counts as a scan. Only the first pages of a long book are read, so a book is judged
+// on its first 30 pages, not its page count.
+export const scanned = (text, pages) => pages > 0 && text.length < 100 * Math.min(pages, 30);
 async function ocrAllowed() {
   if (!remote()) return true;
   const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });

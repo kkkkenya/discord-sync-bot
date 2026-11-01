@@ -66,3 +66,11 @@ test('a scan read before OCR existed (no text, no status) is read again, once', 
   await prepareUnit(files.slice(1, 2), 'EMM 302');
   assert.equal(calls.gemini, before + 1);
 });
+
+test('a long book with a text layer is not a scan, however many pages it has', async () => {
+  const { scanned } = await import('../server/ingest.js');
+  assert.equal(scanned('x'.repeat(44000), 900), false);
+  assert.equal(scanned('', 6), true);
+  assert.equal(scanned('x'.repeat(300), 6), true);
+  assert.equal(scanned('x'.repeat(5000), 6), false);
+});

@@ -16,6 +16,7 @@ import { predictedMock } from './predict.js';
 import { GOALS, buildPack } from './context-pack.js';
 import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { buildPrompt } from './prompt.js';
+import { nextActions } from './next.js';
 import { KITS, KIT_FOR, makeKitFor } from './kit.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, flagCheckpoint, markBroke } from './practice.js';
@@ -34,6 +35,7 @@ const state = () => {
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), media: { image: canRead('image'), audio: canRead('audio') }, provider: provider(), settings: data.settings,
     mastery: masteryMap(today), library: libraryMeta(),
+    next: nextActions(today, { prepared: new Set(Object.values(library.files).filter((e) => e.text).map((e) => e.unit)) }),
   };
 };
 

@@ -1,27 +1,45 @@
-const SECTION = { teach: 'teach', paper: 'papers', topics: 'units', mock: 'mock', practice: 'practice', kit: 'kit', prompt: 'prompt' };
+import FirstRun from './FirstRun.jsx';
+import { Icon } from './icons.jsx';
+import { href, unitSlug } from './route.js';
 
-export default function Today({ s, go }) {
+const daysText = (p) => (p.days == null ? 'TBA' : p.days < 0 ? 'Passed' : p.days === 0 ? 'Today' : `${p.days} day${p.days === 1 ? '' : 's'}`);
+
+// Today: up to 3 next actions, then every unit with its days left and stage. Nothing else.
+export default function Today({ s, go, refresh }) {
+  if (!s.data.units.length) return <FirstRun s={s} refresh={refresh} />;
+  const strip = s.data.units.map((u) => ({ code: u.code, ...s.units[u.code] })).sort((a, b) => (a.days ?? 999) - (b.days ?? 999));
   return (
-    <section id="today" className="reveal" data-tour="today">
-      <h2>Today</h2>
-      {!s.plan.length ? (
-        <p className="muted">Pick your units below and the plan fills in: weakest and closest paper first, one task each, shaped by its study stage.</p>
-      ) : (
-        <ol className="plan">
-          {s.plan.map((p) => (
-            <li key={p.code}>
-              <div>
-                <span className="code">{p.code}</span>
-                <span className="title">{p.title}</span>
-                <span className={`stage ${p.stage.id}`} title={p.stage.source === 'unit' || p.stage.source === 'all' ? 'Set by you' : p.stage.source === 'tba' ? 'Date TBA' : 'From the date'}>{p.stage.name}</span>
-                {p.cat && p.days >= 0 && <span className={`when ${p.days <= 3 ? 'hot' : ''}`}>{p.days ? `in ${p.days}d` : 'today'}</span>}
-              </div>
-              <button onClick={() => go(SECTION[p.task.kind], { unit: p.code, topic: p.task.topic, kind: p.task.promptKind, questionId: p.task.questionId, kit: p.task.kit })}>{p.task.text} →</button>
+    <>
+      <header className="page-head"><h1>Today</h1></header>
+      <div>
+        <h2 className="list-title">Next</h2>
+        <div className="list">
+          {s.next.map((a) => (
+            <a key={a.unit + a.label} className="list-row" href={a.href} onClick={(e) => { e.preventDefault(); go(a.focus.section, a.focus); }}>
+              <span className="row-main">
+                <span>{a.label}</span>
+                <span className="row-sub">{a.reason}</span>
+              </span>
+              <span className="row-sub">{a.minutes} min</span>
+              <span className="chev"><Icon name="chevron" /></span>
+            </a>
+          ))}
+        </div>
+      </div>
+      <div>
+        <h2 className="list-title">Units</h2>
+        <ul className="strip">
+          {strip.map((u) => (
+            <li key={u.code}>
+              <a href={href('unit', unitSlug(u.code), 'topics')}>
+                <span className={`dot ${u.stage.id}`} aria-hidden="true" />
+                <b>{u.code}</b>
+                <span className="row-sub">{daysText(u)}<span className="visually-hidden">, {u.stage.name}</span></span>
+              </a>
             </li>
           ))}
-        </ol>
-      )}
-      <p className="muted small">Solve before you re-read: attempt the question closed book, then check. Teach a topic out loud before you call it done.</p>
-    </section>
+        </ul>
+      </div>
+    </>
   );
 }

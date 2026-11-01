@@ -75,6 +75,7 @@ export default function App({ user }) {
   const props = { s, refresh, go, focus, notify, unit, setUnit };
   const settingsOpen = route.name === 'settings';
   const page = settingsOpen ? 'today' : route.name;
+  const bare = !s.data.units.length; // the first run: no tabs until there are units
   const current = (id) => (page === id || (id === 'units' && page === 'unit') ? 'page' : undefined);
 
   let content;
@@ -105,7 +106,10 @@ export default function App({ user }) {
   } else if (page === 'insights') {
     content = <><header className="page-head"><h1>Insights</h1></header><div className="legacy"><Progress {...props} /><Prompt {...props} /></div></>;
   } else {
-    content = <><header className="page-head"><h1>Today</h1></header><div className="legacy"><Today {...props} /></div></>;
+    content = <Today {...props} />;
+  }
+  if (bare) {
+    content = <Today {...props} />; // whatever the route: there's nothing else to show yet
   }
 
   return (
@@ -120,18 +124,20 @@ export default function App({ user }) {
         )}
         <a className="iconbtn" href={href('settings')} aria-label="Settings"><Icon name="settings" /></a>
       </header>
-      <div className="layout">
-        <nav className="rail" aria-label="Sections">
+      <div className={bare ? '' : 'layout'}>
+        {!bare && <nav className="rail" aria-label="Sections">
           {TABS.map((t) => <a key={t.id} href={href(t.id)} aria-current={current(t.id)}><Icon name={t.icon} />{t.label}</a>)}
-        </nav>
+        </nav>}
         <main className="main" id="main" tabIndex={-1}>
           {problem && <p className="notice bad" role="alert">{problem} <button className="btn plain" onClick={refresh}>Try again</button></p>}
           {content}
         </main>
       </div>
-      <nav className="tabbar" aria-label="Sections">
-        {TABS.map((t) => <a key={t.id} href={href(t.id)} aria-current={current(t.id)}><Icon name={t.icon} />{t.label}</a>)}
-      </nav>
+      {!bare && (
+        <nav className="tabbar" aria-label="Sections">
+          {TABS.map((t) => <a key={t.id} href={href(t.id)} aria-current={current(t.id)}><Icon name={t.icon} />{t.label}</a>)}
+        </nav>
+      )}
       {settingsOpen && <Settings s={s} user={user} refresh={refresh} onProblem={setProblem} onClose={() => (history.length > 1 ? history.back() : goTo(href('today')))} />}
       {toast && (
         <div className="toast" role="status">

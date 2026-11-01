@@ -96,7 +96,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
         </form>
       )}
 
-      {problem && <p className="notice bad" role="alert">{problem}</p>}
+      {problem && <p className="notice bad" role="alert">{problem}{problem.startsWith("Today's AI limit") && <> <button className="btn plain" onClick={deeper}>Go deeper</button></>}</p>}
       {res?.needKey && (
         <div className="notice" role="status">
           <p>{res.message}</p>

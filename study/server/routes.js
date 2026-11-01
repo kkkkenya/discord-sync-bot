@@ -19,6 +19,8 @@ import { buildPrompt } from './prompt.js';
 import { nextActions } from './next.js';
 import { insights } from './insights.js';
 import { deleteNote, importNotes, listNotes, loadNotes, ownNotes } from './notes-store.js';
+import { bump, usedToday } from './usage.js';
+import { requestScope } from './store.js';
 import { KITS, KIT_FOR, makeKitFor } from './kit.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, flagCheckpoint, markBroke } from './practice.js';
@@ -48,6 +50,8 @@ const routes = {
   'GET /api/export': async (q, body, ctx) => ({ exportedAt: new Date().toISOString(), user: ctx?.user, doc: JSON.parse(JSON.stringify(data)), notes: await listNotes(ctx?.user?.id) }),
   // Imported notes (Obsidian, Notion): parsed in the browser, saved per unit and title.
   'GET /api/notes': (q, body, ctx) => listNotes(ctx.user.id, q.get('unit')),
+  // Today's AI actions against the member's limit, for Settings.
+  'GET /api/usage': async (q, body, ctx) => ({ ai: await usedToday(ctx?.user, 'ai') }),
   'POST /api/notes/import': (q, { notes } = {}, ctx) => importNotes(ctx.user.id, notes, data.units.map((u) => u.code)),
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.
   'GET /api/catalog': (q) => {
@@ -387,7 +391,17 @@ const CHECKS = {
 // Routes that ground their work in the student's own notes: those notes are loaded into the request first.
 const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints))/;
 
+// Routes that use the AI: each request is one "AI action" against the member's daily limit.
+const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints)|predict\/map)$/;
+export const AI_LIMIT_MESSAGE = "Today's AI limit is used. Take this pack to any AI.";
+
 export async function dispatch(method, pathname, query, body, ctx) {
+  const scope = requestScope();
+  if (scope && ctx?.user) scope.user = ctx.user; // the provider choice depends on the tier (ai.js)
+  if (method === 'POST' && USES_AI.test(pathname) && ctx?.user && aiReady()) {
+    const used = await bump(ctx.user, 'ai');
+    if (!used.ok) throw Object.assign(new Error(AI_LIMIT_MESSAGE), { status: 429, limit: 'ai' });
+  }
   await ensureLibrary([...data.units.map((u) => u.code), query?.get?.('unit'), body?.unit]); // shared file text, cached
   const unitHere = query?.get?.('unit') || body?.unit || data.topics.find((t) => t.id === (query?.get?.('topicId') || body?.topicId))?.unit;
   if (READS_NOTES.test(pathname) && ctx?.user) await loadNotes(ctx.user.id, unitHere);

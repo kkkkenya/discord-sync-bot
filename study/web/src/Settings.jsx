@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
 import ImportNotes from './ImportNotes.jsx';
@@ -20,6 +20,8 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
     Object.assign(document.createElement('a'), { href: url, download: `crux-${s.today}.json` }).click();
     URL.revokeObjectURL(url);
   }).catch((e) => onProblem(e.message));
+  const [usage, setUsage] = useState(null);
+  useEffect(() => { api('GET', 'usage').then(setUsage).catch(() => {}); }, []);
   const setting = (body) => api('POST', 'settings', body).then(refresh).catch((e) => onProblem(e.message));
   return (
     <>
@@ -40,7 +42,7 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
             <select value={s.settings.aiProvider} onChange={(e) => setting({ aiProvider: e.target.value })}>
               <option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option>
             </select>
-            <span className="hint">{s.ai ? 'Ready.' : `Not available right now. Pick the other one.`}</span>
+            <span className="hint">{s.ai ? 'Ready.' : `Not available right now. Pick the other one.`}{usage?.ai && usage.ai.limit !== null && Number.isFinite(usage.ai.limit) ? ` AI today: ${usage.ai.used} of ${usage.ai.limit}.` : ''}</span>
           </label>
         </div>
         {s.data.units.length > 0 && <ImportNotes s={s} unit={unit} refresh={refresh} notify={notify} onProblem={onProblem} />}

@@ -36,3 +36,13 @@ export const HINT = { focus: 2.5, excludeAdequate: 0.5, excludeLate: 0 };
 
 // A unit's CAT/exam date: null (fall back to the KU calendar), an ISO day (YYYY-MM-DD), or 'TBA'.
 export const TBA = 'TBA';
+
+// What each membership tier gets a day (Nairobi days). Owner: no limits.
+export const LIMITS = {
+  ai: { trial: 15, basic: 15, premium: 40, owner: Infinity },
+  download: { trial: 2, basic: 2, premium: Infinity, owner: Infinity },
+};
+// DeepSeek (Premium's deeper text tasks). Priced at the peak rate so the estimate errs high: deepseek-flash,
+// USD per million tokens, from api-docs.deepseek.com on 2026-11-01. Above the monthly cap Crux uses Gemini instead.
+export const DEEPSEEK = { model: 'deepseek-flash', inputPerM: 0.3, outputPerM: 1.2, priced: '2026-11-01', monthlyCapUsd: 2.9 };
+export const deepseekCost = ({ prompt_tokens: i = 0, completion_tokens: o = 0 } = {}) => (i * DEEPSEEK.inputPerM + o * DEEPSEEK.outputPerM) / 1e6;

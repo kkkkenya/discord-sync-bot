@@ -154,7 +154,11 @@ export default function App({ user }) {
         </nav>}
         <main className="main" id="main" tabIndex={-1}>
           {!online && <p className="notice" role="status">Offline. You're seeing your last saved data, and changes won't save until you're back.</p>}
-          {problem && <p className="notice bad" role="alert">{problem} <button className="btn plain" onClick={refresh}>Try again</button></p>}
+          {problem && (
+            <p className="notice bad" role="alert">{problem}{' '}
+              {problem.startsWith("Today's AI limit") ? <button className="btn plain" onClick={() => { setProblem(''); setDeeper({ unit }); }}>Go deeper</button> : <button className="btn plain" onClick={refresh}>Try again</button>}
+            </p>
+          )}
           {content}
         </main>
       </div>

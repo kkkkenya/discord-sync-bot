@@ -1,10 +1,18 @@
 // One AI helper for Crux, with a provider switch. Every AI call goes through structured().
 // Providers: gemini (default; native REST, schema-enforced), deepseek (OpenAI-compatible JSON, validated + retried).
 // Keys: GEMINI_API_KEY, DEEPSEEK_API_KEY. Model names override via AI_MODEL.
-import { data } from './store.js';
+import { deepseekCost } from './defs.js';
+import { data, requestScope } from './store.js';
+import { addDeepseekSpend, deepseekOpen } from './usage.js';
 
 export const PROVIDERS = ['gemini', 'deepseek'];
-export const provider = () => data?.settings?.aiProvider || process.env.AI_PROVIDER || 'gemini';
+// DeepSeek is Premium's (and the owner's), and only while the month's budget lasts; everyone else uses Gemini.
+// Locally (no request) the setting is used as it is.
+const deepseekFor = () => { const u = requestScope()?.user; return (!u || ['premium', 'owner'].includes(u.tier)) && deepseekOpen(); };
+export const provider = () => {
+  const p = data?.settings?.aiProvider || process.env.AI_PROVIDER || 'gemini';
+  return p === 'deepseek' && !deepseekFor() ? 'gemini' : p;
+};
 
 const MODELS = { gemini: 'gemini-3.8-flash', deepseek: 'deepseek-flash' };
 const KEYS = { gemini: 'GEMINI_API_KEY', deepseek: 'DEEPSEEK_API_KEY' };
@@ -129,6 +137,7 @@ async function deepseekCall(schema, system, content, maxTokens) {
       continue;
     }
     if (!r.ok) throw new Error(`DeepSeek ${r.status}: ${text.slice(0, 200)}`);
+    try { addDeepseekSpend(deepseekCost(JSON.parse(text).usage)).catch((e) => console.error('DeepSeek spend:', e.message)); } catch { /* no usage block */ }
     let raw = '';
     let obj;
     try { raw = JSON.parse(text).choices?.[0]?.message?.content ?? ''; obj = JSON.parse(raw); }

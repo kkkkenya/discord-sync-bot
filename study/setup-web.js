@@ -162,9 +162,14 @@ if (vt) {
   if (project.status === 404) {
     project = await call(`https://api.vercel.com/v11/projects?${q}`, {
       method: 'POST', headers: h,
-      body: JSON.stringify({ name: VERCEL.name, framework: 'vite', rootDirectory: 'study', outputDirectory: 'dist', sourceFilesOutsideRootDirectory: true, gitRepository: { type: 'github', repo: VERCEL.repo } }),
+      body: JSON.stringify({ name: VERCEL.name, framework: 'vite', rootDirectory: 'study', outputDirectory: 'dist', gitRepository: { type: 'github', repo: VERCEL.repo } }),
     });
     console.log(project.ok ? green('✓ Made the Vercel project "crux" (root directory study/).') : red(`✗ Couldn't make the Vercel project (${project.status}): ${project.body?.error?.message || ''}`));
+  }
+  if (project.ok) {
+    // Crux's API imports the bot's lib/ folder, outside study/: Vercel has to include it (can't be set on create)
+    const r = await call(`https://api.vercel.com/v9/projects/${VERCEL.name}?${q}`, { method: 'PATCH', headers: h, body: JSON.stringify({ sourceFilesOutsideRootDirectory: true }) });
+    console.log(r.ok ? green('✓ Vercel includes the files outside study/ that Crux needs.') : red(`✗ Couldn't set "Include files outside the root directory" (${r.status}). Turn it on in Vercel → crux → Settings → Build and Deployment.`));
   }
   if (project.ok) {
     let saved = 0;

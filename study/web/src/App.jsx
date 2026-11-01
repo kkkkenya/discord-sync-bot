@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from './api.js';
-import Analysis from './Analysis.jsx';
+import GoDeeper from './GoDeeper.jsx';
 import { Icon } from './icons.jsx';
+import Insights from './Insights.jsx';
 import Kit from './Kit.jsx';
 import Mock from './Mock.jsx';
 import PractiseQuestions from './PractiseQuestions.jsx';
-import Progress from './Progress.jsx';
-import Prompt from './Prompt.jsx';
 import { go as goTo, href, unitCode, unitSlug, useRoute } from './route.js';
 import Settings from './Settings.jsx';
 import Teach from './Teach.jsx';
@@ -30,7 +29,7 @@ const PLACE = {
   overview: ['today'], today: ['today'], units: ['units'],
   predictions: ['unit', 'papers'], papers: ['unit', 'papers'], analysis: ['unit', 'topics'], learn: ['unit', 'topics'],
   kit: ['unit', 'sheet'], notes: ['unit', 'notes'],
-  practice: ['practise', 'questions'], teach: ['practise', 'explain'], mock: ['practise', 'timed'], prompt: ['insights'], progress: ['insights'],
+  practice: ['practise', 'questions'], teach: ['practise', 'explain'], mock: ['practise', 'timed'], progress: ['insights'],
 };
 
 export default function App({ user }) {
@@ -38,6 +37,7 @@ export default function App({ user }) {
   const [s, setS] = useState(null);
   const [error, setError] = useState('');
   const [problem, setProblem] = useState('');
+  const [deeper, setDeeper] = useState(null); // { unit, topicId?, questionId?, goal? } while Go deeper is open
   const [focus, setFocus] = useState(null); // what a Today task asks for: { section, unit, topic }
   const [toast, setToast] = useState(null); // { text, undo }: deletes happen at once and can be undone for 8 s
   const notify = useCallback((text, undo) => setToast({ text, undo, id: Date.now() }), []);
@@ -66,6 +66,7 @@ export default function App({ user }) {
   const unit = s.data.units.some((u) => u.code === unitPick) ? unitPick : s.plan[0]?.code || s.data.units[0]?.code || '';
   const go = (section, extra = {}) => {
     const target = extra.unit || unit;
+    if (section === 'prompt') { setDeeper({ unit: target, topicId: extra.topicId, questionId: extra.questionId, goal: extra.goal }); return; }
     if (extra.unit) setUnit(extra.unit);
     setFocus({ section, ...extra, at: Date.now() });
     const [name, tab] = PLACE[section] || ['today'];
@@ -113,7 +114,7 @@ export default function App({ user }) {
       </>
     );
   } else if (page === 'insights') {
-    content = <><header className="page-head"><h1>Insights</h1></header><div className="legacy"><Analysis {...props} /><Progress {...props} /><Prompt {...props} /></div></>;
+    content = <><header className="page-head"><h1>Insights</h1></header><Insights {...props} deeper={setDeeper} /></>;
   } else {
     content = <Today {...props} />;
   }
@@ -147,6 +148,7 @@ export default function App({ user }) {
           {TABS.map((t) => <a key={t.id} href={href(t.id)} aria-current={current(t.id)}><Icon name={t.icon} />{t.label}</a>)}
         </nav>
       )}
+      {deeper && <GoDeeper s={s} target={deeper} onClose={() => setDeeper(null)} />}
       {settingsOpen && <Settings s={s} user={user} refresh={refresh} onProblem={setProblem} onClose={() => (history.length > 1 ? history.back() : goTo(href('today')))} />}
       {toast && (
         <div className="toast" role="status">

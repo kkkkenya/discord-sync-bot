@@ -17,6 +17,7 @@ import { GOALS, buildPack } from './context-pack.js';
 import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { buildPrompt } from './prompt.js';
 import { nextActions } from './next.js';
+import { insights } from './insights.js';
 import { KITS, KIT_FOR, makeKitFor } from './kit.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, flagCheckpoint, markBroke } from './practice.js';
@@ -198,6 +199,9 @@ const routes = {
   'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
   'POST /api/attempts/flag': (q, body) => flagCheckpoint(body || {}),
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
+  // Insights across every unit: weakspots by priority (with the mistakes behind each and when it was last tried),
+  // mistakes by type over 14 days, and questions tried per day for 14 days.
+  'GET /api/insights': (q, body, ctx) => insights(ctx?.today || nairobiDay()),
   'GET /api/weakspots': (q) => {
     const unit = q.get('unit');
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });

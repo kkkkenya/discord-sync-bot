@@ -3,6 +3,7 @@ import { api } from './api.js';
 import Busy from './Busy.jsx';
 import { Icon } from './icons.jsx';
 import LimitNote from './LimitNote.jsx';
+import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
 const MINUTE = 60000;
 const PER_MARK = 1.5; // minutes per mark, as in a CAT: 30 marks in about 45 minutes
@@ -112,8 +113,8 @@ export default function Mock({ s, unit, refresh, focus, go, notify }) {
           </div>
           {left <= 0 && <p className="notice bad" role="status">Time's up. Finish the line you're on and submit.</p>}
           {mock.questions.map((q, i) => (
-            <section className="card stack" key={i} aria-label={`Question ${i + 1}`}>
-              <p className="question"><b className="num">{i + 1}.</b> {q.q} <span className="chip num">{q.marks} marks</span></p>
+            <section className="stack" key={i}>
+              <QuestionBox text={q.q} label={`Question ${i + 1}`} marks={q.marks} />
               <label className="field"><span className="visually-hidden">Answer to question {i + 1}</span>
                 <textarea rows={4} placeholder="Your answer" value={answers[i]} onChange={(e) => setAnswers(answers.map((a, j) => (j === i ? e.target.value : a)))} />
               </label>
@@ -127,10 +128,10 @@ export default function Mock({ s, unit, refresh, focus, go, notify }) {
         <>
           <p className="muted">Mark each answer against the model answer.</p>
           {result.items.map((it, i) => (
-            <section className="card stack" key={i} aria-label={`Question ${i + 1}`}>
-              <p className="question"><b className="num">{i + 1}.</b> {it.q} <span className="chip num">{it.marks} marks</span></p>
-              {it.user && <p className="answer mine"><b>You:</b> {it.user}</p>}
-              <p className="answer"><b>Model answer:</b> {it.a}</p>
+            <section className="stack" key={i}>
+              <QuestionBox text={it.q} label={`Question ${i + 1}`} marks={it.marks} />
+              {it.user && <AnswerBox text={it.user} label="Your answer" tone="mine" />}
+              <AnswerBox text={it.a} label="Model answer" tone="model" />
               <label className="field inline">Marks earned
                 <span className="toolbar"><input className="num narrow" type="number" min="0" max={it.marks} value={selfEarned[i]} onChange={(e) => setSelfEarned(selfEarned.map((v, j) => (j === i ? e.target.value : v)))} /><span className="muted num">of {it.marks}</span></span>
               </label>
@@ -145,14 +146,13 @@ export default function Mock({ s, unit, refresh, focus, go, notify }) {
           <LimitNote s={s} unit={result.unit} go={go} what="marking multi-step answers" />
           <section className="card stack" aria-label="Result">
             <p className="score-big num">{result.score}<span className="muted">/{result.outOf}</span> <span className={`chip ${tone(pct(result))}`}>{Math.round((result.score / result.outOf) * 100)}%</span></p>
-            {result.overall && <p>{result.overall}</p>}
+            {result.overall && <Rich text={result.overall} />}
           </section>
           {result.items.map((it, i) => (
-            <section className="card stack" key={i} aria-label={`Question ${i + 1}`}>
-              <p className="question"><b className="num">{i + 1}.</b> {it.q} <span className={`chip num ${tone(it.earned / it.marks)}`}>{it.earned}/{it.marks}</span></p>
-              <p className="answer"><b>Answer:</b> {it.a}</p>
-              <p className="answer mine"><b>You:</b> {it.user || '(blank)'}</p>
-              {it.note && <p className="muted small">{it.note}</p>}
+            <section className="stack" key={i}>
+              <QuestionBox text={it.q} label={`Question ${i + 1}`}><span className={`chip num ${tone(it.earned / it.marks)}`}>{it.earned}/{it.marks}</span></QuestionBox>
+              <AnswerBox text={it.user || '(blank)'} label="Your answer" tone="mine" />
+              <AnswerBox text={it.a} label="Answer" tone="key">{it.note && <Rich text={it.note} className="muted small" />}</AnswerBox>
             </section>
           ))}
           <div className="toolbar"><button className="btn" type="button" onClick={() => setResult(null)}>Back to timed papers</button></div>

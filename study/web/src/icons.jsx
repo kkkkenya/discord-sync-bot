@@ -18,6 +18,7 @@ const P = {
   pause: <path d="M9 5.5v13M15 5.5v13" />,
   edit: <path d="M4 20h4L19 9l-4-4L4 16z" />,
   check: <><circle cx="12" cy="12" r="8.5" /><path d="M8.5 12.2l2.4 2.4 4.6-5" /></>,
+  prompt: <><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-4 3.5v-3.5h0a1.5 1.5 0 0 1-1.5-1.5z" /><path d="M8.5 9h7M8.5 12h4.5" /></>,
   file: <><path d="M7 3.5h7l4 4v13H7z" /><path d="M14 3.5v4h4" /></>,
 };
 export const Icon = ({ name }) => <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{P[name]}</svg>;

@@ -13,7 +13,7 @@ const TABS = [
 const ACTIONS = [
   ['Today', href('today')], ['Units', href('units')], ['Practise questions', href('practise', 'questions')],
   ['Explain it', href('practise', 'explain')], ['Timed paper', href('practise', 'timed')], ['Insights', href('insights')],
-  ['Focus timer', href('focus')], ['Settings', href('settings')], ['Wallpaper', href('settings')], ['Import notes', href('settings')], ['Export my data', href('settings')],
+  ['Focus timer', href('focus')], ['Prompt builder', href('deeper')], ['Settings', href('settings')], ['Wallpaper', href('settings')], ['Import notes', href('settings')], ['Export my data', href('settings')],
 ];
 const inDays = (d) => (d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`);
 const daysText = (d) => (d == null ? 'TBA' : d < 0 ? 'Passed' : d === 0 ? 'Today' : `${d} day${d === 1 ? '' : 's'}`);
@@ -183,6 +183,7 @@ export default function Nav({ s, unit, setUnit, page }) {
         {TABS.map((t) => <a key={t.id} className="tab" href={href(t.id)} data-tip={t.label} aria-current={page === t.id || (t.id === 'units' && page === 'unit') ? 'page' : undefined}><Icon name={t.id} /><span className="lab">{t.label}</span></a>)}
         <span className="sep" />
         <a className="navbtn" href={href('focus')} aria-label="Focus timer" data-tip="Focus" aria-current={page === 'focus' ? 'page' : undefined}><Icon name="timer" /></a>
+        <a className="navbtn" href={href('deeper')} aria-label="Prompt builder" data-tip="Prompt builder" aria-current={page === 'deeper' ? 'page' : undefined}><Icon name="prompt" /></a>
         <button className="navbtn" type="button" aria-label="Search" aria-expanded={open === 'search'} onClick={() => toggle('search')} data-tip="Search"><Icon name="search" /></button>
         {bellBtn}
         <a className="navbtn" href={href('settings')} aria-label="Settings" data-tip="Settings"><Icon name="settings" /></a>

@@ -10,6 +10,13 @@ export const GOALS = {
   diagnose: { name: 'Diagnose my mistakes & targeted practice', ask: 'Look at where my working broke (in the pack), name the exact misconception or slip behind each, explain the correct reasoning, then give me 3 targeted practice questions that would catch the same mistake, one at a time.' },
 };
 
+// How the answer should explain (the Prompt Builder's "explanation style")
+export const STYLES = {
+  teacher: { name: 'Like a teacher', ask: 'Explain like a patient lecturer: the intuition first, then the maths, with an everyday picture where it helps, and check my understanding as you go.' },
+  steps: { name: 'Basic, step by step', ask: 'Keep it basic: short numbered steps, one idea per step, no skipped algebra, and define every symbol the first time it appears.' },
+  exam: { name: 'Exam-quick', ask: 'Exam-quick: only what earns marks, laid out the way a marking scheme awards them: the method, the key equations and the answer.' },
+};
+
 // The goal a stage leans on when none is picked; a target question means "solve it".
 export const defaultGoal = (stage, question) => (question ? 'solution' : { adequate: 'breakdown', 'one-week': 'shortcuts', 'last-minute': 'sheet', 'exam-eve': 'solution' }[stage] || 'breakdown');
 
@@ -32,6 +39,8 @@ const slug = (s) => String(s || '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-
 export function buildPack(input) {
   const { unit, cohort, stage = 'adequate', topic, subtopics = [], weak = [], errors = [], hints = [], questions = [], question = null, failures = [], files = [], budget = 120000, today = '' } = input;
   const goal = GOALS[input.goal] ? input.goal : defaultGoal(stage, question);
+  const style = STYLES[input.style] ? input.style : null;
+  const focus = String(input.focus || '').trim().slice(0, 200);
   const topicName = topic?.name || 'the whole unit';
   const filename = `${slug(unit.code)}-${slug(topic?.name || 'unit')}-context.md`;
   const st = STAGES.find((s) => s.id === stage);
@@ -43,7 +52,7 @@ export function buildPack(input) {
   const prompt = [
     'You are a tough but fair engineering tutor at Kenyatta University, preparing me for a KU CAT/exam. Be technically exact at KU exam level.',
     `## Who I am\n${who}\nStudy stage: ${stageName(stage)} (${st?.window || ''}). ${STAGE_TONE[stage] || ''}`,
-    `## What I need (${GOALS[goal].name})\n${GOALS[goal].ask}${question ? `\n\nTarget question (${question.source}, Q${question.number}${question.marks ? `, ${question.marks} marks` : ''}):\n${question.text}` : ''}`,
+    `## What I need (${GOALS[goal].name})\n${GOALS[goal].ask}${style ? `\n\nHow to explain: ${STYLES[style].ask}` : ''}${focus ? `\n\nKey focus: ${focus}` : ''}${question ? `\n\nTarget question (${question.source}, Q${question.number}${question.marks ? `, ${question.marks} marks` : ''}):\n${question.text}` : ''}`,
     hints.length ? `## What my lecturer said (verbatim)\n${hints.map((h) => `- "${h.text}"${h.kind === 'focus' ? ' (focus)' : h.kind === 'exclude' ? ' (skip)' : ''}`).join('\n')}` : '',
     `## My weakspots${topic ? ` on ${topic.name}` : ''}\n${[
       by('stuck').length ? `- Stuck (don't get the concept or steps): ${by('stuck').join('; ')}` : '',
@@ -53,7 +62,7 @@ export function buildPack(input) {
       weak.length ? `- Highest risk first: ${weak.slice(0, 5).map((w) => w.name).join('; ')}` : '',
       by('solid').length ? `- Already solid (don't spend effort re-teaching): ${by('solid').join('; ')}` : '',
     ].filter(Boolean).join('\n') || '- Not audited yet: start from the fundamentals and check my understanding as you go.'}\nSpend your effort on the stuck and shaky ones.`,
-    `## Rules for your answer\n1. Number every step as a checkpoint: "Checkpoint n — what you do: equation = value [SI unit]", so I can compare my handwritten working line by line.\n2. Carry SI units through every line; convert units before substituting (mm to m, kN to N, MPa to Pa).\n3. State every assumption, the sign convention you use, and when the method stops applying.\n4. Use the attached ${filename} as the source of truth for notation, the syllabus and the lecturer's emphasis. If something isn't in it, say so instead of guessing.\n5. If a question needs a figure I haven't attached, ask for it before solving.\n6. Finish by testing me: 3 questions on my weak sub-topics, one at a time, waiting for my answer and marking it.`,
+    `## Rules for your answer\n1. Number every step as a checkpoint: "Checkpoint n — what you do: equation = value [SI unit]", so I can compare my handwritten working line by line. Write equations in LaTeX ($...$ inline, $$...$$ on their own line) and bold the given values and every result.\n2. Carry SI units through every line; convert units before substituting (mm to m, kN to N, MPa to Pa).\n3. State every assumption, the sign convention you use, and when the method stops applying.\n4. Use the attached ${filename} as the source of truth for notation, the syllabus and the lecturer's emphasis. If something isn't in it, say so instead of guessing.\n5. If a question needs a figure I haven't attached, ask for it before solving.\n6. Finish by testing me: 3 questions on my weak sub-topics, one at a time, waiting for my answer and marking it.`,
   ].filter(Boolean).join('\n\n');
 
   // ---- the .md pack: the fixed sections first, then course material until the budget runs out ----

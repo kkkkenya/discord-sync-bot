@@ -3,6 +3,7 @@ import { api } from './api.js';
 import Busy from './Busy.jsx';
 import LimitNote from './LimitNote.jsx';
 import { wavData } from './media.js';
+import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
 const MAX_SECS = 240; // 4 minutes of voice is about 7.7 MB as WAV, under the upload limit
 
@@ -10,9 +11,9 @@ function Feedback({ f }) {
   return (
     <section className="card stack" aria-label="Marking">
       <p className="score-big num">{f.score}<span className="muted">/5</span></p>
-      <p><b className="good-text">Good:</b> {f.good}</p>
-      {f.gaps.length > 0 && <ul className="plain-list">{f.gaps.map((g) => <li key={g}><b className="bad-text">Gap:</b> {g}</li>)}</ul>}
-      <p className="notice">Answer this next, from memory: {f.followUp}</p>
+      <AnswerBox text={f.good} label="What you got right" tone="key" />
+      {f.gaps.length > 0 && <AnswerBox label="Gaps" tone="gap"><ul className="plain-list">{f.gaps.map((g) => <li key={g}><Rich text={g} as="span" /></li>)}</ul></AnswerBox>}
+      <QuestionBox text={f.followUp} label="Answer this next, from memory" />
     </section>
   );
 }

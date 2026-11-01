@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { Component, useCallback, useEffect, useState } from 'react';
 import { api, flushOutbox, outbox, prepareUnit } from './api.js';
 import { adoptFocus } from './focus-store.js';
 import { adoptLook } from './look.js';
 import { onSync, pull, push } from './sync.js';
 import Focus, { FocusBar } from './Focus.jsx';
-import GoDeeper from './GoDeeper.jsx';
+import PromptBuilder from './PromptBuilder.jsx';
 import { Icon } from './icons.jsx';
 import Insights from './Insights.jsx';
 import Kit from './Kit.jsx';
@@ -48,12 +48,33 @@ function AutoRead({ s, unit, refresh }) {
   return line ? <p className="muted small" role="status">{line}</p> : null;
 }
 
+// Every list a screen expects, even when an older or new account is missing one (a missing list used to blank the page).
+const LISTS = ['units', 'topics', 'subtopics', 'paperq', 'attempts', 'teach', 'questions', 'mocks', 'materials', 'papers', 'hints'];
+const withLists = (x) => ({ ...x, data: { ...x.data, ...Object.fromEntries(LISTS.map((k) => [k, Array.isArray(x.data?.[k]) ? x.data[k] : []])) } });
+
+// If a screen fails, show what happened instead of a blank page.
+class Guard extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div className="card stack" role="alert">
+        <h2 className="card-title">This screen hit a problem</h2>
+        <p className="muted small">{String(this.state.error.message || this.state.error)}</p>
+        <div className="toolbar"><button type="button" className="btn primary" onClick={() => this.setState({ error: null })}>Try again</button><a className="btn" href={href('today')}>Back to Today</a></div>
+      </div>
+    );
+  }
+}
+
 export default function App({ user }) {
   const route = useRoute();
   const [s, setS] = useState(null);
   const [error, setError] = useState('');
   const [problem, setProblem] = useState('');
-  const [deeper, setDeeper] = useState(null); // { unit, topicId?, questionId?, goal? } while Go deeper is open
+  const [deeper, setDeeperTarget] = useState(null); // { unit, topicId?, questionId?, goal? }: what the Prompt Builder starts from
+  const setDeeper = useCallback((t) => { setDeeperTarget(t); goTo(href('deeper')); }, []);
   const [focus, setFocus] = useState(null); // what a Today task asks for: { section, unit, topic }
   const [toast, setToast] = useState(null); // { text, undo }: deletes happen at once and can be undone for 8 s
   const notify = useCallback((text, undo) => setToast({ text, undo, id: Date.now() }), []);
@@ -82,7 +103,7 @@ export default function App({ user }) {
       localStorage.setItem('crux-version', __CRUX_VERSION__);
     } catch { /* private window */ }
   }, [notify]);
-  const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(x); setProblem(''); }).catch((e) => setError(e.message)), []);
+  const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(withLists(x)); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { if (s) pull(s.settings?.sync); }, [s]);
   // changes kept offline: shown as a count, sent when the connection comes back or Crux is opened again
@@ -148,7 +169,7 @@ export default function App({ user }) {
     const mode = MODES.some((m) => m.id === route.rest[0]) ? route.rest[0] : 'questions';
     content = (
       <>
-        <header className="page-head"><h1>Practise</h1><p><span className="num">{unit}</span> · {s.data.units.find((x) => x.code === unit)?.title}</p></header>
+        <header className="page-head practise-head"><a className="btn" href={href('deeper')}>Prompt builder</a><h1>Practise</h1><p><span className="num">{unit}</span> · {s.data.units.find((x) => x.code === unit)?.title}</p></header>
         <nav className="segmented" aria-label="Ways to practise">
           {MODES.map((m) => <a key={m.id} href={href('practise', m.id)} aria-current={mode === m.id ? 'page' : undefined}>{m.label}</a>)}
         </nav>
@@ -157,6 +178,8 @@ export default function App({ user }) {
         {mode === 'timed' && <Mock {...props} />}
       </>
     );
+  } else if (page === 'deeper') {
+    content = <PromptBuilder {...props} target={deeper} />;
   } else if (page === 'focus') {
     content = <Focus {...props} />;
   } else if (page === 'insights') {
@@ -182,10 +205,9 @@ export default function App({ user }) {
               {problem.startsWith("Today's AI limit") ? <button className="btn plain" onClick={() => { setProblem(''); setDeeper({ unit }); }}>Go deeper</button> : <button className="btn plain" onClick={refresh}>Try again</button>}
             </p>
           )}
-          {content}
+          <Guard key={`${page}|${unit}`}>{content}</Guard>
         </main>
       {!bare && page !== 'focus' && <FocusBar />}
-      {deeper && <GoDeeper s={s} target={deeper} onClose={() => setDeeper(null)} />}
       {settingsOpen && <Settings s={s} user={user} unit={unit} notify={notify} refresh={refresh} onProblem={setProblem} onClose={() => (history.length > 1 ? history.back() : goTo(href('today')))} />}
       {toast && (
         <div className="toast" role="status">

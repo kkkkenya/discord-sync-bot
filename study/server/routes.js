@@ -13,7 +13,7 @@ import { masteryMap } from './mastery.js';
 import { checkSubtopic } from './analysis.js';
 import { hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } from './weakspots.js';
 import { predictedMock } from './predict.js';
-import { GOALS, buildPack } from './context-pack.js';
+import { GOALS, STYLES, buildPack } from './context-pack.js';
 import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { buildPrompt } from './prompt.js';
 import { nextActions } from './next.js';
@@ -40,6 +40,7 @@ const state = () => {
     units, stageMix: stageMix(Object.values(units).map((x) => x.stage)), stages: STAGES.map(({ maxDays, ...s }) => s),
     errorTypes: ERROR_TYPES, kits: { names: KITS, forStage: KIT_FOR },
     goals: Object.entries(GOALS).map(([id, g]) => ({ id, name: g.name })),
+    styles: Object.entries(STYLES).map(([id, x]) => ({ id, name: x.name })),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), media: { image: canRead('image'), audio: canRead('audio') }, provider: provider(), settings: data.settings,
     mastery: masteryMap(today), library: libraryMeta(),
@@ -247,7 +248,7 @@ const routes = {
     const since = Date.now() - 30 * 86400000;
     const cohort = data.settings.cohort ? { ...data.settings.cohort, name: COURSES[data.settings.cohort.course] } : null;
     return buildPack({
-      unit, cohort, stage: unitStage(unit).stage.id, topic, subtopics: subs, goal: body.goal,
+      unit, cohort, stage: body.stage && validStage(body.stage) ? body.stage : unitStage(unit).stage.id, topic, subtopics: subs, goal: body.goal, style: body.style, focus: body.focus,
       weak: critical.filter((c) => !topic || c.topicId === topic.id), errors: errors.counts,
       hints: data.hints.filter((h) => h.unit === unit.code && (!topic || !h.topicIds?.length || h.topicIds.includes(topic.id))),
       questions: data.paperq.filter((x) => x.unit === unit.code && (topic ? x.topicId === topic.id : true)).slice(0, 40),

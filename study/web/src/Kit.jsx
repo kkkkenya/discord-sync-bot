@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import Busy from './Busy.jsx';
+import Rich from './Rich.jsx';
 
 // Study kit (Phase 10): practice material made for how close the unit's paper is. Adequate Prep gets a ladder (a worked
 // example, the same method with steps to fill in, then one to solve alone), 1-Week Mode gets solving recipes for the
@@ -15,7 +16,9 @@ const setIn = (obj, [k, ...rest], value) => {
 };
 
 // text you can correct in place while editing (saved when you click away)
+// text you can correct in place while editing (saved when you click away); typeset maths when not editing
 function Field({ value, path, edit, save, as: Tag = 'span', className = '' }) {
+  if (!edit) return <Tag className={`kfield ${className}`}><Rich text={value} as="span" /></Tag>;
   return (
     <Tag className={`kfield ${className}`} contentEditable={edit} suppressContentEditableWarning spellCheck={false}
       onBlur={(e) => { const v = e.currentTarget.innerText.trim(); if (edit && v !== value) save(path, v); }}>{value}</Tag>

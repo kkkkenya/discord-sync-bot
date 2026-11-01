@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, useElapsed } from './api.js';
 import { photoData } from './media.js';
+import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
 // One question at a time: answer it (final answer with units, or a photo of the working), check it, and when it's
 // wrong, say where your working broke and what kind of mistake it was. That feeds Insights; then the next question.
@@ -72,10 +73,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       </label>
 
       {q && (
-        <article className="card">
-          <p className="row-sub">{[q.source, q.year, q.type, q.marks && `${q.marks} marks`].filter(Boolean).join(' · ')}</p>
-          <p className="question">{q.text}</p>
-        </article>
+        <QuestionBox text={q.text} meta={[q.source, q.year, q.type]} marks={q.marks} />
       )}
 
       {q && !res && (
@@ -108,7 +106,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       {(right || wrong) && (
         <div className="card" role="status">
           <h2 className={right ? 'good-text' : 'bad-text'}>{right ? 'Correct' : 'Not quite'}</h2>
-          <p>Answer: <b>{res.key.answer}</b> <span className="chip">{res.key.label}</span></p>
+          <AnswerBox text={res.key.answer} label={res.key.label ? `Answer · ${res.key.label}` : 'Answer'} />
           {res.note && <p className="row-sub">{res.note}</p>}
           {right && <button className="btn primary" onClick={nextQuestion}>Next question</button>}
         </div>
@@ -124,9 +122,9 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
                 <button className="step" aria-pressed={broke === cp.n} onClick={() => setBroke(cp.n)}>
                   <span className="step-n">{cp.n}</span>
                   <span className="row-main">
-                    <span>{cp.step}</span>
-                    {cp.equation && <code>{cp.equation}</code>}
-                    {cp.value && <span className="row-sub">= {cp.value}</span>}
+                    <Rich text={cp.step} as="span" />
+                    {cp.equation && <Rich text={cp.equation} as="span" className="step-eq" />}
+                    {cp.value && <span className="row-sub">= <Rich text={cp.value} as="span" /></span>}
                   </span>
                 </button>
               </li>

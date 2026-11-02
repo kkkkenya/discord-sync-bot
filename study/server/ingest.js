@@ -78,6 +78,29 @@ export function contextFor(unit, topic, maxChars = 12000) {
   return out.slice(0, maxChars);
 }
 
+// Numbered worked examples and exercises in the unit's books and notes ("Example 4.2", "Problem 7"), for making
+// questions the way the books set them. A random spread across files, each cut to one example's length.
+const EXAMPLE = /\b(?:Worked [Ee]xample|Illustrative [Ee]xample|Example|EXAMPLE|Exercise|EXERCISE|Problem|PROBLEM)\s*\d+(?:\.\d+)*/g;
+export function bookExamples(unit, maxChars = 14000, files = library.files, pick = Math.random) {
+  const found = [];
+  for (const e of Object.values(files).filter((x) => x.unit === unit && x.text && !x.paper)) {
+    const hits = [...e.text.matchAll(EXAMPLE)];
+    hits.forEach((m, i) => {
+      const end = Math.min(hits[i + 1]?.index ?? Infinity, m.index + 1400);
+      const text = e.text.slice(m.index, end).replace(/\s+/g, ' ').trim();
+      if (text.length > 80) found.push(`--- ${e.name}: ${text}`);
+    });
+  }
+  const out = [];
+  let size = 0;
+  for (const piece of found.map((p) => [pick(), p]).sort((a, b) => a[0] - b[0]).map(([, p]) => p)) {
+    if (size + piece.length > maxChars) continue;
+    out.push(piece);
+    size += piece.length;
+  }
+  return out.join('\n\n');
+}
+
 const OUTLINE = /outline|syllabus|course[\s_-]*(content|description)/i;
 
 // What a unit covers, for suggesting its topics: the course outline first, then the parsed past-paper questions,

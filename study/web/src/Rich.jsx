@@ -120,6 +120,10 @@ export default function Rich({ text, as: Tag = 'div', className = '', math = tru
   );
 }
 
+// Text read out of a PDF comes as one line: start each part, (a) (b) or (i) (ii), and a closing "Figure 2" on a new line.
+const PART = /\s+(?=\((?:[a-h]|i{1,3}|iv|vi{0,3}|ix|x)\)\s*\S)/g;
+export const layoutParts = (t) => (String(t ?? '').includes('\n') ? String(t ?? '') : String(t ?? '').replace(PART, '\n').replace(/\s+(Fig(?:ure)?\.?\s*\d+\s*)$/i, '\n$1'));
+
 // A question in its own box: a label, source and marks, then the question text.
 export function QuestionBox({ text, meta = [], marks, label = 'Question', children }) {
   return (
@@ -129,7 +133,7 @@ export function QuestionBox({ text, meta = [], marks, label = 'Question', childr
         {meta.filter(Boolean).map((m) => <span key={m} className="chip">{m}</span>)}
         {marks ? <span className="chip num">{marks} marks</span> : null}
       </div>
-      <Rich text={text} className="qbox-text" />
+      <Rich text={layoutParts(text)} className="qbox-text" />
       {children}
     </section>
   );

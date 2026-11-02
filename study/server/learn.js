@@ -73,7 +73,7 @@ export function learnPath({ topic, subtopics = [], files = [], questions = [], m
     .sort((a, b) => Number(Boolean(b.key)) - Number(Boolean(a.key)) || Number(b.type === 'Tutorial') - Number(a.type === 'Tutorial')
       || (b.year || 0) - (a.year || 0) || a.number - b.number)
     .slice(0, 8)
-    .map((q) => ({ id: q.id, source: q.source, number: q.number, marks: q.marks || null, hasKey: Boolean(q.key), text: q.text.slice(0, 200) }));
+    .map((q) => ({ id: q.id, source: q.source, number: q.number, marks: q.marks || null, hasKey: Boolean(q.key), text: q.text }));
 
   // then: explain it; AI-made material only where your own files fall short
   const then = [];

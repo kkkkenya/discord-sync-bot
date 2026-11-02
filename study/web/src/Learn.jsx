@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
-import Rich from './Rich.jsx';
+import Rich, { layoutParts } from './Rich.jsx';
 
 // Study this topic: notes and worked examples from your own files first, questions later. Built without AI from the
 // pages that cover the topic (server/learn.js); AI-made material is offered only where your files fall short.
@@ -80,7 +80,7 @@ export default function Learn({ s, unit, go, focus }) {
                   <button key={q.id} type="button" className="list-row" onClick={() => go('practice', { unit, questionId: q.id })}>
                     <span className="row-main">
                       <span>{q.source} · Q{q.number}{q.marks ? ` · ${q.marks} marks` : ''}{q.hasKey && <span className="chip good">Answer on file</span>}</span>
-                      <Rich text={`${q.text}${q.text.length >= 200 ? '…' : ''}`} as="span" className="row-sub qtext" />
+                      <Rich text={layoutParts(q.text)} as="span" className="row-sub qtext" />
                     </span>
                   </button>
                 ))}

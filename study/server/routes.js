@@ -4,14 +4,14 @@ import { coach, coachReady } from './coach.js';
 import { aiReady, canRead, clamp, provider } from './ai.js';
 import { makeQuestions, makeStudyMaterial, mapQuestions, markAnswers, suggestSubtopics, suggestTopics, transcribe } from './brain.js';
 import { checkMedia, saveUpload } from './uploads.js';
-import { LOCAL_TYPES, addLocalFile, contextFor, ensureLibrary, library, libraryMeta, localFiles, outlineContext, prepareUnit, remote, removeLocalFile } from './ingest.js';
+import { LOCAL_TYPES, addLocalFile, bookExamples, contextFor, ensureLibrary, library, libraryMeta, localFiles, outlineContext, prepareUnit, remote, removeLocalFile } from './ingest.js';
 import { ALL_UNITS, calendar, filesFor, nextAssessment } from './library.js';
 import { COURSES, cohortUnits, courses, validCohort } from './cohort.js';
 import { ERROR_TYPES, STAGES, TBA } from './defs.js';
 import { stageMix, validStage } from './stages.js';
 import { masteryMap } from './mastery.js';
 import { checkSubtopic } from './analysis.js';
-import { hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } from './weakspots.js';
+import { PARSER_VERSION, hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } from './weakspots.js';
 import { predictedMock } from './predict.js';
 import { GOALS, STYLES, buildPack } from './context-pack.js';
 import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
@@ -303,6 +303,9 @@ const routes = {
   'GET /api/predict': (q) => {
     const unit = q.get('unit');
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
+    // papers read by an older question splitter are read again once (no AI), so fixes reach saved questions
+    const read = data.settings.papersRead ||= {};
+    if (read[unit] !== PARSER_VERSION) { parsePapers(unit); read[unit] = PARSER_VERSION; save(); }
     return { ranked: predictFor(unit, nairobiDay()), questions: data.paperq.filter((x) => x.unit === unit), hints: data.hints.filter((h) => h.unit === unit), scanned: scannedPapers(unit) };
   },
   // Re-read the unit's synced past papers (no AI). Your topic corrections are kept.
@@ -394,8 +397,8 @@ const routes = {
     const bank = data.questions.filter((x) => x.unit === unit).sort(() => Math.random() - 0.5);
     let questions = bank.slice(0, count).map((x) => ({ q: x.q, a: x.a, marks: x.marks, topic: x.topic || '' }));
     if (questions.length < count && aiReady()) {
-      const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), count: count - questions.length, context: contextFor(unit) });
-      questions = questions.concat(extra.questions.map((x) => ({ q: x.q, a: x.a, marks: clamp(x.marks, 5, 25), topic: x.topic || '' })));
+      const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), count: count - questions.length, context: contextFor(unit, '', 6000), examples: bookExamples(unit) });
+      questions = questions.concat(extra.questions.map((x) => ({ q: x.q, a: x.a, marks: clamp(x.marks, 5, 25), topic: x.topic || '', ...(x.from && { source: x.from }) })));
     }
     if (!questions.length) throw Object.assign(new Error(aiReady() ? 'Nothing to build a mock from. Add topics in Units, or add questions from your notes (below).' : 'No banked questions for this unit and no AI key to write some. Use the Prompt Builder (Mock exam questions) in another AI, or add a key.'), { status: 400 });
     const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} mock`, questions });

@@ -29,3 +29,17 @@ test('Word\'s Symbol-font Greek and signs come out as real characters', async ()
   assert.equal(symbolFont('C = 4.5 x 10-5 m; st = 1.17;  = 50 MPa; 20C; '), 'ΔC = 4.5 x 10-5 m; αst = 1.17; τ = 50 MPa; 20°C; σ×π');
   assert.equal(symbolFont('plain text, nothing to change'), 'plain text, nothing to change');
 });
+
+test('book examples: numbered examples and exercises from notes and books, not past papers, within the budget', async () => {
+  const { bookExamples } = await import('../server/ingest.js');
+  const body = 'A steel bar 2 m long and 25 mm in diameter carries an axial pull of 50 kN. Find the stress and the extension, taking E = 200 GPa.';
+  const files = {
+    a: { unit: 'EMM 302', paper: false, text: `Chapter 1. Intro, for example stress. Example 1.1 ${body} Example 1.2 ${body} Problem 3 ${body}` },
+    b: { unit: 'EMM 302', paper: true, text: `Example 9 ${body}` },
+    c: { unit: 'EMM 305', paper: false, text: `Example 4 ${body}` },
+  };
+  const out = bookExamples('EMM 302', 14000, files, () => 0.5);
+  assert.equal(out.split('--- ').filter(Boolean).length, 3);
+  assert.doesNotMatch(out, /Example 9|Example 4 /);
+  assert.ok(bookExamples('EMM 302', 300, files, () => 0.5).length <= 300);
+});

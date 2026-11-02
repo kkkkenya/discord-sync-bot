@@ -21,8 +21,14 @@ const QUESTION = {
 // A question generated for a specific topic (mock fill): the topic is used for mastery evidence.
 const QUESTION_TOPIC = {
   type: 'object',
-  properties: { topic: { type: 'string', description: 'The topic name this question belongs to.' }, q: { type: 'string' }, a: { type: 'string' }, marks: { type: 'integer' } },
-  required: ['topic', 'q', 'a', 'marks'],
+  properties: {
+    topic: { type: 'string', description: 'The topic name this question belongs to.' },
+    q: { type: 'string', description: 'The whole question, complete and self-contained: every given value with its unit, each part on its own line as (a), (b) or (i), (ii), maths in LaTeX.' },
+    a: { type: 'string', description: 'The model answer, laid out as the system prompt says, reaching a final answer for every part.' },
+    marks: { type: 'integer' },
+    from: { type: 'string', description: 'The book example or exercise it is based on, e.g. "Rajput, Example 4.2", or an empty string.' },
+  },
+  required: ['topic', 'q', 'a', 'marks', 'from'],
   additionalProperties: false,
 };
 
@@ -114,7 +120,7 @@ export async function mapQuestions({ unit, topics, questions }) {
 }
 
 // Fill a mock exam when the question bank is short: generate questions from the unit's topics.
-export async function makeQuestions({ unit, topics, count, context = '' }) {
+export async function makeQuestions({ unit, topics, count, context = '', examples = '' }) {
   const schema = {
     type: 'object',
     properties: { questions: { type: 'array', items: QUESTION_TOPIC, description: `${count} CAT-style questions for this unit.` } },
@@ -122,8 +128,14 @@ export async function makeQuestions({ unit, topics, count, context = '' }) {
     additionalProperties: false,
   };
   const topicList = topics.length ? topics.map((t) => `- ${t.name} (${t.status || 'red'})`).join('\n') : '(no topics listed)';
-  const content = `Unit: ${unit}${context ? `\n\nMaterial from the student's library — draw the questions from this, especially past papers and CATs:\n${context}` : ''}\n\nTopics the student is working through (put the exact topic name on each question):\n${topicList}\n\nWrite ${count} fresh exam-style questions for this unit, each tagged with its topic, with a model answer and a mark count (5-20).`;
-  return structured(schema, TUTOR, content, 8000);
+  const content = [
+    `Unit: ${unit}`,
+    examples ? `Worked examples and exercises from the student's textbooks. Base each question on one of these: keep the book's set-up and the kind of data it gives, change the numbers, and name it in "from":\n${examples}` : '',
+    context ? `Other material from the student's library (past papers and CATs show the exam style):\n${context}` : '',
+    `Topics the student is working through (put the exact topic name on each question):\n${topicList}`,
+    `Write ${count} exam-style questions for this unit, each tagged with its topic, with a model answer and a mark count (5-20). Every question must be complete: all the data needed to solve it, nothing cut off, nothing that refers to a figure the student can't see (describe the set-up in words instead). Put each part on its own line as (a), (b), (c).`,
+  ].filter(Boolean).join('\n\n');
+  return structured(schema, TUTOR, content, Math.min(16000, 2500 * count + 2000));
 }
 
 // Mark a full mock in one call: per-question marks earned plus a one-line note, and an overall read.

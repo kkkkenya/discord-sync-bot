@@ -24,6 +24,10 @@ export function teachFlags(unit, topic, feedback) {
 
 const scannedOf = (unit) => Object.entries(library.files).filter(([, e]) => e.unit === unit && e.paper && !e.text).map(([fileId, e]) => ({ fileId, name: e.name }));
 
+// Bumped when parseQuestions changes, so saved papers are read again (GET /api/predict). 2: looser numbering, no
+// 3000-character cut.
+export const PARSER_VERSION = 2;
+
 // Re-read a unit's synced past papers into paperq. Keeps what you (or the AI) mapped by hand, keyed by
 // file + question number; pasted papers are left alone. { questions, papers, scanned }.
 export function parsePapers(unit) {
@@ -37,7 +41,9 @@ export function parsePapers(unit) {
   for (const [fileId, e] of files) {
     const info = paperInfo(e.name);
     for (const q of parseQuestions(e.text)) {
-      const prev = old.get(`${fileId}#${q.number}`);
+      const found = old.get(`${fileId}#${q.number}`);
+      // a question that was split differently before keeps its topic, but not an answer or solution made for other text
+      const prev = found && (found.text === q.text ? found : { ...found, key: found.text.slice(0, 80) === q.text.slice(0, 80) && found.text.length < q.text.length * 1.5 ? found.key : undefined, explain: undefined });
       const kept = prev && prev.topicFrom !== 'auto' ? { topicId: prev.topicId, subtopicIds: prev.subtopicIds || [], topicFrom: prev.topicFrom } : { ...mapQuestion(q.text, topics, subs), topicFrom: 'auto' };
       data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, ...((prev?.key || q.given) && { key: prev?.key || sheetKey(q.given) }), ...(prev?.explain && { explain: prev.explain }), at: prev?.at || new Date().toISOString() });
       n++;

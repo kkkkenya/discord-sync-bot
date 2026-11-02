@@ -117,7 +117,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
         <summary>Solve several at once</summary>
         <p className="muted small">Pick questions and Crux writes a full worked solution for each, 2 to 4 per AI action. They're saved: open any of them later for free.</p>
         <PickList label="Questions to solve" picked={many} set={setMany}
-          items={questions.map((x) => ({ id: x.id, label: `${x.source} · Q${x.number}`, meta: x.marks ? `${x.marks} marks` : null, disabled: Boolean(x.explain), sub: x.explain ? 'Solution saved' : x.text.length > 100 ? `${x.text.slice(0, 100)}…` : x.text }))} />
+          items={questions.map((x) => ({ id: x.id, label: `${x.source} · Q${x.number}`, meta: x.marks ? `${x.marks} marks` : null, disabled: Boolean(x.explain), sub: x.explain ? 'Solution saved' : x.text }))} />
         <div className="actions start">
           <button type="button" className="btn primary" disabled={!many.size || manyRun?.busy} onClick={solveMany}>
             {manyRun?.busy ? `Solving… ${manyRun.done} of ${manyRun.total} done` : many.size ? `Solve ${many.size} question${many.size === 1 ? '' : 's'}` : 'Pick questions to solve'}

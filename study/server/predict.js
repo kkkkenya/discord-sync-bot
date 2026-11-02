@@ -13,6 +13,16 @@ const SUB_MARKS = /[([]\s*(\d{1,2}(?:\.\d)?)\s*(?:marks?|mks?)\s*[)\]]/gi;
 // numbering is tried, then one question per "(5 marks)". Marks: the header's "(20 marks)", else the sum of its
 // parts' marks, else null. [{ number, marks, text }]
 const BARE = /(?<=(?:^|[.?!:;)\]}\d]|\b[A-Z]{1,12})\s*)(\d{1,2})\s*[.)]\s+(?=[A-Z])/g;
+// Looser: "1." after any word, for papers whose questions end without a full stop ("(c) Notch sensitivity 2. Name…").
+// Used only when it finds more questions than BARE: the 1, 2, 3 sequence keeps stray numbers out.
+const LOOSE = /(?<=(?:^|\S)\s+|^)(\d{1,2})\s*[.)]\s+(?=[A-Z])/g;
+const MAX_TEXT = 8000; // one question's text; a longer one is cut at its last full sentence
+const cap = (t) => {
+  if (t.length <= MAX_TEXT) return t;
+  const cut = t.slice(0, MAX_TEXT);
+  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('? '));
+  return `${end > MAX_TEXT / 2 ? cut.slice(0, end + 1) : cut} …`;
+};
 
 function numbered(src, re, number, replace = true) {
   const starts = [];
@@ -27,7 +37,7 @@ function numbered(src, re, number, replace = true) {
     const head = body.match(/^[\s:.\-–(]*(\d{1,3})\s*(?:marks?|mks?)\s*\)?/i);
     const parts = [...body.matchAll(SUB_MARKS)].reduce((n, m) => n + Number(m[1]), 0);
     const rest = head ? body.slice(head[0].length) : body;
-    return { number: s.n, marks: head ? Number(head[1]) : parts || null, text: rest.replace(/^[\s:.\-–]+/, '').slice(0, 3000) };
+    return { number: s.n, marks: head ? Number(head[1]) : parts || null, text: cap(rest.replace(/^[\s:.\-–]+/, '')) };
   });
 }
 
@@ -38,7 +48,7 @@ function byMarks(src) {
   const seen = new Set();
   let from = 0;
   for (const m of src.matchAll(SUB_MARKS)) {
-    const text = src.slice(from, m.index).trim().slice(0, 3000);
+    const text = cap(src.slice(from, m.index).trim());
     from = m.index + m[0].length;
     const key = text.replace(/\s+/g, '').toLowerCase(); // extracted text spaces words unevenly ("D etermine")
     if (seen.has(key)) continue;
@@ -63,6 +73,8 @@ export function parseQuestions(text) {
   if (qs.length < 2) {
     const bare = numbered(src, BARE, (m) => Number(m[1]), false);
     if (bare.length > qs.length) qs = bare;
+    const loose = numbered(src, LOOSE, (m) => Number(m[1]), false);
+    if (loose.length > qs.length) qs = loose;
     const marked = qs.length < 2 ? byMarks(src) : [];
     if (marked.length > 1) qs = marked;
   }

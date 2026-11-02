@@ -660,3 +660,11 @@ body:has(.notesbar):has(.focusbar) .main { padding-bottom: calc(var(--tabs) + 14
 .q-tools { display: flex; flex-direction: column; align-items: flex-end; gap: var(--s1); flex: none; }
 .list-item { display: grid; }
 .list-item > .openat { padding: 0 var(--s4) var(--s2); }
+/* "Paste CAT or exam dates" on Today (PasteDates.jsx) */
+.pastedates > summary { cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s2); min-height: 32px; }
+.pastedates[open] > summary { margin-bottom: var(--s3); }
+.pastedates textarea { width: 100%; font: inherit; font-size: var(--t-s); }
+.pd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s1); }
+.pd-list .check { align-items: flex-start; }
+.pd-list input { margin-top: 5px; }
+.pd-list .row-main { display: grid; gap: 2px; }

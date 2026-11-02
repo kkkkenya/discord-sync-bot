@@ -1,4 +1,5 @@
 import FirstRun from './FirstRun.jsx';
+import PasteDates from './PasteDates.jsx';
 import { Icon } from './icons.jsx';
 import { href, unitSlug } from './route.js';
 
@@ -7,7 +8,7 @@ const dateText = (iso) => new Date(`${iso}T12:00:00+03:00`).toLocaleDateString('
 
 // Today: the next action as one card with Start, the other actions as a short list, then every unit with its days
 // left and stage. Nothing else.
-export default function Today({ s, go, refresh }) {
+export default function Today({ s, go, refresh, notify }) {
   if (!s.data.units.length) return <FirstRun s={s} refresh={refresh} />;
   const title = Object.fromEntries(s.data.units.map((u) => [u.code, u.title]));
   const strip = s.data.units.map((u) => ({ code: u.code, title: u.title, ...s.units[u.code] })).sort((a, b) => (a.days ?? 999) - (b.days ?? 999));
@@ -66,6 +67,7 @@ export default function Today({ s, go, refresh }) {
           ))}
         </ul>
       </div>
+      <PasteDates s={s} refresh={refresh} notify={notify} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, prepareUnit } from './api.js';
+import AddToHub from './AddToHub.jsx';
 import OpenAt from './OpenAt.jsx';
 
 const status = (f) => (f.chars > 0 ? ['good', 'Read'] : f.synced ? ['warn', 'No text'] : [null, 'Not read']);
@@ -63,6 +64,7 @@ export default function UnitNotes(props) {
         {busy && <div className="progress" aria-hidden="true"><span style={{ width: `${progress ? (100 * progress.done) / progress.total : 5}%` }} /></div>}
         {lib?.note && <p className="row-sub">{lib.note}</p>}
       </div>
+      <AddToHub unit={unit} notify={props.notify} />
       {files.length > 0 && (
         <div className="list">
           {files.map((f) => {

@@ -738,3 +738,10 @@ body.pdf-open .pinbtn { z-index: 80; }
 @keyframes aiwait { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 html[data-motion="off"] .aiwait-bar::after { animation: none; width: 100%; opacity: 0.5; }
 @media (prefers-reduced-motion: reduce) { .aiwait-bar::after { animation: none; width: 100%; opacity: 0.5; } }
+/* "Add files for the hub" (AddToHub.jsx) */
+.dropzone { display: grid; justify-items: center; gap: var(--s1); padding: var(--s5) var(--s4); border: 2px dashed var(--separator); border-radius: var(--radius-l); text-align: center; cursor: pointer; background: var(--surface-2); transition: border-color 0.15s, background-color 0.15s; }
+.dropzone .icon { width: 26px; height: 26px; color: var(--text-2); }
+.dropzone.is-over, .dropzone:hover { border-color: var(--a2); background: color-mix(in srgb, var(--a2) 10%, var(--surface-2)); }
+.dropzone:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.hub-sending { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.hub-sending li { display: grid; gap: 4px; }

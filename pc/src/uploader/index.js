@@ -19,6 +19,8 @@ import { sleep } from '../../../lib/discord.js';
 import { forwardTo } from '../../../lib/sorting.js';
 import { save, state } from '../state.js';
 import { classify } from './classify.js';
+import { convertDrop, converts } from './dropconvert.js';
+import { collectFromCrux } from './fromcrux.js';
 import { fingerprint, onServer } from './existing.js';
 import { dumperFolders, donePath, loadIndex, monthOf, resolveSources, saveIndex, scan, skip, under, update } from './scanner.js';
 import { mb, PIECES_HELP, shrink } from './shrink.js';
@@ -182,7 +184,8 @@ export async function startUploader(ctx) {
       return;
     }
 
-    const label = `${ICON[info.kind]} **${info.name}** · ${LABEL[info.kind]}`;
+    const from = info.rel.match(/\(from ([^)\/]{1,60})\)/)?.[1]; // added by a student in Crux (fromcrux.js)
+    const label = `${ICON[info.kind]} **${info.name}** · ${LABEL[info.kind]}${from ? ` · shared by **${from}** via Crux` : ''}`;
     const record = (msg, extra) => db.insert('files', [{
       hash: key, name: info.name, kind: info.kind, unit_code: info.code, channel_id: msg.channelId, message_id: msg.id,
       size: s.size, source_path: info.rel, ...extra,
@@ -317,6 +320,7 @@ export async function startUploader(ctx) {
   const finished = new Set();  // uploaded, skipped, or failed for good this run
   const enqueue = (path) => {
     if (queued.has(path) || finished.has(path)) return; // a scan can offer a file that's still in the queue
+    if (!ctx.dry && converts(path) && under(path, dumper.drop)) return; // photos and Office files in Drop become PDFs first (dropconvert.js)
     queued.add(path);
     pending++;
     queue = queue
@@ -380,6 +384,7 @@ export async function startUploader(ctx) {
         for (const r of roots) if (!next.some((o) => o.toLowerCase() === r.toLowerCase())) console.log(`No longer watching ${r} (shortcut removed).`);
         roots = next;
       }
+      if (!ctx.dry) await convertDrop(dumper, ctx.log).catch((e) => console.error('drop convert:', e.message));
       const targets = full ? roots : [dumper.drop];
       const started = Date.now();
       const result = await scan(targets, skip);
@@ -407,6 +412,7 @@ export async function startUploader(ctx) {
   if (pending === 0) done();
   const rescan = (full) => () => { if (!down) scanNow(full).catch((e) => console.error('scan:', e.message)); };
   setInterval(rescan(false), 60e3);
+  setInterval(() => { if (!down) collectFromCrux(dumper, ctx.log).catch((e) => console.error('from Crux:', e.message)); }, 2 * 60e3);
   setInterval(rescan(true), 10 * 60e3);
   let tick = Date.now(); // a long gap between ticks means the laptop slept
   setInterval(() => { const gap = Date.now() - tick; tick = Date.now(); if (gap > 90e3) rescan(true)(); }, 15e3);

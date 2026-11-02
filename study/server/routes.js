@@ -27,6 +27,7 @@ import { focusCounts, setFocus } from './focus.js';
 import { classHints, classList, confirmHint, listOf, offerList, shareHint } from './shared.js';
 import { newMaterial } from './inbox.js';
 import { makeGuideFor } from './guide.js';
+import { finishUpload, myUploads, startUpload } from './hub-uploads.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
@@ -280,6 +281,10 @@ const routes = {
   // mark the step where your working broke.
   // Learn a topic: { unit, topicId } → pages to read in your own files, questions to try, then what next. No AI.
   'GET /api/learn': async (q) => learnFor(q.get('unit'), q.get('topicId')),
+  // Files a student adds for the hub: a link to upload straight to storage, then "done" queues it for the hub PC.
+  'POST /api/uploads/start': async (q, body, ctx) => startUpload(body || {}, ctx.user),
+  'POST /api/uploads/done': async (q, body, ctx) => finishUpload(body || {}, ctx.user),
+  'GET /api/uploads': async (q, body, ctx) => ({ files: await myUploads(q.get('unit'), ctx.user) }),
   // A topic's study guide: { unit, topicId, fresh? } → what to learn and where in your books. Shared with the class.
   'POST /api/learn/guide': async (q, body) => makeGuideFor(body || {}),
   // Study kit (Phase 10): { unit, kind?, topicId? } → the saved material, or { needKey, goal } with no AI key.

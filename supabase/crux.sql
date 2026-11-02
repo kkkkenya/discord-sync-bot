@@ -137,3 +137,25 @@ alter table crux_kit_kb      enable row level security;
 alter table crux_class_hints enable row level security;
 -- Study rooms: a focus block can belong to a unit's room (study/server/focus.js counts per room).
 alter table crux_focus add column if not exists unit_code text;
+-- Files students add in Crux for the hub: the file waits in the private crux-uploads bucket, a row here says where
+-- it goes, and the drive dumper (pc/src/uploader/fromcrux.js) takes it into Drop, which sorts it onto the server.
+-- status: uploading (Crux gave a link) → new (uploaded) → received (on the hub PC) | failed
+create table if not exists crux_uploads (
+  id bigserial primary key,
+  user_id text not null,
+  user_name text,
+  unit_code text not null,
+  batch text not null,
+  name text not null,
+  path text not null,
+  size bigint,
+  status text not null default 'uploading',
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists crux_uploads_status_idx on crux_uploads (status);
+create index if not exists crux_uploads_user_idx on crux_uploads (user_id, created_at);
+alter table crux_uploads enable row level security;
+insert into storage.buckets (id, name, public, file_size_limit) values ('crux-uploads', 'crux-uploads', false, 52428800)
+  on conflict (id) do nothing;

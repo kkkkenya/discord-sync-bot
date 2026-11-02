@@ -12,7 +12,7 @@ const loadKatex = () => {
 const MATH = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$)/g;
 const hasMath = (t) => /\$[^$]+\$|\\\(|\\\[/.test(t);
 
-const UNITS = 'mm|cm|km|m|kN·m|kNm|N·m|Nm|N/mm²|N/mm2|N/m²|MN|kN|N|GPa|MPa|kPa|Pa|rad/s|rpm|rev/min|kg|g|ms|s|min|h|kW|MW|W|kJ|J|°C|K|%|°|Hz|kHz|V|A|Ω';
+const UNITS = 'kN/m|mm|cm|km|m|kN·m|kNm|N·m|Nm|N/mm²|N/mm2|N/m²|N/m|MN|kN|N|GPa|MPa|kPa|Pa|rad/s|rpm|rev/min|kg|g|ms|s|min|h|kW|MW|W|kJ|J|°C|K|%|°|Hz|kHz|V|A|Ω';
 const VALUE = new RegExp(`(\\b[A-Za-zα-ωΑ-Ω][\\w']{0,3}\\s*=\\s*-?[\\d.,/]+\\s*(?:${UNITS})?|-?\\b\\d+(?:[.,]\\d+)?(?:\\s*[x×]\\s*10\\^?-?\\d+)?\\s?(?:${UNITS})(?![\\w]))`, 'g');
 
 // plain text: bold values, real superscripts and subscripts
@@ -81,6 +81,8 @@ function blocks(t) {
     if ((m = ln.match(/^(#{1,4})\s+(.*)/))) { flush(); out.push({ type: 'h', level: m[1].length, text: m[2].replace(/\*\*/g, '') }); continue; }
     if ((m = ln.match(/^\s*[-*•]\s+(.*)/))) { if (cur?.type !== 'ul') { flush(); cur = { type: 'ul', items: [] }; } cur.items.push(m[1]); continue; }
     if ((m = ln.match(/^\s*(\d+)[.)]\s+(.*)/))) { if (cur?.type !== 'ol') { flush(); cur = { type: 'ol', start: Number(m[1]), items: [] }; } cur.items.push(m[2]); continue; }
+    // a line straight after a list item (an equation, its result) belongs to that item
+    if ((cur?.type === 'ul' || cur?.type === 'ol') && !NOTE.test(ln) && !/^>/.test(ln)) { cur.items[cur.items.length - 1] += `\n${ln.trim()}`; continue; }
     if ((m = ln.match(/^>\s?(.*)/)) || NOTE.test(ln)) {
       const body = m ? m[1] : ln;
       if (cur?.type !== 'note') { flush(); cur = { type: 'note', kind: noteKind(body), lines: [] }; }
@@ -92,6 +94,8 @@ function blocks(t) {
   flush();
   return out;
 }
+
+const item = (it, math, key) => it.split('\n').map((l, n) => <Fragment key={n}>{n > 0 && <br />}{line(l, math, `${key}-${n}`)}</Fragment>);
 
 export default function Rich({ text, as: Tag = 'div', className = '', math = true }) {
   const t = String(text ?? '');
@@ -105,8 +109,8 @@ export default function Rich({ text, as: Tag = 'div', className = '', math = tru
     <Tag className={`rich${bs.length > 1 ? ' md' : ''} ${className}`}>
       {bs.map((b, i) => {
         if (b.type === 'h') return <p key={i} className={`md-h md-h${Math.min(b.level, 3)}`}>{line(b.text, math, i)}</p>;
-        if (b.type === 'ul') return <ul key={i} className="md-list">{b.items.map((it, j) => <li key={j}>{line(it, math, `${i}-${j}`)}</li>)}</ul>;
-        if (b.type === 'ol') return <ol key={i} className="md-list" start={b.start}>{b.items.map((it, j) => <li key={j}>{line(it, math, `${i}-${j}`)}</li>)}</ol>;
+        if (b.type === 'ul') return <ul key={i} className="md-list">{b.items.map((it, j) => <li key={j}>{item(it, math, `${i}-${j}`)}</li>)}</ul>;
+        if (b.type === 'ol') return <ol key={i} className="md-list" start={b.start}>{b.items.map((it, j) => <li key={j}>{item(it, math, `${i}-${j}`)}</li>)}</ol>;
         if (b.type === 'note') return <div key={i} className={`md-note ${b.kind}`}>{b.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{line(l, math, `${i}-${j}`)}</Fragment>)}</div>;
         return <p key={i} className="md-p">{b.lines.map((l, j) => <Fragment key={j}>{j > 0 && <br />}{line(l, math, `${i}-${j}`)}</Fragment>)}</p>;
       })}

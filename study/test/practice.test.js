@@ -196,3 +196,19 @@ test('an answer given on a tutorial sheet is the key: any of its parts can be ch
   assert.equal(wrong.verdict, 'wrong');
   assert.match(wrong.key.answer, /175 kNm; 4\.3°/, 'all parts are shown');
 });
+
+// The full worked solution: made once with the AI and kept on the question; an empty diagram is dropped
+const { explainQuestion } = await import('../server/practice.js');
+test('the full worked solution is made once, kept, and remade only when asked', async () => {
+  let made = 0;
+  const explain = async () => { made += 1; return { breakdown: '## Given\n- sx = 80 MPa', fbd: '', diagram: { kind: 'none', length: 0, supports: [], loads: [], reactions: [] }, answer: '100 MPa' }; };
+  const none = await explainQuestion({ unit: 'EMM 302', questionId: 'q1' }, { explain, ready: () => false });
+  assert.equal(none.needAi, true);
+  const a = await explainQuestion({ unit: 'EMM 302', questionId: 'q1' }, { explain, ready: () => true });
+  assert.deepEqual([a.answer, a.diagram, made], ['100 MPa', null, 1]);
+  await explainQuestion({ unit: 'EMM 302', questionId: 'q1' }, { explain, ready: () => true });
+  assert.equal(made, 1);
+  await explainQuestion({ unit: 'EMM 302', questionId: 'q1', fresh: true }, { explain, ready: () => true });
+  assert.equal(made, 2);
+  await assert.rejects(explainQuestion({ unit: 'EMM 302', questionId: 'nope' }, { explain }), /Pick a question/);
+});

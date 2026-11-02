@@ -191,6 +191,55 @@ export async function solveWithCheckpoints({ unit, topic = '', question, subtopi
   return structured(schema, TUTOR, content, 4000);
 }
 
+// The full worked solution, for reading: a structured breakdown, plus a free body diagram when forces act on a body.
+// The diagram comes back as data (a beam or bar along x, its supports, loads and reactions) and the app draws it.
+const AT = { type: 'number', description: 'Distance from the left end, in metres.' };
+const FBD_SCHEMA = {
+  type: 'object',
+  properties: {
+    kind: { type: 'string', enum: ['beam', 'bar', 'none'], description: 'beam: a beam or shaft with transverse loads; bar: a member with axial loads; none: no single straight member to draw.' },
+    length: { type: 'number', description: 'Member length in metres (0 when kind is none).' },
+    supports: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['pin', 'roller', 'fixed', 'free'] }, at: AT, label: { type: 'string', description: 'Point name, e.g. A.' } }, required: ['type', 'at', 'label'], additionalProperties: false } },
+    loads: { type: 'array', items: { type: 'object', properties: {
+      type: { type: 'string', enum: ['point', 'udl', 'moment'] },
+      at: AT, to: { type: 'number', description: 'udl only: where it ends, in metres from the left end; else equal to at.' },
+      dir: { type: 'string', enum: ['down', 'up', 'left', 'right', 'cw', 'ccw'] },
+      label: { type: 'string', description: 'Plain text, e.g. 20 kN, 5 kN/m, 10 kN·m.' },
+    }, required: ['type', 'at', 'to', 'dir', 'label'], additionalProperties: false } },
+    reactions: { type: 'array', items: { type: 'object', properties: { at: AT, dir: { type: 'string', enum: ['up', 'down', 'left', 'right', 'cw', 'ccw'] }, label: { type: 'string', description: 'Plain text, e.g. R_A = 12.5 kN, or R_A when unknown.' } }, required: ['at', 'dir', 'label'], additionalProperties: false } },
+  },
+  required: ['kind', 'length', 'supports', 'loads', 'reactions'],
+  additionalProperties: false,
+};
+export async function explainSolution({ unit, topic = '', question, expected = '', scheme = '' }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      breakdown: { type: 'string', description: 'The full worked solution, formatted as the system prompt says.' },
+      fbd: { type: 'string', description: 'The free body diagram in words: the body, every force and moment with its point of action and direction, and the support reactions. Empty when the question has no forces on a body.' },
+      diagram: FBD_SCHEMA,
+      answer: { type: 'string', description: 'The final answer, number then unit, plain text.' },
+    },
+    required: ['breakdown', 'fbd', 'diagram', 'answer'],
+    additionalProperties: false,
+  };
+  const content = [
+    `Unit: ${unit}${topic ? `\nTopic: ${topic}` : ''}`,
+    scheme ? `Marking scheme material. Follow it, and do not contradict its answers:\n${scheme}` : '',
+    expected ? `The answer key says the final answer is ${expected}. Your solution must reach it.` : '',
+    `Question:\n${question}`,
+    `Write the full worked solution a student can learn from, in this order, each part under its own ## heading:
+## Given (the data, symbols and SI units, as - bullets)
+## Free body diagram (only when forces act on a body: say what is drawn and why, the sign convention, then the equilibrium equations)
+## Method (the idea in two or three sentences: which principle and why it applies)
+## Solution (numbered steps; each step says what is done, the equation in $$...$$, then the numbers substituted and the result in bold)
+## Check (a quick sanity check: units, order of magnitude, or a second route)
+Do not repeat the final answer under its own heading: the answer field holds it. Add a Trap: line for the mistake students usually make here.
+For the diagram: when the question has a beam, shaft or bar, fill it in with every support, load and reaction placed by distance from the left end; otherwise kind none with empty lists.`,
+  ].filter(Boolean).join('\n\n');
+  return structured(schema, TUTOR, content, 8000);
+}
+
 // Study material matched to the stage (Phase 10). kind: 'ladder' (Adequate Prep: worked → faded → solo, plus
 // teach-back prompts), 'recipes' (1-Week Mode: solving recipes and shortcuts for the top predicted topics) or 'sheet'
 // (Last-Minute / Exam-Eve: a one-page formula and shortcut sheet with the student's own traps).

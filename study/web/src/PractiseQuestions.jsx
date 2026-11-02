@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, useElapsed } from './api.js';
 import { photoData } from './media.js';
+import FreeBody from './FreeBody.jsx';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
 // One question at a time: answer it (final answer with units, or a photo of the working), check it, and when it's
@@ -17,13 +18,32 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const [mistake, setMistake] = useState({ subtopicId: '', errorType: '' });
   const [saved, setSaved] = useState(false);
   const [problem, setProblem] = useState('');
-  const waited = useElapsed(busy);
+  const [sol, setSol] = useState(null); // the full worked solution, once asked for (or already made)
+  const [solOpen, setSolOpen] = useState(false);
+  const [solBusy, setSolBusy] = useState(false);
+  const waited = useElapsed(busy || solBusy);
 
   useEffect(() => { if (unit) api('GET', `predict?unit=${encodeURIComponent(unit)}`).then((p) => setQuestions(p.questions)).catch(() => setQuestions([])); }, [unit]);
   // where to start: the question a link asked for, else Today's top practise action
   const start = focus?.section === 'practice' ? focus : s.next?.find((a) => a.focus?.section === 'practice')?.focus;
   useEffect(() => { if (start?.questionId) { if (start.unit && start.unit !== unit) setUnit(start.unit); setQid(start.questionId); } }, [start?.questionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // a solution made earlier for this question comes back free; a new one is an AI action
+  useEffect(() => {
+    setSol(null); setSolOpen(false);
+    if (unit && qid) api('GET', `attempts/explain?unit=${encodeURIComponent(unit)}&questionId=${encodeURIComponent(qid)}`).then((x) => { if (!x.none) setSol(x); }).catch(() => {});
+  }, [unit, qid]);
+  const explain = async (fresh = false) => {
+    setSolOpen(true);
+    if (sol && !fresh) return;
+    setSolBusy(true); setProblem('');
+    try {
+      const out = await api('POST', 'attempts/explain', { unit, questionId: qid, fresh });
+      if (out.needAi) throw new Error(out.message);
+      setSol(out);
+    } catch (e) { setProblem(e.message); setSolOpen(false); }
+    setSolBusy(false);
+  };
   const q = questions.find((x) => x.id === qid);
   const tried = useMemo(() => new Set(s.data.attempts.map((a) => a.questionId)), [s.data.attempts]);
   const reset = () => { setRes(null); setSteps([]); setBroke(null); setMistake({ subtopicId: '', errorType: '' }); setSaved(false); setProblem(''); setAnswer(''); setKey(''); };
@@ -89,9 +109,34 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
               Photo of working
               <input type="file" accept="image/*" capture="environment" className="visually-hidden" disabled={busy || !s.media?.image} onChange={(e) => { photo(e.target.files[0]); e.target.value = ''; }} />
             </label>
+            {!solOpen && <button type="button" className="btn plain" disabled={solBusy} onClick={() => explain()}>Stuck? Show the full solution</button>}
           </div>
           {busy && <p className="row-sub" role="status">The AI may solve it first. This can take a minute.</p>}
         </form>
+      )}
+
+      {solOpen && (
+        <section className="card stack solution" aria-labelledby="sol-title" aria-busy={solBusy}>
+          <div className="card-head">
+            <h2 className="card-title" id="sol-title">Worked solution</h2>
+            <button type="button" className="btn plain" onClick={() => setSolOpen(false)}>Hide</button>
+          </div>
+          {solBusy && <><div className="skeleton" style={{ height: 160 }} /><p className="row-sub" role="status">Working it out… {waited}s</p></>}
+          {sol && !solBusy && (
+            <>
+              {(sol.diagram || sol.fbd) && (
+                <div className="stack-s">
+                  <h3 className="sub-title">Free body diagram</h3>
+                  {sol.diagram && <FreeBody d={sol.diagram} />}
+                  {sol.fbd && <Rich text={sol.fbd} className="fbd-words" />}
+                </div>
+              )}
+              <Rich text={sol.breakdown} />
+              {sol.answer && <AnswerBox text={sol.answer} label="Final answer" />}
+              <p className="row-sub">Made by the AI: check it against your notes. <button type="button" className="btn plain" onClick={() => explain(true)}>Make it again</button></p>
+            </>
+          )}
+        </section>
       )}
 
       {problem && <p className="notice bad" role="alert">{problem}{problem.startsWith("Today's AI limit") && <> <button className="btn plain" onClick={deeper}>Go deeper</button></>}</p>}
@@ -108,7 +153,10 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
           <h2 className={right ? 'good-text' : 'bad-text'}>{right ? 'Correct' : 'Not quite'}</h2>
           <AnswerBox text={res.key.answer} label={res.key.label ? `Answer · ${res.key.label}` : 'Answer'} />
           {res.note && <p className="row-sub">{res.note}</p>}
-          {right && <button className="btn primary" onClick={nextQuestion}>Next question</button>}
+          <div className="actions start">
+            {right && <button className="btn primary" onClick={nextQuestion}>Next question</button>}
+            {!solOpen && <button type="button" className="btn" disabled={solBusy} onClick={() => explain()}>Full worked solution</button>}
+          </div>
         </div>
       )}
 

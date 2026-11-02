@@ -6,7 +6,7 @@
 // failure) or 'disputed' (the student says the checkpoints are wrong: nothing is held against them).
 import { compareAnswers } from './answer.js';
 import { aiReady, canRead, provider } from './ai.js';
-import { compareWorking, readWorking, solveWithCheckpoints } from './brain.js';
+import { compareWorking, explainSolution, readWorking, solveWithCheckpoints } from './brain.js';
 import { ERROR_TYPES } from './defs.js';
 import { library } from './ingest.js';
 import { paperInfo } from './predict.js';
@@ -158,6 +158,20 @@ export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, 
     patch('attempts', id, { checkpoints });
     return { checkpoints, note: '' };
   } catch (e) { return { checkpoints: [], note: `Couldn't write the checkpoints (${e.message}). Take it to the Prompt Builder for a full solution.` }; }
+}
+
+// "Full worked solution": a readable breakdown and a free body diagram for one past-paper question, made once and
+// kept on the question. body: { unit, questionId, fresh? } → { breakdown, fbd, diagram, answer } or { needAi, message }.
+export async function explainQuestion({ unit, questionId, fresh = false }, { explain = explainSolution, ready = aiReady } = {}) {
+  const row = data.paperq.find((x) => x.id === questionId && x.unit === unit);
+  if (!row) throw bad('Pick a question first.');
+  if (row.explain && !fresh) return row.explain;
+  if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
+  const topic = data.topics.find((t) => t.id === row.topicId);
+  const out = await explain({ unit, topic: topic?.name || '', question: row.text, expected: row.key?.answer || '', scheme: schemeFor(row)?.text || '' });
+  const d = out.diagram || {};
+  const diagram = d.kind && d.kind !== 'none' && d.length > 0 ? d : null;
+  return patch('paperq', row.id, { explain: { breakdown: String(out.breakdown || ''), fbd: String(out.fbd || ''), diagram, answer: String(out.answer || '') } }).explain;
 }
 
 // "Broke here": the student found the checkpoint where their paper diverged. This is the only thing that counts as a

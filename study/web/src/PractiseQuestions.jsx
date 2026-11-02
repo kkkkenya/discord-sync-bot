@@ -109,7 +109,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
               Photo of working
               <input type="file" accept="image/*" capture="environment" className="visually-hidden" disabled={busy || !s.media?.image} onChange={(e) => { photo(e.target.files[0]); e.target.value = ''; }} />
             </label>
-            {!solOpen && <button type="button" className="btn plain" disabled={solBusy} onClick={() => explain()}>Stuck? Show the full solution</button>}
+            {!solOpen && <button type="button" className="btn" disabled={solBusy} onClick={() => explain()}>Show full solution</button>}
           </div>
           {busy && <p className="row-sub" role="status">The AI may solve it first. This can take a minute.</p>}
         </form>
@@ -171,8 +171,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
                   <span className="step-n">{cp.n}</span>
                   <span className="row-main">
                     <Rich text={cp.step} as="span" />
-                    {cp.equation && <Rich text={cp.equation} as="span" className="step-eq" />}
-                    {cp.value && <span className="row-sub">= <Rich text={cp.value} as="span" /></span>}
+                    {cp.equation && <Rich text={cp.equation} as="span" className="step-eq" tex />}
+                    {cp.value && <span className="row-sub">= <Rich text={cp.value} as="span" tex /></span>}
                   </span>
                 </button>
               </li>

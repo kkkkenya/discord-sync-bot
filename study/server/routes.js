@@ -465,7 +465,8 @@ export const AI_LIMIT_MESSAGE = "Today's AI limit is used. Take this pack to any
 export async function dispatch(method, pathname, query, body, ctx) {
   const scope = requestScope();
   if (scope && ctx?.user) scope.user = ctx.user; // the provider choice depends on the tier (ai.js)
-  if (method === 'POST' && USES_AI.test(pathname) && ctx?.user && aiReady()) {
+  if (scope && ctx?.memo) scope.memo = ctx.memo; // AI answers kept for a redo after a save conflict
+  if (method === 'POST' && USES_AI.test(pathname) && ctx?.user && aiReady() && !ctx.redo) {
     const used = await bump(ctx.user, 'ai');
     if (!used.ok) throw Object.assign(new Error(AI_LIMIT_MESSAGE), { status: 429, limit: 'ai' });
   }

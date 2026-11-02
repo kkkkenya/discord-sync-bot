@@ -165,6 +165,11 @@ export async function structured(schema, system, content, maxTokens = 4000, medi
     const kind = m.mime.startsWith('audio/') ? 'audio' : 'image';
     if (!CAN[p]?.[kind]) throw Object.assign(new Error(`${p} can't read ${kind === 'audio' ? 'recordings' : 'photos'}. Switch to Gemini in Settings, or type it.`), { status: 400 });
   }
-  if (p === 'gemini') return geminiCall(schema, system, content, maxTokens, media);
-  return deepseekCall(schema, system, content, maxTokens);
+  // a request redone after a save conflict (api/router.js) gets the answers it already paid for
+  const memo = requestScope()?.memo;
+  const key = memo && JSON.stringify([p, schema, system, content, media.map((m) => m.data.length)]);
+  if (key && memo.has(key)) return structuredClone(memo.get(key));
+  const out = p === 'gemini' ? await geminiCall(schema, system, content, maxTokens, media) : await deepseekCall(schema, system, content, maxTokens);
+  if (key) memo.set(key, structuredClone(out));
+  return out;
 }

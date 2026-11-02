@@ -11,6 +11,8 @@ const loadKatex = () => {
 };
 const MATH = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$)/g;
 const hasMath = (t) => /\$[^$]+\$|\\\(|\\\[/.test(t);
+// a field that holds only an equation, written in LaTeX without the $…$ around it (checkpoint equations)
+const asTex = (t) => (!hasMath(t) && /\\[a-zA-Z]+|[_^]\{/.test(t) ? `$\\displaystyle ${t.replace(/\$/g, '')}$` : t);
 
 const UNITS = 'kN/m|mm|cm|km|m|kN·m|kNm|N·m|Nm|N/mm²|N/mm2|N/m²|N/m|MN|kN|N|GPa|MPa|kPa|Pa|rad/s|rpm|rev/min|kg|g|ms|s|min|h|kW|MW|W|kJ|J|°C|K|%|°|Hz|kHz|V|A|Ω';
 const VALUE = new RegExp(`(\\b[A-Za-zα-ωΑ-Ω][\\w']{0,3}\\s*=\\s*-?[\\d.,/]+\\s*(?:${UNITS})?|-?\\b\\d+(?:[.,]\\d+)?(?:\\s*[x×]\\s*10\\^?-?\\d+)?\\s?(?:${UNITS})(?![\\w]))`, 'g');
@@ -97,8 +99,8 @@ function blocks(t) {
 
 const item = (it, math, key) => it.split('\n').map((l, n) => <Fragment key={n}>{n > 0 && <br />}{line(l, math, `${key}-${n}`)}</Fragment>);
 
-export default function Rich({ text, as: Tag = 'div', className = '', math = true }) {
-  const t = String(text ?? '');
+export default function Rich({ text, as: Tag = 'div', className = '', math = true, tex = false }) {
+  const t = tex ? asTex(String(text ?? '')) : String(text ?? '');
   const [, setReady] = useState(Boolean(katex));
   useEffect(() => { if (math && !katex && hasMath(t)) loadKatex().then(() => setReady(true)).catch(() => {}); }, [t]);
   if (Tag === 'span') {

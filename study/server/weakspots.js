@@ -39,7 +39,7 @@ export function parsePapers(unit) {
     for (const q of parseQuestions(e.text)) {
       const prev = old.get(`${fileId}#${q.number}`);
       const kept = prev && prev.topicFrom !== 'auto' ? { topicId: prev.topicId, subtopicIds: prev.subtopicIds || [], topicFrom: prev.topicFrom } : { ...mapQuestion(q.text, topics, subs), topicFrom: 'auto' };
-      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, ...((prev?.key || q.given) && { key: prev?.key || sheetKey(q.given) }), at: prev?.at || new Date().toISOString() });
+      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, ...((prev?.key || q.given) && { key: prev?.key || sheetKey(q.given) }), ...(prev?.explain && { explain: prev.explain }), at: prev?.at || new Date().toISOString() });
       n++;
     }
   }

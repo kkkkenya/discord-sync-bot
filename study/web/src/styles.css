@@ -529,7 +529,7 @@ input.narrow { width: 88px; }
 .fbd-text.dim { font-weight: 500; fill: var(--text-2); }
 .fbd-words { color: var(--text-2); }
 @media (max-width: 560px) { .fbd { padding: var(--s2); } .fbd-text { font-size: 18px; } }
-.step-eq { display: block; font-size: var(--t-s); }
+.step-eq { display: block; font-size: var(--t-s); overflow-x: auto; overflow-y: hidden; padding-block: 2px; }
 
 /* ---- Prompt builder ---- */
 .builder { display: grid; gap: var(--s5); max-width: 860px; }

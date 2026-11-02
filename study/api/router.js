@@ -49,9 +49,20 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       }
       const query = new URLSearchParams(url.searchParams);
       query.delete('path');
-      const { rev, doc } = await docs.load(user.id);
-      const { result, dirty } = await withDoc(doc, () => dispatch(request.method, path, query, body, { user, today: nairobiDay() }));
-      if (dirty) await docs.save(user.id, rev, doc);
+      const memo = new Map();
+      const run = (doc, redo = false) => withDoc(doc, () => dispatch(request.method, path, query, body, { user, today: nairobiDay(), memo, redo }));
+      let { rev, doc } = await docs.load(user.id);
+      let { result, dirty } = await run(doc);
+      if (dirty) {
+        try { await docs.save(user.id, rev, doc); } catch (e) {
+          // another request saved while the AI was working (a timer sync, the bell): redo this one on the newer
+          // document with the AI's answers from the first run, instead of failing and paying for them twice
+          if (e.status !== 409 || !memo.size) throw e;
+          ({ rev, doc } = await docs.load(user.id));
+          ({ result, dirty } = await run(doc, true));
+          if (dirty) await docs.save(user.id, rev, doc);
+        }
+      }
       return reply(result);
     } catch (e) {
       if (!e.status) console.error(e);

@@ -141,10 +141,12 @@ export default function App({ user }) {
     window.addEventListener('crux-open-file', open);
     return () => window.removeEventListener('crux-open-file', open);
   }, []);
-  const activateFile = (id) => {
+  // keepSmall: switch the mini reader in the notes bar to another file without opening the full viewer
+  const activateFile = (id, keepSmall = false) => {
     const t = files.find((x) => x.fileId === id);
     if (t && !(t.until > Date.now())) { openFile(id, t.page).catch((e) => setProblem(e.message)); return; } // its link expired: a fresh one
-    setActiveFile(id); setFileOpen(true); setJump((j) => j + 1);
+    setActiveFile(id); setJump((j) => j + 1);
+    if (!keepSmall) setFileOpen(true);
   };
   const closeFile = (id) => setFiles((fs) => { const left = fs.filter((x) => x.fileId !== id); if (!left.length) setFileOpen(false); else if (id === activeFile) setActiveFile(left[0].fileId); return left; });
   const filePage = useCallback((id, page) => setFiles((fs) => fs.map((x) => (x.fileId === id && x.page !== page ? { ...x, page } : x))), []);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import * as pdfjs from 'pdfjs-dist';
 import worker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { api } from './api.js';
@@ -17,6 +18,25 @@ async function part(url, from, to) {
   return { bytes: new Uint8Array(await r.arrayBuffer()), total: Number(r.headers.get('content-range')?.split('/')[1]) };
 }
 const isPdf = (b) => b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46; // %PDF
+
+// One loaded document per open file, shared by the full viewer and the mini reader in the notes bar, so switching
+// between them never fetches it again. → { doc, ratio (page 1's height / width) } or { notPdf: true }
+const docs = new Map();
+export function loadDoc(url) {
+  if (!docs.has(url)) {
+    docs.set(url, (async () => {
+      const first = await part(url, 0, CHUNK - 1);
+      if (!isPdf(first.bytes)) return { notPdf: true };
+      const transport = new pdfjs.PDFDataRangeTransport(first.total || first.bytes.length, first.bytes);
+      transport.requestDataRange = (begin, end) => part(url, begin, end - 1).then(({ bytes }) => transport.onDataRange(begin, bytes)).catch(() => {});
+      const doc = await pdfjs.getDocument({ range: transport, rangeChunkSize: CHUNK, disableAutoFetch: true, disableStream: true }).promise;
+      const p1 = (await doc.getPage(1)).getViewport({ scale: 1 });
+      return { doc, ratio: p1.height / p1.width };
+    })().catch((e) => { docs.delete(url); throw e; }));
+  }
+  return docs.get(url);
+}
+const dropDoc = (url) => { const d = docs.get(url); docs.delete(url); d?.then((r) => r.doc?.destroy()).catch(() => {}); };
 const short = (name) => String(name || 'File').replace(/\.[a-z0-9]+$/i, '').replace(/\(?z-?library\)?/gi, '').replace(/_/g, ' ').trim();
 
 function Page({ doc, n, width, ratio, onSeen, marks, onMark }) {
@@ -79,25 +99,12 @@ function Reader({ tab, onPage, marks, setMarks, onProblem }) {
   const jumped = useRef(false);
 
   useEffect(() => {
-    let task;
     let gone = false;
-    (async () => {
-      try {
-        const first = await part(tab.url, 0, CHUNK - 1);
-        if (!isPdf(first.bytes)) { setNotPdf(true); return; }
-        const transport = new pdfjs.PDFDataRangeTransport(first.total || first.bytes.length, first.bytes);
-        transport.requestDataRange = (begin, end) => part(tab.url, begin, end - 1)
-          .then(({ bytes }) => transport.onDataRange(begin, bytes))
-          .catch((e) => setProblem(e.message));
-        task = pdfjs.getDocument({ range: transport, rangeChunkSize: CHUNK, disableAutoFetch: true, disableStream: true });
-        const d = await task.promise;
-        if (gone) return;
-        const p1 = (await d.getPage(1)).getViewport({ scale: 1 });
-        setRatio(p1.height / p1.width);
-        setDoc(d);
-      } catch (e) { if (!gone) setProblem(e.message); }
-    })();
-    return () => { gone = true; task?.destroy(); };
+    loadDoc(tab.url).then((r) => {
+      if (gone) return;
+      if (r.notPdf) setNotPdf(true); else { setRatio(r.ratio); setDoc(r.doc); }
+    }).catch((e) => { if (!gone) setProblem(e.message); });
+    return () => { gone = true; };
   }, [tab.url]);
   useEffect(() => {
     const size = () => setFit(Math.min(scroller.current?.clientWidth || 800, 900) - 16);
@@ -173,6 +180,66 @@ function Reader({ tab, onPage, marks, setMarks, onProblem }) {
   );
 }
 
+// The collapsed viewer in the notes bar: the page you were on, live and small, with page arrows, a chip per open
+// file, and Continue reading. Same loaded document as the full viewer (loadDoc), so nothing is fetched twice.
+function Mini({ tabs, tab, marks, onActivate, onCloseTab, onPage }) {
+  const canvas = useRef(null);
+  const box = useRef(null);
+  const [info, setInfo] = useState(null); // { pages }
+  const [problem, setProblem] = useState('');
+  const [turn, setTurn] = useState(''); // 'next' | 'prev': which way the page slides in
+  const page = tab.page || 1;
+  useEffect(() => {
+    let gone = false;
+    let task;
+    setProblem('');
+    loadDoc(tab.url).then(async (r) => {
+      if (gone) return;
+      if (r.notPdf) { setProblem("Not a PDF: open it in Discord."); return; }
+      setInfo({ pages: r.doc.numPages });
+      const p = await r.doc.getPage(Math.min(page, r.doc.numPages));
+      if (gone) return;
+      const width = box.current?.clientWidth || 260;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const vp = p.getViewport({ scale: (width / p.getViewport({ scale: 1 }).width) * dpr });
+      const c = canvas.current;
+      c.width = vp.width; c.height = vp.height;
+      task = p.render({ canvasContext: c.getContext('2d'), viewport: vp });
+      await task.promise.catch(() => {});
+    }).catch((e) => { if (!gone) setProblem(e.message); });
+    return () => { gone = true; task?.cancel(); };
+  }, [tab.url, page]);
+  const go = (n) => { if (!info || n < 1 || n > info.pages) return; setTurn(n > page ? 'next' : 'prev'); onPage(tab.fileId, n); };
+  const lit = marks.filter((m) => m.file === tab.fileId && m.page === page).length;
+  return (
+    <section className="mini-reader" aria-label={`Reading ${short(tab.name)}`}>
+      <div className="mini-head">
+        <span className="mini-live" aria-hidden="true" />
+        <span className="mini-name" title={short(tab.name)}>{short(tab.name)}</span>
+        <button type="button" className="iconbtn" aria-label={`Close ${short(tab.name)}`} onClick={() => onCloseTab(tab.fileId)}><Icon name="close" /></button>
+      </div>
+      <button type="button" ref={box} className={`mini-page ${turn}`} key={`${tab.fileId}:${page}`} onClick={() => onActivate(tab.fileId)} aria-label={`Continue reading at page ${page}`}>
+        <canvas ref={canvas} />
+        {problem && <span className="mini-problem">{problem}</span>}
+        <span className="mini-go"><Icon name="file" /> Continue reading</span>
+        {lit > 0 && <span className="mini-lit">{lit} highlight{lit === 1 ? '' : 's'}</span>}
+      </button>
+      <div className="mini-foot">
+        <button type="button" className="iconbtn" aria-label="Previous page" disabled={page <= 1} onClick={() => go(page - 1)}><Icon name="chevron" /></button>
+        <span className="num mini-at">p. {page}{info ? ` / ${info.pages}` : ''}</span>
+        <button type="button" className="iconbtn" aria-label="Next page" disabled={!info || page >= info.pages} onClick={() => go(page + 1)}><Icon name="chevron" /></button>
+      </div>
+      {tabs.length > 1 && (
+        <div className="mini-tabs">
+          {tabs.filter((t) => t.fileId !== tab.fileId).map((t) => (
+            <button key={t.fileId} type="button" className="chip" onClick={() => onActivate(t.fileId, true)} title={short(t.name)}>{short(t.name)} · p. {t.page || 1}</button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 // tabs [{ fileId, url, name, page }], active (fileId), expanded. A collapsed viewer is just the dock of tabs.
 export default function PdfViewer({ tabs, active, expanded, jump, marks: saved, onActivate, onCloseTab, onCollapse, onPage, onProblem }) {
   const [marks, setMarks] = useState(saved);
@@ -184,6 +251,10 @@ export default function PdfViewer({ tabs, active, expanded, jump, marks: saved, 
     document.body.classList.add('pdf-open');
     return () => { document.removeEventListener('keydown', esc); document.body.classList.remove('pdf-open'); };
   }, [expanded, onCollapse]);
+  // the notes bar's slot for the mini reader exists once the page has drawn: look again after each change
+  const [, setDrawn] = useState(0);
+  useEffect(() => { setDrawn((n) => n + 1); }, [expanded, tabs.length]);
+  const close = (id) => { const t = tabs.find((x) => x.fileId === id); if (t) dropDoc(t.url); onCloseTab(id); };
   const tab = tabs.find((t) => t.fileId === active) || tabs[0];
   if (!tab) return null;
   const strip = (
@@ -193,12 +264,20 @@ export default function PdfViewer({ tabs, active, expanded, jump, marks: saved, 
           <button type="button" role="tab" aria-selected={expanded && t.fileId === tab.fileId} onClick={() => onActivate(t.fileId)} title={short(t.name)}>
             <Icon name="file" /><span className="pdf-tab-name">{short(t.name)}</span><span className="num muted">p. {t.page || 1}</span>
           </button>
-          <button type="button" className="pdf-tab-x" aria-label={`Close ${short(t.name)}`} onClick={() => onCloseTab(t.fileId)}><Icon name="close" /></button>
+          <button type="button" className="pdf-tab-x" aria-label={`Close ${short(t.name)}`} onClick={() => close(t.fileId)}><Icon name="close" /></button>
         </span>
       ))}
     </div>
   );
-  if (!expanded) return <nav className="pdf-dock glass" aria-label="Open files">{strip}</nav>;
+  if (!expanded) {
+    const slot = typeof document !== 'undefined' ? document.getElementById('notes-reading') : null;
+    return (
+      <>
+        <nav className="pdf-dock glass" aria-label="Open files">{strip}</nav>
+        {slot && createPortal(<Mini tabs={tabs} tab={tab} marks={marks} onActivate={onActivate} onCloseTab={close} onPage={onPage} />, slot)}
+      </>
+    );
+  }
   return (
     <div className="pdfview" role="dialog" aria-modal="true" aria-label={short(tab.name)}>
       <header className="pdf-bar glass">

@@ -54,9 +54,11 @@ try {
     const first = job.files[0];
     try {
       const msg = await api('GET', `/channels/${first.channel_id}/messages/${first.message_id}`);
+      // a file forwarded into the post sits in the forward's snapshot, not on the message itself
+      const atts = msg.attachments?.length ? msg.attachments : msg.message_snapshots?.[0]?.message?.attachments || [];
       const paths = [];
       for (const f of job.files) {
-        const att = msg.attachments.find((a) => a.filename === f.name || a.filename === f.name.replace(/ /g, '_')) || msg.attachments.find((a) => a.size === f.size);
+        const att = atts.find((a) => a.filename === f.name || a.filename === f.name.replace(/ /g, '_')) || atts.find((a) => a.size === f.size);
         if (!att) continue;
         const p = join(work, `${paths.length}-${basename(f.name)}`);
         writeFileSync(p, Buffer.from(await (await fetch(att.url)).arrayBuffer()));

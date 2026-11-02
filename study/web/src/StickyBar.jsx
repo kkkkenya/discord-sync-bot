@@ -158,6 +158,7 @@ export default function StickyBar({ s, unit, onProblem }) {
           <span className="chip num">{shown.length}</span>
         </button>
         <div className="notes-body">
+          <div id="notes-reading" /> {/* the PDF you're reading, small (PdfViewer.jsx Mini) */}
           <div className="notes-head">
             <h2><Icon name="notes" /> Notes{unit ? <span className="muted"> · {unit}</span> : null}</h2>
           </div>

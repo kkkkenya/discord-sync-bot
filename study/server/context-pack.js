@@ -37,8 +37,9 @@ const slug = (s) => String(s || '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-
 //   topic), question (the target paperq row) | null, failures (recent wrong attempts, with their checkpoints),
 //   files [{ name, paper, text }] (the unit's synced library; text '' = scanned), goal, budget (tokens), today.
 export function buildPack(input) {
-  const { unit, cohort, stage = 'adequate', topic, subtopics = [], weak = [], errors = [], hints = [], questions = [], question = null, failures = [], files = [], budget = 120000, today = '' } = input;
-  const goal = GOALS[input.goal] ? input.goal : defaultGoal(stage, question);
+  const { unit, cohort, stage = 'adequate', topic, subtopics = [], weak = [], errors = [], hints = [], questions = [], question = null, targets: given = null, failures = [], files = [], budget = 120000, today = '' } = input;
+  const targets = (given || (question ? [question] : [])).filter(Boolean);
+  const goal = GOALS[input.goal] ? input.goal : defaultGoal(stage, targets.length > 0);
   const style = STYLES[input.style] ? input.style : null;
   const focus = String(input.focus || '').trim().slice(0, 200);
   const topicName = topic?.name || 'the whole unit';
@@ -52,7 +53,7 @@ export function buildPack(input) {
   const prompt = [
     'You are a tough but fair engineering tutor at Kenyatta University, preparing me for a KU CAT/exam. Be technically exact at KU exam level.',
     `## Who I am\n${who}\nStudy stage: ${stageName(stage)} (${st?.window || ''}). ${STAGE_TONE[stage] || ''}`,
-    `## What I need (${GOALS[goal].name})\n${GOALS[goal].ask}${style ? `\n\nHow to explain: ${STYLES[style].ask}` : ''}${focus ? `\n\nKey focus: ${focus}` : ''}${question ? `\n\nTarget question (${question.source}, Q${question.number}${question.marks ? `, ${question.marks} marks` : ''}):\n${question.text}` : ''}`,
+    `## What I need (${GOALS[goal].name})\n${GOALS[goal].ask}${style ? `\n\nHow to explain: ${STYLES[style].ask}` : ''}${focus ? `\n\nKey focus: ${focus}` : ''}${targets.map((t, i) => `\n\nTarget question${targets.length > 1 ? ` ${i + 1}` : ''} (${t.source}, Q${t.number}${t.marks ? `, ${t.marks} marks` : ''}):\n${t.text}`).join('')}`,
     hints.length ? `## What my lecturer said (verbatim)\n${hints.map((h) => `- "${h.text}"${h.kind === 'focus' ? ' (focus)' : h.kind === 'exclude' ? ' (skip)' : ''}`).join('\n')}` : '',
     `## My weakspots${topic ? ` on ${topic.name}` : ''}\n${[
       by('stuck').length ? `- Stuck (don't get the concept or steps): ${by('stuck').join('; ')}` : '',
@@ -68,7 +69,7 @@ export function buildPack(input) {
   // ---- the .md pack: the fixed sections first, then course material until the budget runs out ----
   const sec = [];
   sec.push(`# ${unit.code} — ${topicName}: context pack\n\nMade by Study Desk on ${today} for ${cohort ? `${cohort.name} ${cohort.year}.${cohort.sem}` : 'a KU engineering student'}. Study stage: ${stageName(stage)}. Goal: ${GOALS[goal].name}.`);
-  if (question) sec.push(`## Target question\n\n**${question.source}, Q${question.number}${question.marks ? ` (${question.marks} marks)` : ''}**\n\n${question.text}`);
+  if (targets.length) sec.push(`## Target question${targets.length > 1 ? 's' : ''}\n\n${targets.map((t) => `**${t.source}, Q${t.number}${t.marks ? ` (${t.marks} marks)` : ''}**\n\n${t.text}`).join('\n\n')}`);
   sec.push(`## My weakspot profile\n\n${subtopics.length ? subtopics.map((s) => `- ${s.name} (${s.kind || 'concept'}): **${s.audit}**`).join('\n') : '_No sub-topics listed yet._'}${errLine ? `\n\nRecurring mistakes (last 30 days): ${errLine}.` : ''}${weak.length ? `\n\nFix first: ${weak.slice(0, 5).map((w) => `${w.name} (${w.reason})`).join('; ')}.` : ''}`);
   if (hints.length) sec.push(`## What the lecturer said\n\n${hints.map((h) => `- "${h.text}" (${h.kind}, ${String(h.at || '').slice(0, 10)})`).join('\n')}`);
   if (questions.length) sec.push(`## Past-paper and CAT questions on ${topicName}\n\n${[...questions].sort((a, b) => (b.year || 0) - (a.year || 0)).map((q) => `### ${q.source} · Q${q.number}${q.marks ? ` · ${q.marks} marks` : ''}\n\n${q.text}`).join('\n\n')}`);
@@ -94,10 +95,10 @@ export function buildPack(input) {
 
   // ---- what to upload ----
   const scanned = files.filter((f) => !f.text && f.paper).map((f) => f.name);
-  const figures = [...new Set([question, ...questions].filter((q) => q && FIGURE.test(q.text)).map((q) => q.source))];
+  const figures = [...new Set([...targets, ...questions].filter((q) => q && FIGURE.test(q.text)).map((q) => q.source))];
   const checklist = [
     `Attach the downloaded file ${filename}.`,
-    ...(question && FIGURE.test(question.text) ? [`Attach a photo or screenshot of the figure in ${question.source}, Q${question.number}: the question refers to one.`] : []),
+    ...targets.filter((t) => FIGURE.test(t.text)).map((t) => `Attach a photo or screenshot of the figure in ${t.source}, Q${t.number}: the question refers to one.`),
     ...(figures.length ? [`Also attach the original PDF${figures.length === 1 ? '' : 's'} with diagrams: ${figures.join(', ')}.`] : []),
     ...(scanned.length ? [`Scanned papers have no text in the pack; attach them if they matter: ${scanned.join(', ')}.`] : []),
     ...(cut.length ? [`Over the size budget, left out of the pack: ${cut.join(', ')}.`] : []),

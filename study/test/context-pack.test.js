@@ -78,3 +78,12 @@ test('works with nothing but a unit', () => {
   assert.equal(p.filename, 'EMM-312-unit-context.md');
   assert.equal(p.cut.length, 0);
 });
+
+test('several target questions all go in the prompt and the pack, and mean "solve them"', () => {
+  const t = (n) => ({ source: 'ECU 300 CAT 2023', number: n, marks: 5, text: `Evaluate integral number ${n}.` });
+  const p = buildPack({ ...base, goal: undefined, targets: [t(1), t(2)] });
+  assert.equal(p.goal, 'solution');
+  assert.match(p.prompt, /Target question 1 \(ECU 300 CAT 2023, Q1/);
+  assert.match(p.prompt, /Target question 2 \(ECU 300 CAT 2023, Q2/);
+  assert.match(p.md, /## Target questions[\s\S]*integral number 1[\s\S]*integral number 2/);
+});

@@ -6,7 +6,7 @@
 // failure) or 'disputed' (the student says the checkpoints are wrong: nothing is held against them).
 import { compareAnswers } from './answer.js';
 import { aiReady, canRead, provider } from './ai.js';
-import { compareWorking, explainSolution, readWorking, solveWithCheckpoints } from './brain.js';
+import { compareWorking, explainSolution, explainSolutions, readWorking, solveWithCheckpoints } from './brain.js';
 import { ERROR_TYPES } from './defs.js';
 import { library } from './ingest.js';
 import { paperInfo } from './predict.js';
@@ -169,9 +169,52 @@ export async function explainQuestion({ unit, questionId, fresh = false }, { exp
   if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
   const topic = data.topics.find((t) => t.id === row.topicId);
   const out = await explain({ unit, topic: topic?.name || '', question: row.text, expected: row.key?.answer || '', scheme: schemeFor(row)?.text || '' });
+  return keepSolution(row, out);
+}
+
+const keepSolution = (row, out) => {
   const d = out.diagram || {};
   const diagram = d.kind && d.kind !== 'none' && d.length > 0 ? d : null;
   return patch('paperq', row.id, { explain: { breakdown: String(out.breakdown || ''), fbd: String(out.fbd || ''), diagram, answer: String(out.answer || '') } }).explain;
+};
+
+// How many questions one AI call solves: a full solution runs to about 900 tokens plus 150 a mark, and one call
+// writes up to OUT_BUDGET tokens, so short questions go 4 at a time and long ones 2 (1 when only one is left).
+const OUT_BUDGET = 9000;
+const SCHEME_BUDGET = 24000; // characters of marking scheme a batch carries (about 6k tokens)
+export const solutionTokens = (row) => 900 + 150 * Math.min(Number(row.marks) || 10, 30);
+export function nextBatch(rows) {
+  const batch = [];
+  let used = 0;
+  for (const row of rows) {
+    const need = solutionTokens(row);
+    if (batch.length >= 4 || (batch.length >= 2 && used + need > OUT_BUDGET)) break;
+    batch.push(row);
+    used += need;
+  }
+  return { batch, tokens: used };
+}
+
+// "Solve several": body { unit, questionIds } → solves the next 2-4 that have no saved solution, in one AI call, and
+// keeps each on its question. { done: [ids], left: [ids] }: the app calls again while anything is left.
+export async function explainBatch({ unit, questionIds = [] }, { explain = explainSolutions, ready = aiReady } = {}) {
+  const rows = questionIds.map((id) => data.paperq.find((x) => x.id === id && x.unit === unit)).filter(Boolean);
+  const todo = rows.filter((r) => !r.explain);
+  if (!todo.length) return { done: [], left: [] };
+  if (!ready()) return { needAi: true, message: 'Solving needs the built-in AI. Take the questions to the Prompt Builder instead.' };
+  const { batch, tokens } = nextBatch(todo);
+  const schemes = [...new Map(batch.map((r) => [r.fileId, schemeFor(r)]).filter(([, x]) => x)).values()];
+  let room = SCHEME_BUDGET;
+  const schemeText = schemes.map((x) => { const t = x.text.slice(0, Math.max(room, 0)); room -= t.length; return t; }).filter(Boolean);
+  const items = batch.map((r) => ({ id: r.id, topic: data.topics.find((t) => t.id === r.topicId)?.name || '', question: r.text, expected: r.key?.answer || '' }));
+  const out = await explain({ unit, items, schemes: schemeText, maxTokens: Math.min(16000, Math.round(tokens * 1.6)) });
+  const done = [];
+  for (const sol of out.solutions || []) {
+    const row = batch.find((r) => r.id === sol.id);
+    if (row && sol.breakdown) { keepSolution(row, sol); done.push(row.id); }
+  }
+  if (!done.length) throw bad('The AI sent back no usable solutions. Try again, or solve them one at a time.', 502);
+  return { done, left: todo.filter((r) => !r.explain).map((r) => r.id) };
 }
 
 // "Broke here": the student found the checkpoint where their paper diverged. This is the only thing that counts as a

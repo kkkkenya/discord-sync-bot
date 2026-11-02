@@ -27,7 +27,7 @@ import { focusCounts, setFocus } from './focus.js';
 import { classHints, classList, confirmHint, listOf, offerList, shareHint } from './shared.js';
 import { newMaterial } from './inbox.js';
 import { learnFor } from './learn-store.js';
-import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
+import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
 
 // The retired flashcards (cards, reviews) stay in study.json but never go to the dashboard; only their count does,
@@ -234,13 +234,26 @@ const routes = {
     save();
     return state();
   },
-  // Deep Context Pack: { unit, topicId? | topic? (name), questionId?, goal? } → { prompt, md, filename, checklist,
-  // tokens, cut }. Works without an AI key.
+  // The files a pack can carry, for the Prompt Builder's file list: { files: [{ id, name, paper, size (bytes) | null,
+  // tokens, scanned }] }. Sizes come from the hub's file index; tokens from the text Crux has read.
+  'GET /api/pack/files': async (q) => {
+    const unit = q.get('unit');
+    const hub = new Map((await filesFor(unit).catch(() => ({ files: [] }))).files.map((f) => [String(f.id), f]));
+    const files = Object.entries(library.files).filter(([, e]) => e.unit === unit)
+      .map(([id, e]) => ({ id, name: e.name, paper: Boolean(e.paper), size: hub.get(id)?.size || null, tokens: Math.ceil((e.text || '').length / 4), scanned: !e.text }))
+      .sort((a, b) => Number(b.paper) - Number(a.paper) || a.name.localeCompare(b.name));
+    return { files };
+  },
+  // Deep Context Pack: { unit, topicId? | topic? (name), questionIds? | questionId?, fileIds?, goal? } → { prompt, md,
+  // filename, checklist, tokens, cut }. fileIds limits the course material to those files. Works without an AI key.
   'POST /api/pack': (q, body) => {
     const unit = data.units.find((u) => u.code === body.unit);
     if (!unit) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     if (body.goal && !GOALS[body.goal]) throw Object.assign(new Error('unknown goal'), { status: 400 });
-    const question = body.questionId ? data.paperq.find((x) => x.id === body.questionId && x.unit === unit.code) : null;
+    const wanted = Array.isArray(body.questionIds) ? body.questionIds : body.questionId ? [body.questionId] : [];
+    const targets = wanted.map((id) => data.paperq.find((x) => x.id === id && x.unit === unit.code)).filter(Boolean).slice(0, 12);
+    const question = targets[0] || null;
+    const only = Array.isArray(body.fileIds) ? new Set(body.fileIds.map(String)) : null;
     const topic = data.topics.find((t) => t.unit === unit.code && (t.id === (body.topicId || question?.topicId) || (body.topic && t.name.toLowerCase() === String(body.topic).toLowerCase()))) || null;
     const subs = data.subtopics.filter((s) => s.unit === unit.code && (!topic || s.topicId === topic.id));
     const ids = new Set(subs.map((s) => s.id));
@@ -252,9 +265,9 @@ const routes = {
       weak: critical.filter((c) => !topic || c.topicId === topic.id), errors: errors.counts,
       hints: data.hints.filter((h) => h.unit === unit.code && (!topic || !h.topicIds?.length || h.topicIds.includes(topic.id))),
       questions: data.paperq.filter((x) => x.unit === unit.code && (topic ? x.topicId === topic.id : true)).slice(0, 40),
-      question,
+      targets,
       failures: data.attempts.filter((a) => a.verdict === 'wrong' && Date.parse(a.at) >= since && (ids.has(a.subtopicId) || (topic && a.topicId === topic.id))).map(breakOf),
-      files: Object.values(library.files).filter((e) => e.unit === unit.code).map((e) => ({ name: e.name, paper: e.paper, text: e.text || '' })),
+      files: Object.entries(library.files).filter(([id, e]) => e.unit === unit.code && (!only || only.has(id))).map(([, e]) => ({ name: e.name, paper: e.paper, text: e.text || '' })),
       today: nairobiDay(),
     });
   },
@@ -273,6 +286,8 @@ const routes = {
   // The full worked solution and free body diagram for a question: { unit, questionId, fresh? }.
   'GET /api/attempts/explain': (q) => data.paperq.find((x) => x.id === q.get('questionId') && x.unit === q.get('unit'))?.explain || { none: true },
   'POST /api/attempts/explain': async (q, body) => explainQuestion(body || {}),
+  // Solve several: { unit, questionIds } → the next 2-4 solved in one AI call; { done, left }.
+  'POST /api/attempts/explain-batch': async (q, body) => explainBatch(body || {}),
   'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
   'POST /api/attempts/flag': (q, body) => flagCheckpoint(body || {}),
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
@@ -456,10 +471,10 @@ const CHECKS = {
 // One request: method + path → a handler (query, body, ctx). ctx = { user: { id, name, tier }, today }.
 // Errors carry .status; the dev server and the Vercel router turn them into { error }.
 // Routes that ground their work in the student's own notes: those notes are loaded into the request first.
-const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints|explain))/;
+const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints|explain|explain-batch))/;
 
 // Routes that use the AI: each request is one "AI action" against the member's daily limit.
-const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain)|predict\/map)$/;
+const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch)|predict\/map)$/;
 export const AI_LIMIT_MESSAGE = "Today's AI limit is used. Take this pack to any AI.";
 
 export async function dispatch(method, pathname, query, body, ctx) {

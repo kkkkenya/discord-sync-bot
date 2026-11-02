@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, useElapsed } from './api.js';
 import { photoData } from './media.js';
 import FreeBody from './FreeBody.jsx';
+import PickList from './PickList.jsx';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
 // One question at a time: answer it (final answer with units, or a photo of the working), check it, and when it's
@@ -21,6 +22,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const [sol, setSol] = useState(null); // the full worked solution, once asked for (or already made)
   const [solOpen, setSolOpen] = useState(false);
   const [solBusy, setSolBusy] = useState(false);
+  const [many, setMany] = useState(new Set()); // questions picked for "Solve several"
+  const [manyRun, setManyRun] = useState(null); // { done, total, busy }
   const waited = useElapsed(busy || solBusy);
 
   useEffect(() => { if (unit) api('GET', `predict?unit=${encodeURIComponent(unit)}`).then((p) => setQuestions(p.questions)).catch(() => setQuestions([])); }, [unit]);
@@ -43,6 +46,24 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       setSol(out);
     } catch (e) { setProblem(e.message); setSolOpen(false); }
     setSolBusy(false);
+  };
+  // Solve several: the server solves 2-4 per call (by size); keep calling until none are left
+  const solveMany = async () => {
+    let left = questions.filter((x) => many.has(x.id) && !x.explain).map((x) => x.id);
+    setManyRun({ done: 0, total: left.length, busy: true }); setProblem('');
+    try {
+      while (left.length) {
+        const r = await api('POST', 'attempts/explain-batch', { unit, questionIds: left });
+        if (r.needAi) throw new Error(r.message);
+        const done = new Set(r.done);
+        setQuestions((qs) => qs.map((x) => (done.has(x.id) ? { ...x, explain: true } : x)));
+        setManyRun((m) => ({ ...m, done: m.done + r.done.length }));
+        if (done.has(qid)) setSol(null);
+        left = r.left;
+      }
+      setMany(new Set());
+    } catch (e) { setProblem(e.message); }
+    setManyRun((m) => ({ ...m, busy: false }));
   };
   const q = questions.find((x) => x.id === qid);
   const tried = useMemo(() => new Set(s.data.attempts.map((a) => a.questionId)), [s.data.attempts]);
@@ -88,9 +109,23 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       <label className="field">Question
         <select value={qid} onChange={(e) => pick(e.target.value)}>
           <option value="">Pick a question</option>
-          {questions.map((x) => <option key={x.id} value={x.id}>{tried.has(x.id) ? '✓ ' : ''}{x.source} · Q{x.number}{x.marks ? ` · ${x.marks} marks` : ''}</option>)}
+          {questions.map((x) => <option key={x.id} value={x.id}>{tried.has(x.id) ? '✓ ' : ''}{x.source} · Q{x.number}{x.marks ? ` · ${x.marks} marks` : ''}{x.explain ? ' · solution saved' : ''}</option>)}
         </select>
       </label>
+
+      <details className="disclosure">
+        <summary>Solve several at once</summary>
+        <p className="muted small">Pick questions and Crux writes a full worked solution for each, 2 to 4 per AI action. They're saved: open any of them later for free.</p>
+        <PickList label="Questions to solve" picked={many} set={setMany}
+          items={questions.map((x) => ({ id: x.id, label: `${x.source} · Q${x.number}`, meta: x.marks ? `${x.marks} marks` : null, disabled: Boolean(x.explain), sub: x.explain ? 'Solution saved' : x.text.length > 100 ? `${x.text.slice(0, 100)}…` : x.text }))} />
+        <div className="actions start">
+          <button type="button" className="btn primary" disabled={!many.size || manyRun?.busy} onClick={solveMany}>
+            {manyRun?.busy ? `Solving… ${manyRun.done} of ${manyRun.total} done` : many.size ? `Solve ${many.size} question${many.size === 1 ? '' : 's'}` : 'Pick questions to solve'}
+          </button>
+        </div>
+        {manyRun?.busy && <p className="row-sub" role="status">Each group of 2 to 4 takes a minute or two. You can keep using Crux; stay on this page until it's done.</p>}
+        {manyRun && !manyRun.busy && manyRun.done > 0 && <p className="notice good" role="status">{manyRun.done} solution{manyRun.done === 1 ? '' : 's'} saved. Pick one from the Question list to read it.</p>}
+      </details>
 
       {q && (
         <QuestionBox text={q.text} meta={[q.source, q.year, q.type]} marks={q.marks} />

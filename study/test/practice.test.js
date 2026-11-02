@@ -212,3 +212,21 @@ test('the full worked solution is made once, kept, and remade only when asked', 
   assert.equal(made, 2);
   await assert.rejects(explainQuestion({ unit: 'EMM 302', questionId: 'nope' }, { explain }), /Pick a question/);
 });
+
+// Solve several: 2-4 a call by size, each kept on its question, and only the unsolved ones are sent
+const { explainBatch, nextBatch } = await import('../server/practice.js');
+test('several questions are solved 2-4 a call, sized by marks, and kept', async () => {
+  assert.equal(nextBatch([{ marks: 5 }, { marks: 5 }, { marks: 5 }, { marks: 5 }, { marks: 5 }]).batch.length, 4);
+  assert.equal(nextBatch([{ marks: 25 }, { marks: 25 }, { marks: 25 }]).batch.length, 2);
+  assert.equal(nextBatch([{ marks: 25 }]).batch.length, 1);
+  for (const n of [2, 3, 4]) data.paperq.push({ ...row(), id: `b${n}`, number: n, marks: 5, text: `Batch question ${n}: find the stress in a 20 mm bar under 10 kN.` });
+  const sent = [];
+  const explain = async ({ items }) => { sent.push(items.map((x) => x.id)); return { solutions: items.map((x) => ({ id: x.id, breakdown: `## Solution\n${x.id}`, fbd: '', diagram: { kind: 'none', length: 0, supports: [], loads: [], reactions: [] }, answer: '31.8 MPa' })) }; };
+  const ids = ['q1', 'b2', 'b3', 'b4'];
+  data.paperq.find((x) => x.id === 'q1').explain = { breakdown: 'kept', fbd: '', diagram: null, answer: '100 MPa' };
+  const r = await explainBatch({ unit: 'EMM 302', questionIds: ids }, { explain, ready: () => true });
+  assert.deepEqual([r.done, r.left, sent], [['b2', 'b3', 'b4'], [], [['b2', 'b3', 'b4']]]);
+  assert.equal(data.paperq.find((x) => x.id === 'b3').explain.answer, '31.8 MPa');
+  assert.deepEqual(await explainBatch({ unit: 'EMM 302', questionIds: ids }, { explain, ready: () => true }), { done: [], left: [] });
+  assert.equal(sent.length, 1);
+});

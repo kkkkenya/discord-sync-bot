@@ -5,6 +5,7 @@ import { authRoute, memberOf, readSession, RECHECK_MS, rememberUser, sessionCook
 import { runBackup, supabaseStorage } from '../server/backup.js';
 import { docStore, withSavedDoc } from '../server/doc-store.js';
 import { fileBytes } from '../server/file-bytes.js';
+import { withReward } from '../server/rewards.js';
 import { nairobiDay } from '../server/plan.js';
 import { dispatch } from '../server/routes.js';
 import { VERSION } from '../server/store.js';
@@ -38,7 +39,7 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       const session = readSession(request);
       if (!session) throw fail('Sign in first.', 401);
       const { user: u, cookie } = await recheck(session, deps);
-      const user = { id: u.id, name: u.name, tier: u.tier };
+      const user = await withReward({ id: u.id, name: u.name, tier: u.tier }, nairobiDay()); // Premium earned by adding files to the hub
       const reply = (body, status) => { const r = json(body, status); if (cookie) r.headers.append('Set-Cookie', cookie); return r; };
       if (user.tier === 'none') return reply({ error: 'no-access' }, 403);
       if (path === '/api/me') return reply(user);

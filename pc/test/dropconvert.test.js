@@ -31,3 +31,20 @@ test('a batch from Crux goes in one folder named with its unit, first file and s
   assert.equal(batchFolder(row, 'CAT 1 2023 page 1.jpg'), 'EMM 302 CAT 1 2023 page 1 (from Amina W.)');
   assert.equal(batchFolder({ ...row, user_name: 'a/b:c' }, 'x.pdf'), 'EMM 302 x (from a b c)');
 });
+
+test('credits: a photo batch is one credit, a duplicate none, and the tenth sends the congratulations', async () => {
+  const { markPosted } = await import('../src/uploader/fromcrux.js');
+  const { state } = await import('../src/state.js');
+  const dir = join(DROP, 'From Crux', 'EMM 302 page 1 (from Amina)');
+  state.fromCrux = { [dir]: { user_id: 'u1', user_name: 'Amina', files: { 'page 1.jpg': 11, 'page 2.jpg': 12, 'notes.pptx': 13 } } };
+  const updates = [];
+  const told = [];
+  let posted = 9;
+  const deps = { update: async (t, q, row) => { updates.push([q, row.status]); if (row.status === 'posted') posted++; }, select: async () => Array(posted).fill({}), tell: async (id, text) => told.push(id) };
+  await markPosted(join(dir, 'EMM 302 page 1 (from Amina).pdf'), 'posted', () => {}, deps);
+  assert.deepEqual(updates, [['id=eq.11', 'posted'], ['id=in.(12)', 'merged']]);
+  assert.deepEqual(told, ['u1']);
+  await markPosted(join(dir, 'notes.pdf'), 'duplicate', () => {}, deps);
+  assert.deepEqual(updates.at(-1), ['id=in.(13)', 'duplicate']);
+  assert.equal(state.fromCrux[dir], undefined);
+});

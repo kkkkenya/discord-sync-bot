@@ -7,7 +7,11 @@ import { Icon } from './icons.jsx';
 // posts them to the unit, credited to you. Photos sent together become one PDF.
 const OK = /\.(pdf|jpe?g|png|pptx?|docx?)$/i;
 const MAX = 50 * 1024 * 1024;
-const STATUS = { new: 'Waiting for the hub PC', received: 'On the hub: posted to the unit within a few minutes', failed: "Couldn't be posted" };
+const STATUS = {
+  new: 'Waiting for the hub PC', received: 'On the hub PC: being posted', posted: 'Posted to the unit · 1 credit',
+  merged: 'Joined with your other photos into one PDF', duplicate: 'The hub already had this one · no credit', failed: "Couldn't be posted",
+};
+const day = (iso) => new Date(`${iso}T12:00:00+03:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Africa/Nairobi' });
 const size = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
 async function sendOne(file, unit, batch, onProgress) {
@@ -29,9 +33,10 @@ async function sendOne(file, unit, batch, onProgress) {
 export default function AddToHub({ unit, notify }) {
   const [sending, setSending] = useState([]); // [{ name, size, done (0-1), error }]
   const [mine, setMine] = useState([]);
+  const [credits, setCredits] = useState(null); // { count, goal, until, premium, earned }
   const [over, setOver] = useState(false);
   const input = useRef(null);
-  const load = () => api('GET', `uploads?unit=${encodeURIComponent(unit)}`).then((r) => setMine(r.files || [])).catch(() => {});
+  const load = () => api('GET', `uploads?unit=${encodeURIComponent(unit)}`).then((r) => { setMine(r.files || []); setCredits(r.credits || null); }).catch(() => {});
   useEffect(() => { load(); }, [unit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (list) => {
@@ -56,6 +61,16 @@ export default function AddToHub({ unit, notify }) {
   return (
     <div className="card stack-s">
       <div className="card-head"><span className="row-main"><h2>Add files for the hub</h2><span className="row-sub">Past papers, notes, slides or photos of a paper the hub doesn't have yet</span></span></div>
+      {credits && (
+        <div className="credits">
+          <span className="credits-n num"><b>{credits.count}</b> / {credits.goal}</span>
+          <span className="row-main">
+            <span>{credits.earned ? <b>You've earned Premium until {day(credits.until)}. Thank you!</b> : credits.premium ? 'Your files help the whole class.' : <>Add <b className="num">{Math.max(0, credits.goal - credits.count)}</b> more file{credits.goal - credits.count === 1 ? '' : 's'} the hub doesn't have and get <b>Premium until {day(credits.until)}</b>.</>}</span>
+            <span className="row-sub">Each file the hub posts is one credit this semester. Files it already has don't count.</span>
+          </span>
+          <span className="meter" aria-hidden="true"><span style={{ width: `${Math.min(100, (100 * credits.count) / credits.goal)}%` }} /></span>
+        </div>
+      )}
       <label className={`dropzone${over ? ' is-over' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); send(e.dataTransfer.files); }}>

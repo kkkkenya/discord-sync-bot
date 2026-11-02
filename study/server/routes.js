@@ -28,6 +28,7 @@ import { classHints, classList, confirmHint, listOf, offerList, shareHint } from
 import { newMaterial } from './inbox.js';
 import { makeGuideFor } from './guide.js';
 import { finishUpload, myUploads, startUpload } from './hub-uploads.js';
+import { rewardInfo } from './rewards.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
@@ -284,7 +285,7 @@ const routes = {
   // Files a student adds for the hub: a link to upload straight to storage, then "done" queues it for the hub PC.
   'POST /api/uploads/start': async (q, body, ctx) => startUpload(body || {}, ctx.user),
   'POST /api/uploads/done': async (q, body, ctx) => finishUpload(body || {}, ctx.user),
-  'GET /api/uploads': async (q, body, ctx) => ({ files: await myUploads(q.get('unit'), ctx.user) }),
+  'GET /api/uploads': async (q, body, ctx) => ({ files: await myUploads(q.get('unit'), ctx.user), credits: await rewardInfo(ctx.user, ctx.today || nairobiDay()) }),
   // A topic's study guide: { unit, topicId, fresh? } → what to learn and where in your books. Shared with the class.
   'POST /api/learn/guide': async (q, body) => makeGuideFor(body || {}),
   // Study kit (Phase 10): { unit, kind?, topicId? } → the saved material, or { needKey, goal } with no AI key.

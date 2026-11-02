@@ -15,7 +15,7 @@ const safe = (name) => String(name).replace(/[\\/:*?"<>|#%{}^~[\]`]+/g, ' ').rep
 async function storage(method, path, body) {
   const r = await fetch(`${process.env.SUPABASE_URL}/storage/v1${path}`, {
     method,
-    headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, apikey: process.env.SUPABASE_SERVICE_KEY, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY}`, apikey: process.env.SUPABASE_SERVICE_KEY, ...(body && { 'Content-Type': 'application/json' }) },
     body: body && JSON.stringify(body),
   });
   const out = await r.json().catch(() => ({}));

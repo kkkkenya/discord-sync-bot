@@ -20,7 +20,7 @@ import { forwardTo } from '../../../lib/sorting.js';
 import { save, state } from '../state.js';
 import { classify } from './classify.js';
 import { convertDrop, converts } from './dropconvert.js';
-import { collectFromCrux } from './fromcrux.js';
+import { collectFromCrux, markPosted } from './fromcrux.js';
 import { fingerprint, onServer } from './existing.js';
 import { dumperFolders, donePath, loadIndex, monthOf, resolveSources, saveIndex, scan, skip, under, update } from './scanner.js';
 import { mb, PIECES_HELP, shrink } from './shrink.js';
@@ -157,19 +157,21 @@ export async function startUploader(ctx) {
     // no duplicates, cheapest check first:
     // 1. already on the server (old uploads, files posted by hand, or uploaded by this bot before)
     if (ctx.dry ? ctx.existing?.has(fp) : await onServer(s.size, basename(path))) {
+      mark.outcome = 'duplicate';
       if (ctx.dry) dryRows.push({ dest: 'skip: already on the server', rel: relOf(path, root), kind: '', size: s.size });
       return;
     }
     // 2. the same file twice in your folders (same content, any name)
     const key = ctx.dry ? fp : await sha256(path);
     if (seen.has(key)) {
+      mark.outcome = 'duplicate';
       report.dupes++;
       if (ctx.dry) dryRows.push({ dest: 'skip: duplicate of another file in your folders', rel: relOf(path, root), kind: '', size: s.size });
       return;
     }
     seen.add(key);
     mark.key = key;
-    if (!ctx.dry && (await db.select('files', `hash=eq.${key}&select=id`)).length) return;
+    if (!ctx.dry && (await db.select('files', `hash=eq.${key}&select=id`)).length) { mark.outcome = 'duplicate'; return; }
 
     const info = await classify(path, root, s.size, ctx.index);
     info.name = await withExtension(path, info.name);
@@ -200,6 +202,7 @@ export async function startUploader(ctx) {
         const msgs = await post(posts[0].thread, label, path, s.size, info);
         await record(msgs[0], { dest_name: posts[0].name, forum: posts[0].forum }); // straight away, so a crash can't mean a second copy
         for (const other of posts.slice(1)) for (const m of msgs) await forwardTo(other.id, m.id, m.channelId).catch(() => {});
+        mark.outcome = 'posted';
         console.log(`↑ ${info.rel} -> ${posts[0].forum} › ${posts[0].name}`);
         report.unit++;
         return;
@@ -208,6 +211,7 @@ export async function startUploader(ctx) {
         const shelf = await ctx.client.channels.fetch(info.shelf.id);
         const msgs = await post(shelf, `${label}${info.title ? `\n_${info.title.slice(0, 150)}_` : ''}`, path, s.size, info);
         await record(msgs[0], { dest_name: info.shelf.name });
+        mark.outcome = 'posted';
         console.log(`↑ ${info.rel} -> shelf ${info.shelf.name}`);
         report.shelf++;
         return;
@@ -217,6 +221,7 @@ export async function startUploader(ctx) {
       const toSort = await ctx.client.channels.fetch(CHANNELS.toSort);
       const msgs = await post(toSort, '', path, s.size, info);
       await record(msgs[0], { dest_name: 'to-sort' }); // recorded first: a failed note never means a second copy
+      mark.outcome = 'posted';
       console.log(`↑ ${info.rel} -> #to-sort`);
       const reason = info.code ? `${info.code} has no forum to put a new post in`
         : info.kind === 'book' ? 'a book that matches no shelf' : 'no unit code in the name, folders or page 1';
@@ -334,6 +339,7 @@ export async function startUploader(ctx) {
         const mark = await handle(path);
         finished.add(path);
         if (index[path]) { index[path].handled = true; saveSoon(); }
+        if (!ctx.dry) await markPosted(path, mark.outcome, ctx.log).catch((e) => console.error('credit:', e.message));
         settleDrop(path, mark.problem);
       })
       .catch((e) => {

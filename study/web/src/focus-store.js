@@ -8,7 +8,9 @@ export const MODES = { focus: 'Focus', short: 'Short break', long: 'Long break' 
 export const PLANS = { classic: { focus: 25, short: 5, long: 15 }, long: { focus: 50, short: 10, long: 20 } };
 const KEY = 'crux-focus';
 const fresh = { active: false, mode: 'focus', running: false, endsAt: 0, left: 25 * 60e3, round: 1, plan: 'classic', others: null, room: null, roomCount: null };
-let state = (() => { try { return { ...fresh, ...JSON.parse(localStorage.getItem(KEY)), others: null }; } catch { return fresh; } })();
+// rooms used to be per unit: anyone still in one is now in the hub's study room
+const oneRoom = (st) => (st.room && st.room !== 'hub' ? { ...st, room: 'hub' } : st);
+let state = (() => { try { return oneRoom({ ...fresh, ...JSON.parse(localStorage.getItem(KEY)), others: null }); } catch { return fresh; } })();
 const subs = new Set();
 function set(patch) {
   state = { ...state, ...patch };
@@ -17,9 +19,9 @@ function set(patch) {
 }
 // after an action, the timer (without the count) goes to your account so your other devices show it
 const share = () => { const { others, ...rest } = state; push('focus', rest); };
-export const adoptFocus = (v) => { if (v) set({ ...fresh, ...v, others: state.others }); };
+export const adoptFocus = (v) => { if (v) set(oneRoom({ ...fresh, ...v, others: state.others })); };
 export const useFocus = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => state);
-// Study rooms: everyone in a unit's room follows the same clock, so nobody has to coordinate. Focus from :00 to :25
+// The study room: one for the whole hub (HUB_ROOM), everyone in it on the same clock, so nobody has to coordinate. Focus from :00 to :25
 // and :30 to :55, breaks in between. (Nairobi is a whole number of hours from UTC, so UTC minutes are local minutes.)
 const BLOCK = 30 * 60e3, ROOM_FOCUS = 25 * 60e3;
 export function roomPhase(now = Date.now()) {
@@ -84,8 +86,9 @@ export function end() {
   set({ ...fresh, plan: state.plan, left: minutes('focus') });
   share();
 }
-// join a unit's room: your own timer stops and you follow the room's clock
-export function joinRoom(unit) {
+export const HUB_ROOM = 'hub';
+// join the study room: your own timer stops and you follow the room's clock
+export function joinRoom(unit = HUB_ROOM) {
   prime();
   if (state.running && state.mode === 'focus') tell(null);
   set({ room: unit, active: true, running: false, roomCount: null });

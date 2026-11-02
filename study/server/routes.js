@@ -120,7 +120,7 @@ const routes = {
   },
   'GET /api/inbox': (q) => newMaterial(data.units.map((u) => u.code), q.get('since')),
   'GET /api/focus': (q, body, ctx) => focusCounts(ctx?.user?.id || 'local', q.get('unit') || null).catch(() => ({ others: null, room: null })),
-  'POST /api/focus': (q, { until = null, unit = null } = {}, ctx) => setFocus(ctx?.user?.id || 'local', until, Date.now(), data.units.some((u) => u.code === unit) ? unit : null).catch((e) => { if (e.status) throw e; return { others: null, room: null }; }),
+  'POST /api/focus': (q, { until = null, unit = null } = {}, ctx) => setFocus(ctx?.user?.id || 'local', until, Date.now(), unit === 'hub' ? 'hub' : null) /* the study room is one for the whole hub */.catch((e) => { if (e.status) throw e; return { others: null, room: null }; }),
   'GET /api/usage': async (q, body, ctx) => ({ ai: await usedToday(ctx?.user, 'ai'), download: await usedToday(ctx?.user, 'download') }),
   'POST /api/notes/import': (q, { notes } = {}, ctx) => importNotes(ctx.user.id, notes, data.units.map((u) => u.code)),
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.

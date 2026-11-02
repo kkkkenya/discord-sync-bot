@@ -710,6 +710,8 @@ body:has(.notesbar):has(.focusbar) .main { padding-bottom: calc(var(--tabs) + 14
 body.pdf-open { overflow: hidden; }
 body.pdf-open .notesbar { z-index: 65; }
 body.pdf-open .pinbtn { z-index: 80; }
+/* pdf.js measures text on a canvas it adds to the page (black, alpha off): its own stylesheet hides it, so here too */
+.hiddenCanvasElement { position: absolute; top: 0; left: 0; width: 0; height: 0; display: none; }
 /* the text over each page, invisible, for selecting (pdf.js text layer) */
 .textLayer { position: absolute; inset: 0; overflow: clip; opacity: 1; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 1; }
 .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }

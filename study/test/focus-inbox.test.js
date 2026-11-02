@@ -34,13 +34,13 @@ test('without the hub (local runs) or a valid date, there is no new material and
   assert.deepEqual(await newMaterial(['EMM 302'], 'never'), { files: [], announcements: [] });
 });
 
-test('study rooms count people focusing in the same unit, separately from everyone', async () => {
+test('the study room (one for the whole hub) counts the people in it, separately from everyone focusing', async () => {
   resetFocusForTests();
   const now = Date.parse('2026-11-02T08:00:00Z');
   const { focusCounts } = await import('../server/focus.js');
-  await setFocus('a', '2026-11-02T08:25:00Z', now, 'EMM 302');
-  await setFocus('b', '2026-11-02T08:25:00Z', now, 'EMM 305');
+  await setFocus('a', '2026-11-02T08:25:00Z', now, 'hub');
+  await setFocus('b', '2026-11-02T08:25:00Z', now, 'hub');
   await setFocus('c', '2026-11-02T08:25:00Z', now);
-  assert.deepEqual(await setFocus('me', '2026-11-02T08:25:00Z', now, 'EMM 302'), { others: 3, room: 1 });
+  assert.deepEqual(await setFocus('me', '2026-11-02T08:25:00Z', now, 'hub'), { others: 3, room: 2 });
   assert.deepEqual(await focusCounts('me', null, now), { others: 3, room: null });
 });

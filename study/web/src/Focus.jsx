@@ -1,4 +1,4 @@
-import { MODES, clock, end, joinRoom, leaveRoom, pause, reset, setPlan, start, switchMode, useOthers, useTick, view } from './focus-store.js';
+import { HUB_ROOM, MODES, clock, end, joinRoom, leaveRoom, pause, reset, setPlan, start, switchMode, useOthers, useTick, view } from './focus-store.js';
 import { Icon } from './icons.jsx';
 import { href } from './route.js';
 
@@ -19,7 +19,7 @@ export function Together({ count, label, none = 'Just you right now.' }) {
   );
 }
 
-// The Focus page: your own timer, or your unit's study room (everyone on the same clock). Shows how many are focusing.
+// The Focus page: your own timer, or the study room (everyone on the hub on the same clock). Shows how many are focusing.
 export default function Focus({ s, unit }) {
   const st = useTick();
   useOthers(true); // the count shows before you start, too
@@ -32,11 +32,11 @@ export default function Focus({ s, unit }) {
     <div className="focus">
       <header className="page-head">
         <h1>Focus</h1>
-        <p><span className="num">{room || unit}</span>{room ? ' study room' : title ? ` · ${title}` : ''}</p>
+        <p>{room ? 'The study room: everyone on the hub, one clock' : <><span className="num">{unit}</span>{title ? ` · ${title}` : ''}</>}</p>
       </header>
       <nav className="segmented" aria-label="How to focus">
         <button type="button" aria-pressed={!room} onClick={() => room && leaveRoom()}>On my own</button>
-        <button type="button" aria-pressed={Boolean(room)} onClick={() => room !== unit && joinRoom(unit)}><span className="num">{unit}</span>&nbsp;room</button>
+        <button type="button" aria-pressed={Boolean(room)} onClick={() => !room && joinRoom(HUB_ROOM)}>Study room</button>
       </nav>
       {!room && (
         <nav className="segmented" aria-label="Timer">
@@ -56,7 +56,7 @@ export default function Focus({ s, unit }) {
         </div>
         {room ? (
           <>
-            <Together count={st.roomCount} label={(n) => `in the ${room} room with you`} none={v.mode === 'focus' ? `Nobody else in the ${room} room yet.` : 'Break time for the room.'} />
+            <Together count={st.roomCount} label={(n) => `in the study room with you`} none={v.mode === 'focus' ? 'Nobody else in the study room yet.' : 'Break time for the room.'} />
             <div className="actions focus-actions"><button className="btn" type="button" onClick={leaveRoom}>Leave the room</button></div>
             <p className="muted small together">Rooms focus from :00 to :25 and :30 to :55, with breaks in between, so you can join at any time.</p>
           </>
@@ -97,7 +97,7 @@ export function FocusBar() {
     <div className="focusbar glass" role="region" aria-label="Focus timer">
       <a className="focusbar-main" href={href('focus')}>
         <span className={`fdot ${v.mode}`} aria-hidden="true" />
-        <span className="row-main"><b className="num">{clock(v.left)}</b><span className="row-sub">{st.room ? `${st.room} room · ${MODES[v.mode]}` : v.running ? MODES[v.mode] : `${MODES[v.mode]}, paused`}</span></span>
+        <span className="row-main"><b className="num">{clock(v.left)}</b><span className="row-sub">{st.room ? `Study room · ${MODES[v.mode]}` : v.running ? MODES[v.mode] : `${MODES[v.mode]}, paused`}</span></span>
         {count > 0 && <span className="row-sub fcount"><Icon name="user" /><span className="num">{count}</span></span>}
       </a>
       {st.room

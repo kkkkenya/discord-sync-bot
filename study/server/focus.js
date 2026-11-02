@@ -1,5 +1,5 @@
 // Focus sessions (the Focus page): who is studying until when, so the page can say how many others are focusing
-// right now, in total and in your unit's study room. Only counts ever leave the server, never who. A session is one
+// right now, in total and in the hub's study room ('hub'). Only counts ever leave the server, never who. A session is one
 // row with its end time (and the unit room, if any), so nobody has to keep pinging: the row simply stops counting
 // when the time passes.
 import { db, enc } from '../../lib/db.js';

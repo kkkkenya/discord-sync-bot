@@ -71,8 +71,11 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
           <label className="field">Wallpaper
             <select value={look.wp} onChange={(e) => setLookState(setLook({ wp: e.target.value }))}>
               <option value="auto">Lagoon when light, Ember when dark</option>
-              <option value="lagoon">Lagoon</option>
-              <option value="ember">Ember</option>
+              <option value="lagoon">Lagoon: light on water</option>
+              <option value="ember">Ember: paper and rising flecks</option>
+              <option value="dusk">Dusk: stars and a slow haze</option>
+              <option value="harbor">Harbor: a harbour chart</option>
+              <option value="fern">Fern: fronds from two corners</option>
             </select>
           </label>
           <label className="check">

@@ -103,6 +103,25 @@ export default function App({ user }) {
       localStorage.setItem('crux-version', __CRUX_VERSION__);
     } catch { /* private window */ }
   }, [notify]);
+  // a phone keeps Crux open for days: when it comes back to the front (at most every 5 minutes), look for a newer
+  // build and offer to load it
+  const [newer, setNewer] = useState(false);
+  useEffect(() => {
+    if (!import.meta.env.PROD) return undefined;
+    const mine = document.querySelector('script[type="module"][src*="/assets/index-"]')?.getAttribute('src') || '';
+    let last = 0;
+    const check = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - last < 5 * 60e3) return;
+      last = Date.now();
+      fetch('/', { cache: 'no-store' }).then((r) => r.text()).then((html) => {
+        const live = html.match(/\/assets\/index-[\w-]+\.js/)?.[0];
+        if (mine && live && !mine.endsWith(live)) setNewer(true);
+      }).catch(() => {});
+    };
+    check();
+    document.addEventListener('visibilitychange', check);
+    return () => document.removeEventListener('visibilitychange', check);
+  }, []);
   const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(withLists(x)); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { if (s) pull(s.settings?.sync); }, [s]);
@@ -198,6 +217,7 @@ export default function App({ user }) {
         <header className="bare-head"><span className="wordmark">Crux</span><a className="navbtn" href={href('settings')} aria-label="Settings"><Icon name="settings" /></a></header>
       ) : <Nav s={s} unit={unit} setUnit={setUnit} page={page} tab={route.rest[1]} />}
       <main className={bare ? 'main bare' : 'main'} id="main" tabIndex={-1}>
+          {newer && <p className="notice good" role="status">A new version of Crux is ready. <button type="button" className="btn plain" onClick={() => window.location.reload()}>Load it</button></p>}
           {!online && <p className="notice" role="status">Offline. You're seeing your last saved data. Changes that don't need AI are kept on this device and sent when you're back.</p>}
           {queued > 0 && <p className="notice" role="status"><span className="num">{queued}</span> change{queued === 1 ? '' : 's'} waiting to sync.</p>}
           {problem && (

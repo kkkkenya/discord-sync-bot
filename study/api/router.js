@@ -4,6 +4,7 @@ import { db } from '../../lib/db.js';
 import { authRoute, memberOf, readSession, RECHECK_MS, rememberUser, sessionCookie, tierFor } from '../server/auth.js';
 import { runBackup, supabaseStorage } from '../server/backup.js';
 import { docStore, withSavedDoc } from '../server/doc-store.js';
+import { fileBytes } from '../server/file-bytes.js';
 import { nairobiDay } from '../server/plan.js';
 import { dispatch } from '../server/routes.js';
 import { VERSION } from '../server/store.js';
@@ -41,6 +42,8 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       const reply = (body, status) => { const r = json(body, status); if (cookie) r.headers.append('Set-Cookie', cookie); return r; };
       if (user.tier === 'none') return reply({ error: 'no-access' }, 403);
       if (path === '/api/me') return reply(user);
+      // the PDF viewer's byte ranges: no document to load, and the bytes go back as they are
+      if (path === '/api/files/bytes') { const r = await fileBytes(new URLSearchParams(url.searchParams)); if (cookie) r.headers.append('Set-Cookie', cookie); return r; }
       let body = null;
       if (['POST', 'PUT', 'PATCH'].includes(request.method)) {
         const text = await request.text();

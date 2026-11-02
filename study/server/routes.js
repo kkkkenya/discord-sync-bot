@@ -54,6 +54,9 @@ const routes = {
   'GET /api/me': (q, body, ctx) => ctx.user,
   // Everything Crux keeps about you, as one JSON file (Settings → Export my data).
   'GET /api/export': async (q, body, ctx) => ({ exportedAt: new Date().toISOString(), user: ctx?.user, doc: JSON.parse(JSON.stringify(data)), notes: await listNotes(ctx?.user?.id) }),
+  // "Bring data back": a file from Export my data, merged in. Nothing you have now is replaced: units, topics,
+  // attempts, notes, highlights and the rest come back only where they're missing. { added: { list: n }, notes }.
+  'POST /api/import': async (q, body, ctx) => importData(body || {}, ctx?.user?.id),
   // Imported notes (Obsidian, Notion): parsed in the browser, saved per unit and title.
   'GET /api/notes': (q, body, ctx) => listNotes(ctx.user.id, q.get('unit')),
   // Today's AI actions against the member's limit, for Settings.
@@ -471,6 +474,18 @@ function checkHint(b) {
 // Validation for generic list writes (undo re-POSTs a deleted row with its id, so create goes through here too).
 const CHECKS = {
   hints: (b) => checkHint(b),
+  // highlights in the PDF viewer: { file (hub file id), page, rects [[x, y, w, h] as fractions of the page], text }
+  marks: (b, opts) => {
+    const out = {};
+    if (opts?.create) {
+      out.file = String(b.file || '').slice(0, 40);
+      out.page = Math.max(1, Math.round(Number(b.page) || 1));
+      out.rects = (Array.isArray(b.rects) ? b.rects : []).slice(0, 60).map((r) => (Array.isArray(r) ? r.slice(0, 4).map((v) => Math.min(1, Math.max(0, Number(v) || 0))) : null)).filter((r) => r?.length === 4);
+      if (!out.file || !out.rects.length) throw Object.assign(new Error('Select some text on the page first.'), { status: 400 });
+    }
+    if ('text' in b || opts?.create) out.text = String(b.text || '').trim().slice(0, 1000);
+    return out;
+  },
   // the notes bar: { text (up to 2000 characters), unit (a unit code, or null for all units), from, order }
   stickies: (b, opts) => {
     const out = {};
@@ -491,6 +506,23 @@ const CHECKS = {
     return out;
   },
 };
+
+// "Bring data back" (POST /api/import): an exported file merged into your document, adding only what's missing.
+async function importData(file, userId) {
+  const doc = file.doc;
+  if (!doc || typeof doc !== 'object' || !Array.isArray(doc.units)) throw Object.assign(new Error("That isn't a Crux export (the file from Export my data)."), { status: 400 });
+  const added = {};
+  const units = new Set(data.units.map((u) => u.code));
+  for (const u of doc.units) if (u?.code && !units.has(u.code)) { data.units.push(u); units.add(u.code); added.units = (added.units || 0) + 1; }
+  for (const list of [...LISTS, 'attempts']) {
+    if (!Array.isArray(doc[list]) || !Array.isArray(data[list])) continue;
+    const have = new Set(data[list].map((x) => x?.id));
+    for (const x of doc[list]) if (x?.id && !have.has(x.id)) { data[list].push(x); have.add(x.id); added[list] = (added[list] || 0) + 1; }
+  }
+  const notes = Array.isArray(file.notes) && file.notes.length && userId ? await importNotes(userId, file.notes, data.units.map((u) => u.code)) : null;
+  save();
+  return { added, notes };
+}
 
 // One request: method + path → a handler (query, body, ctx). ctx = { user: { id, name, tier }, today }.
 // Errors carry .status; the dev server and the Vercel router turn them into { error }.

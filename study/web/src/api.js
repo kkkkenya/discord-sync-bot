@@ -16,7 +16,7 @@ const send = async (method, path, body) => {
 
 // Offline changes: edits that need no AI (dates, ratings, topics, settings, timer, marks) are kept on this device
 // and sent in order when Crux is back online. Anything that needs AI or reads files still needs a connection.
-const QUEUE = /^(units|stickies(\/[\w-]+)?|topics(\/[\w-]+)?|subtopics(\/audit|\/(?!suggest)[\w-]+)?|settings|sync|focus|hints|attempts\/(broke|flag)|mocks\/[\w-]+|materials\/[\w-]+)(\?.*)?$/;
+const QUEUE = /^(units|stickies(\/[\w-]+)?|marks(\/[\w-]+)?|topics(\/[\w-]+)?|subtopics(\/audit|\/(?!suggest)[\w-]+)?|settings|sync|focus|hints|attempts\/(broke|flag)|mocks\/[\w-]+|materials\/[\w-]+)(\?.*)?$/;
 const OUTBOX = 'crux-outbox';
 export const outbox = () => { try { return JSON.parse(localStorage.getItem(OUTBOX)) || []; } catch { return []; } };
 const keep = (list) => { try { localStorage.setItem(OUTBOX, JSON.stringify(list)); } catch { /* private window */ } window.dispatchEvent(new Event('crux-outbox')); };
@@ -83,25 +83,23 @@ export async function prepareUnit(unit, onProgress = () => {}) {
   }
 }
 
-// A hub file opened at a page (#page=N works in browser PDF viewers). Discord's file links last about a day, so one is
-// kept per file for 20 hours: opening the same book again, at another page, doesn't use another of today's downloads.
-// Opens the tab straight away (so the browser allows it) and fills it in when the link comes.
+// A hub file opened at a page, in Crux's own read-only viewer (PdfViewer.jsx, shown by App on 'crux-open-file').
+// Discord's file links last about a day, so one is kept per file for 20 hours: opening the same book again, at
+// another page, doesn't use another of today's downloads.
 const LINKS = 'crux-file-links';
 export async function openFile(fileId, page) {
-  const win = window.open('about:blank', '_blank');
   let links = {};
   try { links = JSON.parse(localStorage.getItem(LINKS) || '{}'); } catch { /* private window */ }
   try {
-    let url = links[fileId]?.until > Date.now() ? links[fileId].url : null;
-    if (!url) {
-      url = (await api('GET', `files/${fileId}/download`)).url;
-      links[fileId] = { url, until: Date.now() + 20 * 3600e3 };
+    let link = links[fileId]?.until > Date.now() ? links[fileId] : null;
+    if (!link) {
+      const r = await api('GET', `files/${fileId}/download`);
+      link = { url: r.url, name: r.name, until: Date.now() + 20 * 3600e3 };
+      links[fileId] = link;
       try { localStorage.setItem(LINKS, JSON.stringify(links)); } catch { /* not kept: the next open asks again */ }
     }
-    const to = page ? `${url}#page=${page}` : url;
-    if (win) win.location.href = to; else window.location.href = to;
+    window.dispatchEvent(new CustomEvent('crux-open-file', { detail: { fileId: String(fileId), url: link.url, name: link.name, until: link.until, page: page || 1 } }));
   } catch (e) {
-    win?.close();
     throw new Error(e.message === 'download-limit' ? "Today's downloads are used: more tomorrow, or open the file in Discord." : e.message);
   }
 }

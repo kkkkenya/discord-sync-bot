@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, useElapsed } from './api.js';
+import { api } from './api.js';
 import { photoData } from './media.js';
 import FreeBody from './FreeBody.jsx';
 import OpenAt from './OpenAt.jsx';
+import { AiWait } from './Busy.jsx';
 import PickList from './PickList.jsx';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
@@ -25,7 +26,6 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const [solBusy, setSolBusy] = useState(false);
   const [many, setMany] = useState(new Set()); // questions picked for "Solve several"
   const [manyRun, setManyRun] = useState(null); // { done, total, busy }
-  const waited = useElapsed(busy || solBusy);
 
   useEffect(() => { if (unit) api('GET', `predict?unit=${encodeURIComponent(unit)}`).then((p) => setQuestions(p.questions)).catch(() => setQuestions([])); }, [unit]);
   // where to start: the question a link asked for, else Today's top practise action
@@ -128,7 +128,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
             {manyRun?.busy ? `Solving… ${manyRun.done} of ${manyRun.total} done` : many.size ? `Solve ${many.size} question${many.size === 1 ? '' : 's'}` : 'Pick questions to solve'}
           </button>
         </div>
-        {manyRun?.busy && <p className="row-sub" role="status">Each group of 2 to 4 takes a minute or two. You can keep using Crux; stay on this page until it's done.</p>}
+        <AiWait on={Boolean(manyRun?.busy)} kind="batch" note="Each group of 2 to 4 takes a minute or two. Stay on this page until it's done." />
         {manyRun && !manyRun.busy && manyRun.done > 0 && <p className="notice good" role="status">{manyRun.done} solution{manyRun.done === 1 ? '' : 's'} saved. Pick one from the Question list to read it.</p>}
       </details>
 
@@ -146,14 +146,14 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
             <label className="field">Answer key<input value={key} onChange={(e) => setKey(e.target.value)} placeholder="From the marking scheme" /></label>
           </details>
           <div className="actions start">
-            <button className="btn primary" disabled={busy || !answer.trim()}>{busy ? `Checking… ${waited}s` : 'Check answer'}</button>
+            <button className="btn primary" disabled={busy || !answer.trim()}>{busy ? 'Checking…' : 'Check answer'}</button>
             <label className={`btn${busy || !s.media?.image ? ' is-disabled' : ''}`}>
               Photo of working
               <input type="file" accept="image/*" capture="environment" className="visually-hidden" disabled={busy || !s.media?.image} onChange={(e) => { photo(e.target.files[0]); e.target.value = ''; }} />
             </label>
             {!solOpen && <button type="button" className="btn" disabled={solBusy} onClick={() => explain()}>Show full solution</button>}
           </div>
-          {busy && <p className="row-sub" role="status">The AI may solve it first. This can take a minute.</p>}
+          <AiWait on={busy} kind="check" note="The first check of a question can take a minute: the AI solves it once, then it's saved." />
         </form>
       )}
 
@@ -163,7 +163,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
             <h2 className="card-title" id="sol-title">Worked solution</h2>
             <button type="button" className="btn plain" onClick={() => setSolOpen(false)}>Hide</button>
           </div>
-          {solBusy && <><div className="skeleton" style={{ height: 160 }} /><p className="row-sub" role="status">Working it out… {waited}s</p></>}
+          {solBusy && <><AiWait on kind="solution" /><div className="skeleton" style={{ height: 160 }} /></>}
           {sol && !solBusy && (
             <>
               {(sol.diagram || sol.fbd) && (

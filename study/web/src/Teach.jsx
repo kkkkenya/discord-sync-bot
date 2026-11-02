@@ -110,7 +110,7 @@ export default function Teach({ s, unit, refresh, focus, go }) {
           <textarea rows={8} placeholder="Imagine you have…" value={text} onChange={(e) => setText(e.target.value)} />
         </label>
         <div className="toolbar">
-          <button className="btn primary" disabled={busy || rec || !unit || !topic.trim() || text.trim().length < 40}><Busy on={busy} label="Marking…" idle={s.coach ? 'Get it marked' : 'Save'} /></button>
+          <button className="btn primary" disabled={busy || rec || !unit || !topic.trim() || text.trim().length < 40}><Busy on={busy} kind="teach" idle={s.coach ? 'Get it marked' : 'Save'} /></button>
           {rec
             ? <button type="button" className="btn" onClick={() => rec.stop()}><span className="recdot" />Stop and mark <span className="num">{Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}</span></button>
             : <button type="button" className="btn" onClick={record} disabled={busy || !s.media?.audio || !unit || !topic.trim()}>Say it out loud</button>}

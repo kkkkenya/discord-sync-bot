@@ -28,7 +28,7 @@ export const DATA_DIR = DIR; // uploads (photos of working, voice teach-backs) l
 //   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
 //   unitArchive: { code: { catDate, confidence, ... } } (units you un-ticked, restored if you tick them again) }
 const EMPTY = {
-  units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [], materials: [], stickies: [],
+  units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [], materials: [], stickies: [], marks: [],
   settings: { aiProvider: 'gemini', tour: {}, cohort: null, unitArchive: {} },
 };
 
@@ -103,7 +103,7 @@ export function save() {
   renameSync(tmp, FILE);
 }
 
-export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks', 'subtopics', 'hints', 'paperq', 'materials', 'stickies'];
+export const LISTS = ['topics', 'sessions', 'papers', 'teach', 'questions', 'mocks', 'subtopics', 'hints', 'paperq', 'materials', 'stickies', 'marks'];
 
 export function add(list, row) {
   const item = { id: randomUUID().slice(0, 8), at: new Date().toISOString(), ...row };

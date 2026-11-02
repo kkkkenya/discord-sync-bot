@@ -26,6 +26,8 @@ function selectionText(range) {
 // Where a clip came from: the box or card it sits in.
 function sourceOf(node, unit) {
   const el = node.nodeType === 1 ? node : node.parentElement;
+  const page = el?.closest('.pdf-page'); // a book in the viewer: its name and the page
+  if (page) return `${el.closest('.pdfview')?.getAttribute('aria-label') || 'File'} · p. ${page.dataset.page}`.slice(0, 120);
   const box = el?.closest('[aria-label], section, .card');
   const label = box?.getAttribute('aria-label') || box?.querySelector('h2, h3, .qbox-label')?.textContent || document.querySelector('h1')?.textContent || '';
   return [unit, label.trim()].filter(Boolean).join(' · ').slice(0, 120);
@@ -53,12 +55,13 @@ function PinButton({ onPin }) {
     return () => { clearTimeout(t); document.removeEventListener('selectionchange', check); };
   }, []);
   if (!at) return null;
+  const done = () => { window.getSelection()?.removeAllRanges(); setAt(null); };
+  const inPdf = (at.range.commonAncestorContainer.nodeType === 1 ? at.range.commonAncestorContainer : at.range.commonAncestorContainer.parentElement)?.closest('.pdf-page');
   return (
-    <button type="button" className="pinbtn glass" style={{ left: at.x, top: at.y }}
-      onMouseDown={(e) => e.preventDefault()}
-      onClick={() => { onPin(at.range); window.getSelection()?.removeAllRanges(); setAt(null); }}>
-      <Icon name="pin" /> Pin to notes
-    </button>
+    <span className="pinbtn glass" style={{ left: at.x, top: at.y }} onMouseDown={(e) => e.preventDefault()}>
+      <button type="button" onClick={() => { onPin(at.range); done(); }}><Icon name="pin" /> Pin to notes</button>
+      {inPdf && <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('crux-highlight', { detail: { range: at.range.cloneRange() } })); done(); }}><Icon name="edit" /> Highlight</button>}
+    </span>
   );
 }
 
@@ -135,6 +138,12 @@ export default function StickyBar({ s, unit, onProblem }) {
     change(n, { order: (before + (target.order ?? 0)) / 2 });
   };
 
+  // "Pin to notes" from a highlight in the PDF viewer
+  useEffect(() => {
+    const pin = (e) => create(e.detail.text, e.detail.from);
+    window.addEventListener('crux-pin', pin);
+    return () => window.removeEventListener('crux-pin', pin);
+  });
   const newest = shown[0];
   return (
     <>

@@ -23,19 +23,25 @@ if (live) {
 }
 
 const { dispatch } = await import('./routes.js');
+const { fileBytes } = await import('./file-bytes.js');
 const { docStore, withSavedDoc } = await import('./doc-store.js');
 const docs = live ? docStore((await import('../../lib/db.js')).db) : null;
 const { nairobiDay } = await import('./plan.js');
 
 const PORT = Number(process.env.PORT) || 5190;
 const DIST = new URL('../dist/', import.meta.url);
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
 const user = { id: process.env.OWNER_ID || 'local', name: 'You', tier: 'owner' };
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname.startsWith('/api/')) {
     try {
+      if (url.pathname === '/api/files/bytes') { // the PDF viewer's byte ranges, sent as they are
+        const r = await fileBytes(url.searchParams);
+        res.writeHead(r.status, Object.fromEntries(r.headers)).end(Buffer.from(await r.arrayBuffer()));
+        return;
+      }
       const raw = ['POST', 'PUT', 'PATCH'].includes(req.method) ? Buffer.concat(await req.toArray()) : null;
       if (raw && raw.length > 14 * 1024 * 1024) throw Object.assign(new Error('That upload is too big.'), { status: 413 });
       const body = raw ? JSON.parse(raw.toString() || '{}') : null;

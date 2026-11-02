@@ -30,8 +30,9 @@
   --good-text: color-mix(in srgb, var(--good) 65%, var(--text)); --warn-text: color-mix(in srgb, var(--warn) 65%, var(--text)); --bad-text: color-mix(in srgb, var(--bad) 65%, var(--text));
   color-scheme: light;
 }
+/* dark: the device's setting, unless Settings says Light; or always, when Settings says Dark (look.js) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --surface: rgba(28, 29, 34, 0.76); --surface-2: rgba(255, 255, 255, 0.07); --surface-solid: #1c1d22;
     --glass: rgba(28, 29, 34, 0.6); --glass-bd: rgba(255, 255, 255, 0.07); --glass-hi: rgba(255, 255, 255, 0.04); --pill: rgba(255, 255, 255, 0.12);
     --text: #eeeff1; --text-2: #a0a5af; --text-3: #7d828c;
@@ -42,6 +43,17 @@
     --grain: 0.16;
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --surface: rgba(28, 29, 34, 0.76); --surface-2: rgba(255, 255, 255, 0.07); --surface-solid: #1c1d22;
+  --glass: rgba(28, 29, 34, 0.6); --glass-bd: rgba(255, 255, 255, 0.07); --glass-hi: rgba(255, 255, 255, 0.04); --pill: rgba(255, 255, 255, 0.12);
+  --text: #eeeff1; --text-2: #a0a5af; --text-3: #7d828c;
+  --separator: rgba(255, 255, 255, 0.09);
+  --link: #7cc4d6;
+  --good: #58bf86; --warn: #e3a05a; --bad: #e3726d;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --grain: 0.16;
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -668,3 +680,61 @@ body:has(.notesbar):has(.focusbar) .main { padding-bottom: calc(var(--tabs) + 14
 .pd-list .check { align-items: flex-start; }
 .pd-list input { margin-top: 5px; }
 .pd-list .row-main { display: grid; gap: 2px; }
+/* the in-app PDF viewer (PdfViewer.jsx): tabs over the page, read-only; the notes bar stays beside it */
+.pdfview { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; background: color-mix(in srgb, var(--text) 82%, #000); }
+.pdf-bar { display: flex; align-items: center; gap: var(--s1); padding: 4px; margin: var(--s2) var(--s2) 0; border-radius: var(--radius-nav); min-width: 0; }
+.pdf-tabs { display: flex; gap: 4px; overflow-x: auto; min-width: 0; flex: 1; scrollbar-width: none; }
+.pdf-tab { display: inline-flex; align-items: center; flex: none; max-width: 260px; border-radius: var(--radius); background: var(--surface-2); }
+.pdf-tab > button:first-child { display: inline-flex; align-items: center; gap: var(--s2); min-height: 40px; padding: 0 var(--s1) 0 var(--s3); border: 0; background: none; color: var(--text); font: inherit; font-size: var(--t-xs); font-weight: 650; cursor: pointer; min-width: 0; }
+.pdf-tab > button[aria-selected="true"] { color: var(--text); }
+.pdf-tab:has(> button[aria-selected="true"]) { background: var(--pill); box-shadow: var(--shadow); }
+.pdf-tab .icon { width: 15px; height: 15px; flex: none; }
+.pdf-tab-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pdf-tab-x { display: grid; place-items: center; width: 32px; height: 40px; border: 0; background: none; color: var(--text-2); cursor: pointer; flex: none; }
+.pdf-tab-x .icon { width: 13px; height: 13px; }
+.pdf-bar > .iconbtn .icon { transform: none; }
+.pdf-tools { display: flex; align-items: center; justify-content: center; gap: 2px; padding: 4px var(--s2); color: #fff; }
+.pdf-tools .iconbtn { color: #fff; }
+.pdf-tools .iconbtn:first-child .icon { transform: rotate(180deg); }
+.pdf-tools .btn.plain { min-width: 36px; font-size: var(--t-m); color: #fff; }
+.pdf-at { min-width: 64px; text-align: center; font-size: var(--t-s); }
+.pdf-scroll { flex: 1; min-height: 0; overflow: auto; display: grid; justify-items: center; align-content: start; gap: var(--s3); padding: var(--s1) var(--s2) calc(var(--s7) + 64px); overscroll-behavior: contain; }
+.pdf-page { position: relative; background: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35); }
+.pdf-page canvas { display: block; width: 100%; height: 100%; }
+.pdf-mark { position: absolute; z-index: 2; padding: 0; border: 0; border-radius: 2px; background: rgba(255, 210, 0, 0.38); mix-blend-mode: multiply; cursor: pointer; }
+.pdf-markmenu { position: fixed; z-index: 75; transform: translateX(-50%); display: flex; gap: 2px; padding: 4px; border-radius: 999px; box-shadow: var(--shadow); }
+.pdf-markmenu .btn { display: inline-flex; align-items: center; gap: var(--s1); min-height: 36px; font-size: var(--t-xs); }
+.pdf-markmenu .icon { width: 15px; height: 15px; }
+.pdf-loading { display: grid; justify-items: center; gap: var(--s2); padding-top: var(--s5); color: #fff; }
+.pdf-dock { position: fixed; z-index: 21; left: var(--nav-gap); right: var(--nav-gap); top: calc(var(--nav-gap) * 2 + var(--bar) + env(safe-area-inset-top)); padding: 4px; border-radius: var(--radius-nav); }
+body.pdf-open { overflow: hidden; }
+body.pdf-open .notesbar { z-index: 65; }
+body.pdf-open .pinbtn { z-index: 80; }
+/* the text over each page, invisible, for selecting (pdf.js text layer) */
+.textLayer { position: absolute; inset: 0; overflow: clip; opacity: 1; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; z-index: 1; }
+.textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+.textLayer span.markedContent { top: 0; height: 0; }
+.textLayer ::selection { background: rgba(0, 100, 255, 0.28); }
+@media print { .pdfview, .pdf-dock { display: none !important; } }
+@media (max-width: 560px) { .pdf-tools .btn.plain { display: none; } }
+@media (min-width: 768px) {
+  .pdfview { left: calc(92px); }
+  .pdf-dock { left: calc(92px + var(--s4)); right: auto; top: auto; bottom: var(--s4); max-width: min(720px, calc(100vw - 92px - 2 * var(--s4))); }
+}
+@media (min-width: 1100px) {
+  .pdfview { right: calc(300px + var(--s4) * 2); }
+  body:has(.notesbar) .pdf-dock { max-width: calc(100vw - 92px - 300px - 4 * var(--s4)); }
+}
+.pinbtn { padding: 0 4px; gap: 0; }
+.pinbtn button { display: inline-flex; align-items: center; gap: var(--s2); min-height: 38px; padding: 0 var(--s3); border: 0; border-radius: 999px; background: none; color: inherit; font: inherit; cursor: pointer; }
+.pinbtn button:hover { background: var(--surface-2); }
+.pinbtn button + button { border-left: 1px solid var(--separator); border-radius: 0 999px 999px 0; }
+.pdf-tab .num { white-space: nowrap; }
+/* what the AI is doing while you wait (Busy.jsx AiWait) */
+.aiwait { display: grid; gap: var(--s1); padding: var(--s2) 0; }
+.aiwait-text { font-size: var(--t-s); }
+.aiwait-bar { display: block; height: 3px; border-radius: 2px; overflow: hidden; background: var(--surface-2); position: relative; }
+.aiwait-bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 35%; border-radius: 2px; background: var(--accent); animation: aiwait 1.4s ease-in-out infinite; }
+@keyframes aiwait { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
+html[data-motion="off"] .aiwait-bar::after { animation: none; width: 100%; opacity: 0.5; }
+@media (prefers-reduced-motion: reduce) { .aiwait-bar::after { animation: none; width: 100%; opacity: 0.5; } }

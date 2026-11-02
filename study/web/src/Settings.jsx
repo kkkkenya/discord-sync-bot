@@ -21,6 +21,16 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
     Object.assign(document.createElement('a'), { href: url, download: `crux-${s.today}.json` }).click();
     URL.revokeObjectURL(url);
   }).catch((e) => onProblem(e.message));
+  // "Bring data back": the file from Export my data, merged in (nothing you have now is replaced)
+  const importData = async (f) => {
+    if (!f) return;
+    try {
+      const out = await api('POST', 'import', JSON.parse(await f.text()));
+      const n = Object.values(out.added || {}).reduce((a, b) => a + b, 0);
+      notify(n ? `Brought back ${n} item${n === 1 ? '' : 's'}.` : 'Nothing was missing: your data already has everything in that file.');
+      await refresh();
+    } catch (e) { onProblem(e instanceof SyntaxError ? "That file isn't a Crux export." : e.message); }
+  };
   const [usage, setUsage] = useState(null);
   useEffect(() => { api('GET', 'usage').then(setUsage).catch(() => {}); }, []);
   const setting = (body) => api('POST', 'settings', body).then(refresh).catch((e) => onProblem(e.message));
@@ -50,9 +60,17 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
           </label>}
         </div>
         <div className="card">
+          <div className="field">Appearance
+            <div className="segmented" role="group" aria-label="Appearance">
+              {[['system', 'System'], ['light', 'Light'], ['dark', 'Dark']].map(([id, name]) => (
+                <button key={id} type="button" aria-pressed={(look.theme || 'system') === id} onClick={() => setLookState(setLook({ theme: id }))}>{name}</button>
+              ))}
+            </div>
+            <span className="hint">System follows your phone or laptop's light and dark setting.</span>
+          </div>
           <label className="field">Wallpaper
             <select value={look.wp} onChange={(e) => setLookState(setLook({ wp: e.target.value }))}>
-              <option value="auto">Lagoon in light mode, Ember in dark mode</option>
+              <option value="auto">Lagoon when light, Ember when dark</option>
               <option value="lagoon">Lagoon</option>
               <option value="ember">Ember</option>
             </select>
@@ -67,8 +85,10 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
           {user && <><p><b>{user.name}</b></p><p className="row-sub">{TIER[user.tier] || user.tier}</p></>}
           <div className="actions start">
             <button className="btn" onClick={exportData}>Export my data</button>
+            <label className="btn">Bring data back<input type="file" accept=".json,application/json" className="visually-hidden" onChange={(e) => { importData(e.target.files[0]); e.target.value = ''; }} /></label>
             <a className="btn" href="/auth/logout" onClick={forget}>Sign out</a>
           </div>
+          <p className="row-sub">Your work is saved in your account. If your trial or membership ends it's kept, and it's all there when you're back.</p>
         </div>
       </div>
     </>

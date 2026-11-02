@@ -38,7 +38,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;
   if (url.pathname.startsWith('/assets/')) return e.respondWith(cacheFirst(e.request));
-  // API reads: the network first, the last copy when offline. Downloads and sign-in are never kept.
-  if (url.pathname.startsWith('/api/') && !/(^\/api\/me$|\/download$)/.test(url.pathname)) return e.respondWith(networkFirst(e.request));
+  // API reads: the network first, the last copy when offline. Downloads, sign-in and the PDF viewer's bytes are never kept.
+  if (url.pathname.startsWith('/api/') && !/(^\/api\/me$|\/download$|^\/api\/files\/bytes$)/.test(url.pathname)) return e.respondWith(networkFirst(e.request));
   if (e.request.mode === 'navigate') return e.respondWith(networkFirst(e.request, '/'));
 });

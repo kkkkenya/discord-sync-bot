@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api, useElapsed } from './api.js';
+import { api } from './api.js';
+import { AiWait } from './Busy.jsx';
 import OpenAt from './OpenAt.jsx';
 import Rich, { layoutParts } from './Rich.jsx';
 
@@ -68,7 +69,6 @@ export default function Learn({ s, unit, go, focus }) {
   const [path, setPath] = useState(null);
   const [err, setErr] = useState('');
   const [guideBusy, setGuideBusy] = useState(false);
-  const waited = useElapsed(guideBusy);
   const makeGuide = async (fresh = false) => {
     setGuideBusy(true); setErr('');
     try {
@@ -107,7 +107,7 @@ export default function Learn({ s, unit, go, focus }) {
         <>
           <div className="stack-s">
             <h3 className="sub-title">Study guide</h3>
-            {guideBusy ? <><div className="skeleton" style={{ height: 140 }} /><p className="muted small" role="status">Reading your outline, papers and books… {waited}s</p></>
+            {guideBusy ? <><AiWait on kind="guide" /><div className="skeleton" style={{ height: 140 }} /></>
               : path.guide ? <Guide g={path.guide} books={path.books} busy={guideBusy} remake={() => makeGuide(true)} />
                 : (
                   <div className="stack-s">

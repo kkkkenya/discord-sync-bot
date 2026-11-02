@@ -30,6 +30,7 @@ export default function Gate() {
       ) : (
         <>
           <p>Crux comes with Engineering Hub membership. Join the server, then sign in again.</p>
+          <p>Used Crux before? Your work is kept: units, notes, highlights and answers all come back when your membership is active again.</p>
           <div className="gate-actions">
             <a className="btn primary" href={INVITE}>Join Discord</a>
             <a className="btn" href="/auth/logout">Sign in again</a>

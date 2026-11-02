@@ -103,7 +103,7 @@ export default function Mock({ s, unit, refresh, focus, go, notify }) {
             </label>
           </div>
           <label className="check"><input type="checkbox" checked={predicted} onChange={(e) => setPredicted(e.target.checked)} /> Predicted from past papers</label>
-          <div className="toolbar"><button className="btn primary" disabled={busy || !unit}><Busy on={busy} label="Building…" idle="Start timed paper" /></button></div>
+          <div className="toolbar"><button className="btn primary" disabled={busy || !unit}><Busy on={busy} kind="mock" idle="Start timed paper" /></button></div>
         </form>
       )}
 
@@ -124,7 +124,7 @@ export default function Mock({ s, unit, refresh, focus, go, notify }) {
               </label>
             </section>
           ))}
-          <div className="toolbar"><button className="btn primary" type="button" onClick={submit} disabled={busy}><Busy on={busy} label="Marking…" idle="Submit" /></button></div>
+          <div className="toolbar"><button className="btn primary" type="button" onClick={submit} disabled={busy}><Busy on={busy} kind="marking" idle="Submit" /></button></div>
         </>
       )}
 

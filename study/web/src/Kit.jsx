@@ -193,7 +193,7 @@ export default function Kit({ s, unit, refresh, go, focus, notify }) {
             </label>
           )}
         </div>
-        <div className="toolbar"><button className="btn primary" type="button" onClick={() => make()} disabled={busy || !unit}><Busy on={busy} label="Making it…" idle="Make it" /></button></div>
+        <div className="toolbar"><button className="btn primary" type="button" onClick={() => make()} disabled={busy || !unit}><Busy on={busy} kind="kit" idle="Make it" /></button></div>
         {err && <p className="notice bad" role="alert">{err}</p>}
         {need && (
           <p className="notice" role="status">{need.message}{' '}

@@ -76,3 +76,15 @@ test('notes bar: a note is saved for its unit or for all units, trimmed, editabl
   await srv.call('DELETE', `stickies/${made.id}`);
   assert.ok(!(await srv.call('GET', 'state')).body.data.stickies.some((n) => n.id === made.id));
 });
+
+test('bring data back: an export merged in adds only what is missing', async () => {
+  const note = (await srv.call('POST', 'stickies', { text: 'Torsion: $T/J = \tau/r$' })).body;
+  const file = (await srv.call('GET', 'export')).body;
+  await srv.call('DELETE', `stickies/${note.id}`);
+  const r = (await srv.call('POST', 'import', file)).body;
+  assert.equal(r.added.stickies, 1);
+  const again = (await srv.call('POST', 'import', file)).body;
+  assert.deepEqual(again.added, {});
+  assert.equal((await srv.call('GET', 'state')).body.data.stickies.filter((n) => n.id === note.id).length, 1);
+  assert.equal((await srv.call('POST', 'import', { hello: 1 })).status, 400);
+});

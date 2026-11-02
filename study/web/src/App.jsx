@@ -1,10 +1,12 @@
-import { Component, useCallback, useEffect, useState } from 'react';
-import { api, flushOutbox, outbox, prepareUnit } from './api.js';
+import { Component, Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { api, flushOutbox, openFile, outbox, prepareUnit } from './api.js';
 import { adoptFocus } from './focus-store.js';
 import { adoptLook } from './look.js';
 import { onSync, pull, push } from './sync.js';
 import Focus, { FocusBar } from './Focus.jsx';
 import StickyBar from './StickyBar.jsx';
+
+const PdfViewer = lazy(() => import('./PdfViewer.jsx')); // only when a file is opened
 import PromptBuilder from './PromptBuilder.jsx';
 import { Icon } from './icons.jsx';
 import Insights from './Insights.jsx';
@@ -50,7 +52,7 @@ function AutoRead({ s, unit, refresh }) {
 }
 
 // Every list a screen expects, even when an older or new account is missing one (a missing list used to blank the page).
-const LISTS = ['units', 'topics', 'subtopics', 'paperq', 'attempts', 'teach', 'questions', 'mocks', 'materials', 'papers', 'hints', 'stickies'];
+const LISTS = ['units', 'topics', 'subtopics', 'paperq', 'attempts', 'teach', 'questions', 'mocks', 'materials', 'papers', 'hints', 'stickies', 'marks'];
 const withLists = (x) => ({ ...x, data: { ...x.data, ...Object.fromEntries(LISTS.map((k) => [k, Array.isArray(x.data?.[k]) ? x.data[k] : []])) } });
 
 // If a screen fails, show what happened instead of a blank page.
@@ -123,6 +125,30 @@ export default function App({ user }) {
     document.addEventListener('visibilitychange', check);
     return () => document.removeEventListener('visibilitychange', check);
   }, []);
+  // a hub file opened from anywhere (openFile in api.js): shown in Crux's own viewer
+  // open files are tabs, kept on this device with the page you were on; collapsed, they wait in a dock
+  const [files, setFiles] = useState(() => { try { return JSON.parse(localStorage.getItem('crux-open-files') || '[]'); } catch { return []; } });
+  const [activeFile, setActiveFile] = useState(() => files[0]?.fileId || null);
+  const [fileOpen, setFileOpen] = useState(false);
+  const [jump, setJump] = useState(0); // a new open: go to the page asked for
+  useEffect(() => { try { localStorage.setItem('crux-open-files', JSON.stringify(files)); } catch { /* private window */ } }, [files]);
+  useEffect(() => {
+    const open = (e) => {
+      const f = e.detail;
+      setFiles((fs) => [f, ...fs.filter((x) => x.fileId !== f.fileId)].slice(0, 8));
+      setActiveFile(f.fileId); setFileOpen(true); setJump((j) => j + 1);
+    };
+    window.addEventListener('crux-open-file', open);
+    return () => window.removeEventListener('crux-open-file', open);
+  }, []);
+  const activateFile = (id) => {
+    const t = files.find((x) => x.fileId === id);
+    if (t && !(t.until > Date.now())) { openFile(id, t.page).catch((e) => setProblem(e.message)); return; } // its link expired: a fresh one
+    setActiveFile(id); setFileOpen(true); setJump((j) => j + 1);
+  };
+  const closeFile = (id) => setFiles((fs) => { const left = fs.filter((x) => x.fileId !== id); if (!left.length) setFileOpen(false); else if (id === activeFile) setActiveFile(left[0].fileId); return left; });
+  const filePage = useCallback((id, page) => setFiles((fs) => fs.map((x) => (x.fileId === id && x.page !== page ? { ...x, page } : x))), []);
+  const collapseFile = useCallback(() => setFileOpen(false), []);
   const refresh = useCallback(() => api('GET', 'state').then((x) => { setS(withLists(x)); setProblem(''); }).catch((e) => setError(e.message)), []);
   useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => { if (s) pull(s.settings?.sync); }, [s]);
@@ -230,6 +256,11 @@ export default function App({ user }) {
         </main>
       {!bare && page !== 'focus' && <FocusBar />}
       {!bare && <StickyBar s={s} unit={unit} onProblem={setProblem} />}
+      {!bare && files.length > 0 && (
+        <Suspense fallback={null}>
+          <PdfViewer tabs={files} active={activeFile} expanded={fileOpen} jump={jump} marks={s.data.marks} onActivate={activateFile} onCloseTab={closeFile} onCollapse={collapseFile} onPage={filePage} onProblem={setProblem} />
+        </Suspense>
+      )}
       {settingsOpen && <Settings s={s} user={user} unit={unit} notify={notify} refresh={refresh} onProblem={setProblem} onClose={() => (history.length > 1 ? history.back() : goTo(href('today')))} />}
       {toast && (
         <div className="toast" role="status">

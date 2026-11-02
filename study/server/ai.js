@@ -1,6 +1,11 @@
 // One AI helper for Crux, with a provider switch. Every AI call goes through structured().
 // Providers: gemini (default; native REST, schema-enforced), deepseek (OpenAI-compatible JSON, validated + retried).
 // Keys: GEMINI_API_KEY, DEEPSEEK_API_KEY. Model names override via AI_MODEL.
+// On the owner's own computer (never on Vercel), CRUX_AI=claude-code sends every call to Claude Code instead: the
+// owner's Claude plan, no API key (claudeCodeCall).
+import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { deepseekCost } from './defs.js';
 import { data, requestScope } from './store.js';
 import { addDeepseekSpend, deepseekOpen } from './usage.js';
@@ -9,7 +14,9 @@ export const PROVIDERS = ['gemini', 'deepseek'];
 // DeepSeek is Premium's (and the owner's), and only while the month's budget lasts; everyone else uses Gemini.
 // Locally (no request) the setting is used as it is.
 const deepseekFor = () => { const u = requestScope()?.user; return (!u || ['premium', 'owner'].includes(u.tier)) && deepseekOpen(); };
+export const localClaude = () => !process.env.VERCEL && process.env.CRUX_AI === 'claude-code';
 export const provider = () => {
+  if (localClaude()) return 'claude-code';
   const p = data?.settings?.aiProvider || process.env.AI_PROVIDER || 'gemini';
   return p === 'deepseek' && !deepseekFor() ? 'gemini' : p;
 };
@@ -17,9 +24,9 @@ export const provider = () => {
 const MODELS = { gemini: 'gemini-3.8-flash', deepseek: 'deepseek-flash' };
 const KEYS = { gemini: 'GEMINI_API_KEY', deepseek: 'DEEPSEEK_API_KEY' };
 
-export const aiReady = () => Boolean(process.env[KEYS[provider()]]);
+export const aiReady = () => provider() === 'claude-code' || Boolean(process.env[KEYS[provider()]]);
 // What each provider can read besides text: photos of working, and voice teach-backs.
-export const CAN = { gemini: { image: true, audio: true }, deepseek: { image: false, audio: false } };
+export const CAN = { gemini: { image: true, audio: true }, deepseek: { image: false, audio: false }, 'claude-code': { image: false, audio: false } };
 export const canRead = (kind) => aiReady() && Boolean(CAN[provider()]?.[kind]);
 const model = () => process.env.AI_MODEL || MODELS[provider()];
 
@@ -114,6 +121,32 @@ function validate(obj, schema) {
   return null;
 }
 
+// One headless Claude Code run per call: the question on stdin, the answer checked against the schema by Claude Code
+// itself (--json-schema). No tools, no settings, no MCP servers and no saved session: it can only answer.
+const WIN_CLAUDE = `${process.env.APPDATA}\\npm\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe`;
+const claudeBin = () => process.env.CLAUDE_BIN || (process.platform === 'win32' && existsSync(WIN_CLAUDE) ? WIN_CLAUDE : 'claude');
+export function claudeCodeCall(schema, system, content, maxTokens, run = spawn) {
+  const args = ['-p', '--output-format', 'json', '--json-schema', JSON.stringify(schema), '--system-prompt', system, '--tools', '',
+    '--no-session-persistence', '--setting-sources', '', '--strict-mcp-config', '--model', process.env.CRUX_CLAUDE_MODEL || 'sonnet'];
+  return new Promise((resolve, reject) => {
+    const child = run(claudeBin(), args, { cwd: tmpdir(), windowsHide: true });
+    let out = '';
+    let err = '';
+    const timer = setTimeout(() => { child.kill(); reject(Object.assign(new Error('Claude Code took too long to answer'), { retryable: true })); }, Math.max(120000, waitFor(maxTokens)));
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('error', (e) => { clearTimeout(timer); reject(new Error(`Couldn't start Claude Code (${e.message}). Check it's installed and signed in: run claude once in a terminal.`)); });
+    child.on('close', () => {
+      clearTimeout(timer);
+      let d;
+      try { d = JSON.parse(out); } catch { return reject(new Error(`Claude Code gave no answer: ${(err || out).trim().slice(0, 200) || 'empty'}`)); }
+      if (d.is_error || !d.structured_output) return reject(new Error(`Claude Code: ${String(d.result || d.subtype || 'no answer').slice(0, 200)}`));
+      return resolve(d.structured_output);
+    });
+    child.stdin.end(content);
+  });
+}
+
 async function deepseekCall(schema, system, content, maxTokens) {
   const schemaText = JSON.stringify(schema);
   const messages = [
@@ -169,7 +202,8 @@ export async function structured(schema, system, content, maxTokens = 4000, medi
   const memo = requestScope()?.memo;
   const key = memo && JSON.stringify([p, schema, system, content, media.map((m) => m.data.length)]);
   if (key && memo.has(key)) return structuredClone(memo.get(key));
-  const out = p === 'gemini' ? await geminiCall(schema, system, content, maxTokens, media) : await deepseekCall(schema, system, content, maxTokens);
+  const out = p === 'claude-code' ? await claudeCodeCall(schema, system, content, maxTokens)
+    : p === 'gemini' ? await geminiCall(schema, system, content, maxTokens, media) : await deepseekCall(schema, system, content, maxTokens);
   if (key) memo.set(key, structuredClone(out));
   return out;
 }

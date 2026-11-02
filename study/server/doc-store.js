@@ -1,7 +1,7 @@
 // Students' documents in Supabase (crux_docs), for the Vercel router. Each save checks the rev it loaded, so two
 // tabs can't silently overwrite each other: the loser gets 409 and the app reloads and tries once more.
 // A per-instance cache keeps the last document per student; a request then fetches only the rev.
-import { emptyDoc, normalize } from './store.js';
+import { emptyDoc, normalize, withDoc } from './store.js';
 
 const conflict = () => Object.assign(new Error('Your data changed in another tab. Reloading.'), { status: 409 });
 
@@ -30,4 +30,21 @@ export function docStore(db) {
       return next;
     },
   };
+}
+
+// One request against a student's saved document: load it, run, save it if anything changed. When another request
+// saved first (a timer sync, the bell) and this one used the AI, it is redone on the newer document with the
+// AI's answers from the first run (ai.js memo), instead of failing and paying for them twice.
+export async function withSavedDoc(docs, userId, run) {
+  const memo = new Map();
+  let { rev, doc } = await docs.load(userId);
+  let { result, dirty } = await withDoc(doc, () => run({ memo, redo: false }));
+  if (!dirty) return result;
+  try { await docs.save(userId, rev, doc); } catch (e) {
+    if (e.status !== 409 || !memo.size) throw e;
+    ({ rev, doc } = await docs.load(userId));
+    ({ result, dirty } = await withDoc(doc, () => run({ memo, redo: true })));
+    if (dirty) await docs.save(userId, rev, doc);
+  }
+  return result;
 }

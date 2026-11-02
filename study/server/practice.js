@@ -22,6 +22,7 @@ export const KEY_LABEL = { you: 'your answer key', sheet: 'given on the tutorial
 // Marking-scheme text for a past-paper question: the paper's own file when it says it is a solution, else a library
 // file of the unit whose name says scheme/solution and that matches the paper's year and type. { name, text } | null.
 export function schemeFor(row, files = library.files) {
+  if (row?.bookSolution) return { name: `${row.source}, ${row.label}`, text: row.bookSolution }; // the book's own solution
   if (!row?.fileId) return null;
   const entries = Object.entries(files).filter(([, e]) => e.unit === row.unit && e.text);
   const own = files[row.fileId];
@@ -239,7 +240,7 @@ export function markBroke({ id, step, subtopicId = null, errorType }) {
 export function breakOf(a) {
   const row = data.paperq.find((q) => q.id === a.questionId);
   const text = String(row?.text || a.question || '').replace(/\s+/g, ' ').trim();
-  const question = text ? `${row ? `${row.source} Q${row.number}: ` : ''}${text.length > 160 ? `${text.slice(0, 160)}…` : text}` : '';
+  const question = text ? `${row ? `${row.source} ${row.label || `Q${row.number}`}: ` : ''}${text.length > 160 ? `${text.slice(0, 160)}…` : text}` : '';
   return { ...a, question, checkpoint: a.brokeAt ? a.checkpoints?.[a.brokeAt - 1]?.step || '' : '' };
 }
 

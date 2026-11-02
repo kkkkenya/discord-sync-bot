@@ -53,7 +53,7 @@ export function buildPack(input) {
   const prompt = [
     'You are a tough but fair engineering tutor at Kenyatta University, preparing me for a KU CAT/exam. Be technically exact at KU exam level.',
     `## Who I am\n${who}\nStudy stage: ${stageName(stage)} (${st?.window || ''}). ${STAGE_TONE[stage] || ''}`,
-    `## What I need (${GOALS[goal].name})\n${GOALS[goal].ask}${style ? `\n\nHow to explain: ${STYLES[style].ask}` : ''}${focus ? `\n\nKey focus: ${focus}` : ''}${targets.map((t, i) => `\n\nTarget question${targets.length > 1 ? ` ${i + 1}` : ''} (${t.source}, Q${t.number}${t.marks ? `, ${t.marks} marks` : ''}):\n${t.text}`).join('')}`,
+    `## What I need (${GOALS[goal].name})\n${GOALS[goal].ask}${style ? `\n\nHow to explain: ${STYLES[style].ask}` : ''}${focus ? `\n\nKey focus: ${focus}` : ''}${targets.map((t, i) => `\n\nTarget question${targets.length > 1 ? ` ${i + 1}` : ''} (${t.source}, ${t.label || `Q${t.number}`}${t.marks ? `, ${t.marks} marks` : ''}):\n${t.text}`).join('')}`,
     hints.length ? `## What my lecturer said (verbatim)\n${hints.map((h) => `- "${h.text}"${h.kind === 'focus' ? ' (focus)' : h.kind === 'exclude' ? ' (skip)' : ''}`).join('\n')}` : '',
     `## My weakspots${topic ? ` on ${topic.name}` : ''}\n${[
       by('stuck').length ? `- Stuck (don't get the concept or steps): ${by('stuck').join('; ')}` : '',
@@ -69,10 +69,10 @@ export function buildPack(input) {
   // ---- the .md pack: the fixed sections first, then course material until the budget runs out ----
   const sec = [];
   sec.push(`# ${unit.code} — ${topicName}: context pack\n\nMade by Study Desk on ${today} for ${cohort ? `${cohort.name} ${cohort.year}.${cohort.sem}` : 'a KU engineering student'}. Study stage: ${stageName(stage)}. Goal: ${GOALS[goal].name}.`);
-  if (targets.length) sec.push(`## Target question${targets.length > 1 ? 's' : ''}\n\n${targets.map((t) => `**${t.source}, Q${t.number}${t.marks ? ` (${t.marks} marks)` : ''}**\n\n${t.text}`).join('\n\n')}`);
+  if (targets.length) sec.push(`## Target question${targets.length > 1 ? 's' : ''}\n\n${targets.map((t) => `**${t.source}, ${t.label || `Q${t.number}`}${t.marks ? ` (${t.marks} marks)` : ''}**\n\n${t.text}`).join('\n\n')}`);
   sec.push(`## My weakspot profile\n\n${subtopics.length ? subtopics.map((s) => `- ${s.name} (${s.kind || 'concept'}): **${s.audit}**`).join('\n') : '_No sub-topics listed yet._'}${errLine ? `\n\nRecurring mistakes (last 30 days): ${errLine}.` : ''}${weak.length ? `\n\nFix first: ${weak.slice(0, 5).map((w) => `${w.name} (${w.reason})`).join('; ')}.` : ''}`);
   if (hints.length) sec.push(`## What the lecturer said\n\n${hints.map((h) => `- "${h.text}" (${h.kind}, ${String(h.at || '').slice(0, 10)})`).join('\n')}`);
-  if (questions.length) sec.push(`## Past-paper and CAT questions on ${topicName}\n\n${[...questions].sort((a, b) => (b.year || 0) - (a.year || 0)).map((q) => `### ${q.source} · Q${q.number}${q.marks ? ` · ${q.marks} marks` : ''}\n\n${q.text}`).join('\n\n')}`);
+  if (questions.length) sec.push(`## Past-paper and CAT questions on ${topicName}\n\n${[...questions].sort((a, b) => (b.year || 0) - (a.year || 0)).map((q) => `### ${q.source} · ${q.label || `Q${q.number}`}${q.marks ? ` · ${q.marks} marks` : ''}\n\n${q.text}`).join('\n\n')}`);
   if (failures.length) sec.push(`## Where my working broke recently\n\n${failures.map((f) => `- ${String(f.at || '').slice(0, 10)}: ${f.question || 'a question'}${f.brokeAt ? ` — broke at checkpoint ${f.brokeAt}${f.checkpoint ? ` (${f.checkpoint})` : ''}` : ''}${f.errorType ? `, ${f.errorType}` : ''}${f.answer ? `; my answer: ${f.answer}` : ''}`).join('\n')}`);
 
   let md = sec.join('\n\n');
@@ -98,7 +98,7 @@ export function buildPack(input) {
   const figures = [...new Set([...targets, ...questions].filter((q) => q && FIGURE.test(q.text)).map((q) => q.source))];
   const checklist = [
     `Attach the downloaded file ${filename}.`,
-    ...targets.filter((t) => FIGURE.test(t.text)).map((t) => `Attach a photo or screenshot of the figure in ${t.source}, Q${t.number}: the question refers to one.`),
+    ...targets.filter((t) => FIGURE.test(t.text)).map((t) => `Attach a photo or screenshot of the figure in ${t.source}, ${t.label || `Q${t.number}`}: the question refers to one.`),
     ...(figures.length ? [`Also attach the original PDF${figures.length === 1 ? '' : 's'} with diagrams: ${figures.join(', ')}.`] : []),
     ...(scanned.length ? [`Scanned papers have no text in the pack; attach them if they matter: ${scanned.join(', ')}.`] : []),
     ...(cut.length ? [`Over the size budget, left out of the pack: ${cut.join(', ')}.`] : []),

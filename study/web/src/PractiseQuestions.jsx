@@ -109,7 +109,11 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       <label className="field">Question
         <select value={qid} onChange={(e) => pick(e.target.value)}>
           <option value="">Pick a question</option>
-          {questions.map((x) => <option key={x.id} value={x.id}>{tried.has(x.id) ? '✓ ' : ''}{x.source} · Q{x.number}{x.marks ? ` · ${x.marks} marks` : ''}{x.explain ? ' · solution saved' : ''}</option>)}
+          {[['Past papers and CATs', questions.filter((x) => x.type !== 'Book')], ['From your books, word for word', questions.filter((x) => x.type === 'Book')]].filter(([, list]) => list.length).map(([group, list]) => (
+            <optgroup key={group} label={group}>
+              {list.map((x) => <option key={x.id} value={x.id}>{tried.has(x.id) ? '✓ ' : ''}{x.source} · {x.label || `Q${x.number}`}{x.marks ? ` · ${x.marks} marks` : ''}{x.explain ? ' · solution saved' : ''}</option>)}
+            </optgroup>
+          ))}
         </select>
       </label>
 
@@ -117,7 +121,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
         <summary>Solve several at once</summary>
         <p className="muted small">Pick questions and Crux writes a full worked solution for each, 2 to 4 per AI action. They're saved: open any of them later for free.</p>
         <PickList label="Questions to solve" picked={many} set={setMany}
-          items={questions.map((x) => ({ id: x.id, label: `${x.source} · Q${x.number}`, meta: x.marks ? `${x.marks} marks` : null, disabled: Boolean(x.explain), sub: x.explain ? 'Solution saved' : x.text }))} />
+          items={questions.map((x) => ({ id: x.id, label: `${x.source} · ${x.label || `Q${x.number}`}`, meta: x.marks ? `${x.marks} marks` : null, disabled: Boolean(x.explain), sub: x.explain ? 'Solution saved' : x.text }))} />
         <div className="actions start">
           <button type="button" className="btn primary" disabled={!many.size || manyRun?.busy} onClick={solveMany}>
             {manyRun?.busy ? `Solving… ${manyRun.done} of ${manyRun.total} done` : many.size ? `Solve ${many.size} question${many.size === 1 ? '' : 's'}` : 'Pick questions to solve'}
@@ -128,7 +132,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       </details>
 
       {q && (
-        <QuestionBox text={q.text} meta={[q.source, q.year, q.type]} marks={q.marks} />
+        <QuestionBox text={q.text} meta={[q.source, q.label, q.year, q.type]} marks={q.marks} />
       )}
 
       {q && !res && (

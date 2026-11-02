@@ -11,7 +11,7 @@ import { ERROR_TYPES, STAGES, TBA } from './defs.js';
 import { stageMix, validStage } from './stages.js';
 import { masteryMap } from './mastery.js';
 import { checkSubtopic } from './analysis.js';
-import { PARSER_VERSION, hintFields, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } from './weakspots.js';
+import { PARSER_VERSION, hintFields, isBook, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } from './weakspots.js';
 import { predictedMock } from './predict.js';
 import { GOALS, STYLES, buildPack } from './context-pack.js';
 import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
@@ -26,6 +26,7 @@ import { KITS, KIT_FOR, makeKitFor } from './kit.js';
 import { focusCounts, setFocus } from './focus.js';
 import { classHints, classList, confirmHint, listOf, offerList, shareHint } from './shared.js';
 import { newMaterial } from './inbox.js';
+import { makeGuideFor } from './guide.js';
 import { learnFor } from './learn-store.js';
 import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
@@ -169,7 +170,7 @@ const routes = {
     if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Copy the topics from the course outline by hand, or use the Prompt Builder.'), { status: 400 });
     if (!data.paperq.some((x) => x.unit === unit)) parsePapers(unit);
     const have = data.topics.filter((t) => t.unit === unit).map((t) => t.name);
-    const { text, sources, outline } = outlineContext(unit, data.paperq.filter((x) => x.unit === unit).map((x) => x.text));
+    const { text, sources, outline } = outlineContext(unit, data.paperq.filter((x) => x.unit === unit && !isBook(x)).map((x) => x.text));
     const { topics } = await suggestTopics({ unit, title: u.title, have, context: text, outline });
     return { suggestions: topics.filter((t) => !have.some((h) => h.toLowerCase() === t.name.toLowerCase())), sources, outline };
   },
@@ -276,6 +277,8 @@ const routes = {
   // mark the step where your working broke.
   // Learn a topic: { unit, topicId } → pages to read in your own files, questions to try, then what next. No AI.
   'GET /api/learn': async (q) => learnFor(q.get('unit'), q.get('topicId')),
+  // A topic's study guide: { unit, topicId, fresh? } → what to learn and where in your books. Shared with the class.
+  'POST /api/learn/guide': async (q, body) => makeGuideFor(body || {}),
   // Study kit (Phase 10): { unit, kind?, topicId? } → the saved material, or { needKey, goal } with no AI key.
   'POST /api/materials/make': async (q, body) => makeKitFor(body || {}),
   'POST /api/attempts/check': async (q, body) => checkAnswer(body || {}),
@@ -324,7 +327,7 @@ const routes = {
     if (!aiReady()) throw Object.assign(new Error('No AI key for the selected provider. Pick each question\'s topic by hand.'), { status: 400 });
     const topics = data.topics.filter((t) => t.unit === unit);
     if (!topics.length) throw Object.assign(new Error('Add the unit\'s topics in Units first.'), { status: 400 });
-    const todo = data.paperq.filter((x) => x.unit === unit && x.topicFrom !== 'you');
+    const todo = data.paperq.filter((x) => x.unit === unit && x.topicFrom !== 'you' && !isBook(x));
     if (!todo.length) return { mapped: 0 };
     let mapped = 0;
     for (let i = 0; i < todo.length; i += 25) {
@@ -384,7 +387,7 @@ const routes = {
     const unit = body.unit;
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });
     if (body.predicted) {
-      const questions = predictedMock(predictFor(unit, nairobiDay()), data.paperq.filter((x) => x.unit === unit))
+      const questions = predictedMock(predictFor(unit, nairobiDay()), data.paperq.filter((x) => x.unit === unit && !isBook(x)))
         // the answer key saved by "Check my answer" when there is one; without, the mock is self-marked (see submitMock)
         .map((x) => (x.key
           ? { q: x.q, a: `Final answer (${KEY_LABEL[x.key.source]}): ${x.key.answer}`, marks: x.marks, topic: x.topic }
@@ -396,6 +399,12 @@ const routes = {
     const count = body.count ? clamp(body.count, 1, 10) : 5;
     const bank = data.questions.filter((x) => x.unit === unit).sort(() => Math.random() - 0.5);
     let questions = bank.slice(0, count).map((x) => ({ q: x.q, a: x.a, marks: x.marks, topic: x.topic || '' }));
+    const topicName = (id) => data.topics.find((t) => t.id === id)?.name || '';
+    const books = data.paperq.filter((x) => x.unit === unit && isBook(x)).sort((a, b) => Number(Boolean(b.bookSolution)) - Number(Boolean(a.bookSolution)) || Math.random() - 0.5);
+    questions = questions.concat(books.slice(0, count - questions.length).map((x) => ({
+      q: x.text, marks: 10, topic: topicName(x.topicId), source: `${x.source}, ${x.label}`,
+      a: x.bookSolution ? `The book's solution (${x.label}):\n${x.bookSolution}` : `The book gives no worked solution for ${x.label}. Open it in Practise for a full worked solution.`,
+    })));
     if (questions.length < count && aiReady()) {
       const extra = await makeQuestions({ unit, topics: data.topics.filter((t) => t.unit === unit), count: count - questions.length, context: contextFor(unit, '', 6000), examples: bookExamples(unit) });
       questions = questions.concat(extra.questions.map((x) => ({ q: x.q, a: x.a, marks: clamp(x.marks, 5, 25), topic: x.topic || '', ...(x.from && { source: x.from }) })));
@@ -462,6 +471,18 @@ function checkHint(b) {
 // Validation for generic list writes (undo re-POSTs a deleted row with its id, so create goes through here too).
 const CHECKS = {
   hints: (b) => checkHint(b),
+  // the notes bar: { text (up to 2000 characters), unit (a unit code, or null for all units), from, order }
+  stickies: (b, opts) => {
+    const out = {};
+    if ('text' in b || opts?.create) {
+      out.text = String(b.text ?? '').trim().slice(0, 2000);
+      if (!out.text) throw Object.assign(new Error('Write something first.'), { status: 400 });
+    }
+    if ('unit' in b || opts?.create) out.unit = data.units.some((u) => u.code === b.unit) ? b.unit : null;
+    if ('from' in b) out.from = String(b.from || '').trim().slice(0, 120);
+    if ('order' in b) out.order = Number(b.order) || 0;
+    return out;
+  },
   // a topic you pick for a past-paper question is yours: re-reading the papers won't change it
   paperq: (b) => ('topicId' in b ? { ...b, topicFrom: 'you' } : b),
   subtopics: (b, opts) => {
@@ -477,7 +498,7 @@ const CHECKS = {
 const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints|explain|explain-batch))/;
 
 // Routes that use the AI: each request is one "AI action" against the member's daily limit.
-const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch)|predict\/map)$/;
+const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch)|learn\/guide|predict\/map)$/;
 export const AI_LIMIT_MESSAGE = "Today's AI limit is used. Take this pack to any AI.";
 
 export async function dispatch(method, pathname, query, body, ctx) {

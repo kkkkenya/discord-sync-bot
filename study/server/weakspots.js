@@ -2,7 +2,7 @@
 // stays pure in analysis.js.
 import { applyTeachGaps } from './analysis.js';
 import { library } from './ingest.js';
-import { mapQuestion, paperInfo, parseQuestions, readHint } from './predict.js';
+import { bookQuestions, mapQuestion, paperInfo, parseQuestions, readHint } from './predict.js';
 import { data, save } from './store.js';
 
 // A tutorial sheet's printed answer as the question's key: "(Ans: 175 kNm; 4.3°)" → any part can be checked, no AI needed.
@@ -25,32 +25,37 @@ export function teachFlags(unit, topic, feedback) {
 const scannedOf = (unit) => Object.entries(library.files).filter(([, e]) => e.unit === unit && e.paper && !e.text).map(([fileId, e]) => ({ fileId, name: e.name }));
 
 // Bumped when parseQuestions changes, so saved papers are read again (GET /api/predict). 2: looser numbering, no
-// 3000-character cut.
-export const PARSER_VERSION = 2;
+// 3000-character cut. 3: worked examples and exercises from the unit's books, word for word.
+export const PARSER_VERSION = 3;
+export const isBook = (q) => q.type === 'Book';
+// "Strength of Materials (R. K. Rajput) (Z-Library).pdf" → "Strength of Materials (R. K. Rajput)"
+const bookName = (name) => String(name).replace(/\.[a-z0-9]+$/i, '').replace(/\(?z-?library\)?/gi, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim().replace(/^(.{44}\S*)\s.+$/, '$1…');
 
-// Re-read a unit's synced past papers into paperq. Keeps what you (or the AI) mapped by hand, keyed by
+// Re-read a unit's synced past papers into paperq, and its books' worked examples and exercises (type 'Book', word for
+// word, with the book's own solution as bookSolution). Keeps what you (or the AI) mapped by hand, keyed by
 // file + question number; pasted papers are left alone. { questions, papers, scanned }.
 export function parsePapers(unit) {
   const topics = data.topics.filter((t) => t.unit === unit);
   const subs = data.subtopics.filter((s) => s.unit === unit);
-  const files = Object.entries(library.files).filter(([, e]) => e.unit === unit && e.paper && e.text);
+  const files = Object.entries(library.files).filter(([, e]) => e.unit === unit && e.text);
   const ids = new Set(files.map(([id]) => id));
+  const read = (e) => (e.paper ? parseQuestions(e.text) : bookQuestions(e.text).map((b, i) => ({ number: i + 1, label: b.label, marks: null, text: b.text, ...(b.solution && { bookSolution: b.solution }) })));
   const old = new Map(data.paperq.filter((q) => ids.has(q.fileId)).map((q) => [`${q.fileId}#${q.number}`, q]));
   data.paperq = data.paperq.filter((q) => !ids.has(q.fileId));
   let n = 0;
   for (const [fileId, e] of files) {
-    const info = paperInfo(e.name);
-    for (const q of parseQuestions(e.text)) {
+    const info = e.paper ? paperInfo(e.name) : { year: null, type: 'Book' };
+    for (const q of read(e)) {
       const found = old.get(`${fileId}#${q.number}`);
       // a question that was split differently before keeps its topic, but not an answer or solution made for other text
       const prev = found && (found.text === q.text ? found : { ...found, key: found.text.slice(0, 80) === q.text.slice(0, 80) && found.text.length < q.text.length * 1.5 ? found.key : undefined, explain: undefined });
       const kept = prev && prev.topicFrom !== 'auto' ? { topicId: prev.topicId, subtopicIds: prev.subtopicIds || [], topicFrom: prev.topicFrom } : { ...mapQuestion(q.text, topics, subs), topicFrom: 'auto' };
-      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.name, ...info, ...q, ...kept, ...((prev?.key || q.given) && { key: prev?.key || sheetKey(q.given) }), ...(prev?.explain && { explain: prev.explain }), at: prev?.at || new Date().toISOString() });
+      data.paperq.push({ id: prev?.id || `${fileId}-${q.number}`, unit, fileId, source: e.paper ? e.name : bookName(e.name), ...info, ...q, ...kept, ...((prev?.key || q.given) && { key: prev?.key || sheetKey(q.given) }), ...(prev?.explain && { explain: prev.explain }), at: prev?.at || new Date().toISOString() });
       n++;
     }
   }
   save();
-  return { questions: n, papers: files.length, scanned: scannedOf(unit) };
+  return { questions: n, papers: files.filter(([, e]) => e.paper).length, scanned: scannedOf(unit) };
 }
 
 // Questions pasted by hand (a scanned paper, or one that isn't on the server). Returns the rows added.

@@ -61,3 +61,18 @@ test('everything is on disk', () => {
   assert.equal(d.cards.length, 500);
   assert.deepEqual(d.settings.cohort, { course: 'EMM', year: 3, sem: 1 });
 });
+
+test('notes bar: a note is saved for its unit or for all units, trimmed, editable and removable', async () => {
+  const unit = (await srv.call('GET', 'state')).body.data.units[0]?.code || null;
+  const made = (await srv.call('POST', 'stickies', { text: `  Hooke: $\sigma = E\varepsilon$  `, unit, from: 'EMM 302 · Q2 solution', order: -1 })).body;
+  assert.equal(made.text, 'Hooke: $\sigma = E\varepsilon$');
+  assert.equal(made.unit, unit);
+  assert.equal((await srv.call('POST', 'stickies', { text: 'x', unit: 'NOT A UNIT' })).body.unit, null);
+  assert.equal((await srv.call('POST', 'stickies', { text: '   ' })).status, 400);
+  assert.equal((await srv.call('POST', 'stickies', { text: 'y'.repeat(2500) })).body.text.length, 2000);
+  await srv.call('PATCH', `stickies/${made.id}`, { unit: null });
+  const after = (await srv.call('GET', 'state')).body.data.stickies;
+  assert.equal(after.find((n) => n.id === made.id).unit, null);
+  await srv.call('DELETE', `stickies/${made.id}`);
+  assert.ok(!(await srv.call('GET', 'state')).body.data.stickies.some((n) => n.id === made.id));
+});

@@ -30,7 +30,7 @@ export function unitStage(u, today = nairobiDay()) {
 export function predictFor(unit, today = nairobiDay()) {
   const u = data.units.find((x) => x.code === unit);
   const late = u ? unitStage(u, today).stage.id !== 'adequate' : false;
-  return predictions({ topics: data.topics.filter((t) => t.unit === unit), questions: data.paperq.filter((q) => q.unit === unit), hints: data.hints.filter((h) => h.unit === unit), late });
+  return predictions({ topics: data.topics.filter((t) => t.unit === unit), questions: data.paperq.filter((q) => q.unit === unit && q.type !== 'Book'), hints: data.hints.filter((h) => h.unit === unit), late });
 }
 
 // The unit's weakspot matrix (Phase 6): critical sub-topics by exam weight × weakness, and recurring errors.

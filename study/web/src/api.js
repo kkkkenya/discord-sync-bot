@@ -16,7 +16,7 @@ const send = async (method, path, body) => {
 
 // Offline changes: edits that need no AI (dates, ratings, topics, settings, timer, marks) are kept on this device
 // and sent in order when Crux is back online. Anything that needs AI or reads files still needs a connection.
-const QUEUE = /^(units|topics(\/[\w-]+)?|subtopics(\/audit|\/(?!suggest)[\w-]+)?|settings|sync|focus|hints|attempts\/(broke|flag)|mocks\/[\w-]+|materials\/[\w-]+)(\?.*)?$/;
+const QUEUE = /^(units|stickies(\/[\w-]+)?|topics(\/[\w-]+)?|subtopics(\/audit|\/(?!suggest)[\w-]+)?|settings|sync|focus|hints|attempts\/(broke|flag)|mocks\/[\w-]+|materials\/[\w-]+)(\?.*)?$/;
 const OUTBOX = 'crux-outbox';
 export const outbox = () => { try { return JSON.parse(localStorage.getItem(OUTBOX)) || []; } catch { return []; } };
 const keep = (list) => { try { localStorage.setItem(OUTBOX, JSON.stringify(list)); } catch { /* private window */ } window.dispatchEvent(new Event('crux-outbox')); };

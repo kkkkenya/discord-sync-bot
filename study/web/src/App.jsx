@@ -4,6 +4,7 @@ import { adoptFocus } from './focus-store.js';
 import { adoptLook } from './look.js';
 import { onSync, pull, push } from './sync.js';
 import Focus, { FocusBar } from './Focus.jsx';
+import StickyBar from './StickyBar.jsx';
 import PromptBuilder from './PromptBuilder.jsx';
 import { Icon } from './icons.jsx';
 import Insights from './Insights.jsx';
@@ -49,7 +50,7 @@ function AutoRead({ s, unit, refresh }) {
 }
 
 // Every list a screen expects, even when an older or new account is missing one (a missing list used to blank the page).
-const LISTS = ['units', 'topics', 'subtopics', 'paperq', 'attempts', 'teach', 'questions', 'mocks', 'materials', 'papers', 'hints'];
+const LISTS = ['units', 'topics', 'subtopics', 'paperq', 'attempts', 'teach', 'questions', 'mocks', 'materials', 'papers', 'hints', 'stickies'];
 const withLists = (x) => ({ ...x, data: { ...x.data, ...Object.fromEntries(LISTS.map((k) => [k, Array.isArray(x.data?.[k]) ? x.data[k] : []])) } });
 
 // If a screen fails, show what happened instead of a blank page.
@@ -228,6 +229,7 @@ export default function App({ user }) {
           <Guard key={`${page}|${unit}`}>{content}</Guard>
         </main>
       {!bare && page !== 'focus' && <FocusBar />}
+      {!bare && <StickyBar s={s} unit={unit} onProblem={setProblem} />}
       {settingsOpen && <Settings s={s} user={user} unit={unit} notify={notify} refresh={refresh} onProblem={setProblem} onClose={() => (history.length > 1 ? history.back() : goTo(href('today')))} />}
       {toast && (
         <div className="toast" role="status">

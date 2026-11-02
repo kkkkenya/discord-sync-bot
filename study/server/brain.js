@@ -390,3 +390,56 @@ export async function transcribe({ topic, audio }) {
   };
   return structured(schema, TUTOR, `The recording is a student explaining "${topic}" out loud, as if teaching a classmate. Transcribe it faithfully. Do not improve or correct what they say.`, 4000, [audio]);
 }
+
+// A topic's study guide (server/guide.js): what the course expects, sub-topic by sub-topic, with the exact book
+// places to read and what to skip, how the papers examine it, a study order and an "I can…" checklist.
+const PLACE = {
+  type: 'object',
+  properties: {
+    book: { type: 'string', description: 'The file name of one of the listed books or notes, exactly as given.' },
+    where: { type: 'string', description: 'Chapter, section and page numbers as the book prints them, e.g. "Ch. 3, §3.4-3.6, pp. 112-121". Only places the material shows; never invent a page.' },
+    focus: { type: 'string', description: 'What to read there for: the derivation, the worked examples, a table.' },
+  },
+  required: ['book', 'where', 'focus'],
+  additionalProperties: false,
+};
+const GUIDE_SCHEMA = {
+  type: 'object',
+  properties: {
+    overview: { type: 'string', description: 'What the topic is and why it matters in this unit, 2-3 sentences.' },
+    outline: {
+      type: 'array',
+      description: 'The whole topic broken into its sub-topics (usually 4-8), in the order to learn them.',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          expect: { type: 'string', description: 'What the course expects you to be able to do, as an outcome: "Derive…", "Calculate…", "Sketch…".' },
+          formulas: { type: 'array', items: { type: 'string' }, description: 'The key formulas, each in LaTeX with $...$, with what the symbols mean. Empty if none.' },
+          read: { type: 'array', items: PLACE, description: '1-3 places in the listed books to read for it, best first.' },
+          skip: { type: 'string', description: 'What the books cover here that this course does not need, or an empty string.' },
+        },
+        required: ['name', 'expect', 'formulas', 'read', 'skip'],
+        additionalProperties: false,
+      },
+    },
+    exam: { type: 'string', description: 'How the past papers examine this topic: question types, typical marks, what keeps coming back. Say so if there are no papers on it.' },
+    plan: { type: 'array', items: { type: 'string' }, description: '4-7 study steps in order, each one line, e.g. "Read Rajput §1.4 for the idea, then do Examples 1.1-1.3."' },
+    checklist: { type: 'array', items: { type: 'string' }, description: '5-10 "I can…" statements to tick off before the exam.' },
+  },
+  required: ['overview', 'outline', 'exam', 'plan', 'checklist'],
+  additionalProperties: false,
+};
+export async function makeGuide({ unit, title = '', topic, subtopics = [], outline = '', pages = '', contents = '', questions = '', books = [] }) {
+  const content = [
+    `Unit: ${unit}${title ? ` ${title}` : ''}\nTopic: ${topic}`,
+    subtopics.length ? `Sub-topics the student has listed so far (often incomplete: cover the whole topic as the course outline and papers set it, including these):\n${subtopics.map((s) => `- ${s}`).join('\n')}` : '',
+    outline ? `Course outline (what the course covers; follow it over the books):\n${outline}` : 'There is no course outline on file: go by the past papers and standard coverage at this level.',
+    questions ? `Past-paper and CAT questions on this topic:\n${questions}` : '',
+    books.length ? `The student's books and notes for this unit:\n${books.map((b) => `- ${b}`).join('\n')}` : '',
+    pages ? `Pages in those books that mention the topic (file, page, a line from the page):\n${pages}` : '',
+    contents ? `The opening pages of each book (usually the contents, with chapters and page numbers):\n${contents}` : '',
+    `Write a study guide for this topic that tells the student exactly what to learn and where to find it in their own books, so they don't read 500 pages to find 20. Point only to the books listed, with places you can see in the contents or page lines above; when you can't place something, name the chapter or section heading to look for instead of guessing a page. Keep the course outline's scope: say what to skip.`,
+  ].filter(Boolean).join('\n\n');
+  return structured(GUIDE_SCHEMA, TUTOR, content, 8000);
+}

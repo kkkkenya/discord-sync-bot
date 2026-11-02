@@ -20,5 +20,10 @@ const P = {
   check: <><circle cx="12" cy="12" r="8.5" /><path d="M8.5 12.2l2.4 2.4 4.6-5" /></>,
   prompt: <><path d="M4.5 6.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H10l-4 3.5v-3.5h0a1.5 1.5 0 0 1-1.5-1.5z" /><path d="M8.5 9h7M8.5 12h4.5" /></>,
   file: <><path d="M7 3.5h7l4 4v13H7z" /><path d="M14 3.5v4h4" /></>,
+  pin: <><path d="M9 4.5h6l-1 5 3 3H7l3-3z" /><path d="M12 12.5v7" /></>,
+  copy: <><rect x="8.5" y="8.5" width="11" height="11" rx="1.8" /><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5" /></>,
+  trash: <><path d="M5 7h14M10 7V5h4v2M7 7l1 12.5h8L17 7" /></>,
+  globe: <><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.5 2.6 2.5 14.4 0 17M12 3.5c-2.5 2.6-2.5 14.4 0 17" /></>,
+  notes: <><path d="M5.5 4.5h13v10l-5 5h-8z" /><path d="M13.5 19.5v-5h5M8.5 8.5h7M8.5 11.5h4" /></>,
 };
 export const Icon = ({ name }) => <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{P[name]}</svg>;

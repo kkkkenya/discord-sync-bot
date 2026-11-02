@@ -108,7 +108,7 @@ let marking = { questionId: null, unit: null, attempt: null, guess: null }; // t
 // A past-paper question for `mark EMM 302`: on the top weakspot's topic if one is listed, else the most likely topic,
 // else any; newest paper first.
 function questionFor(unit) {
-  const qs = data.paperq.filter((q) => q.unit === unit && q.text.length >= 20);
+  const qs = data.paperq.filter((q) => q.unit === unit && q.type !== 'Book' && q.text.length >= 20);
   const weak = weakspotsFor(unit, nairobiDay()).critical[0];
   const top = predictFor(unit, nairobiDay()).find((r) => !r.muted && r.questions);
   const on = (topicId) => qs.filter((q) => q.topicId === topicId);
@@ -175,7 +175,7 @@ async function markText(t, { photo, attachment }) {
     const q = questionFor(unit);
     if (!q) return `No past-paper questions read for ${unit} yet. On the dashboard: Units → Sync all files.`;
     marking = { questionId: q.id, unit, attempt: null, guess: null };
-    return [`**${q.source} Q${q.number}**${q.marks ? ` (${q.marks} marks)` : ''}`, q.text.length > 1500 ? `${q.text.slice(0, 1500)}…` : q.text, '', 'Solve it on paper, closed book, then reply with your final answer and its unit: `mark 142.5 MPa`.'].join('\n');
+    return [`**${q.source} ${q.label || `Q${q.number}`}**${q.marks ? ` (${q.marks} marks)` : ''}`, q.text.length > 1500 ? `${q.text.slice(0, 1500)}…` : q.text, '', 'Solve it on paper, closed book, then reply with your final answer and its unit: `mark 142.5 MPa`.'].join('\n');
   }
   const broke = rest.match(/^broke\s+(\d+)\s*(.*)$/i);
   if (broke) {
@@ -336,7 +336,7 @@ export async function reply(text, { photo = false, attachment = null } = {}) {
       '', '**1. Read**', ...(p.read.length ? p.read.map((r, i) => `${i + 1}. ${where(r)}`) : ['Your notes don’t cover it yet: sync the unit’s files, or add your notes on the dashboard.']),
       '', '**2. Worked examples**', ...(p.examples.length ? p.examples.map((r, i) => `${i + 1}. ${where(r)}`) : ['None in your files: a Study kit ladder on the dashboard makes one.']),
       '', `**3. Explain it:** \`teach ${unit} ${topic.name}\``,
-      ...(first ? ['', `**4. When you're ready:** ${p.attempt.length} question${p.attempt.length === 1 ? '' : 's'} to try, starting with ${first.source} Q${first.number}${first.hasKey ? ' (answer on file)' : ''}: \`mark ${unit}\``] : []),
+      ...(first ? ['', `**4. When you're ready:** ${p.attempt.length} question${p.attempt.length === 1 ? '' : 's'} to try, starting with ${first.source} ${first.label || `Q${first.number}`}${first.hasKey ? ' (answer on file)' : ''}: \`mark ${unit}\``] : []),
     ].join('\n');
   }
   if (word === 'mark') return markText(t, { photo, attachment }).catch((e) => (e.status ? e.message : Promise.reject(e)));

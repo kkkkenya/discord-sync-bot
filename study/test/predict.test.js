@@ -115,3 +115,14 @@ test('a tutorial sheet: numbering after a heading, a typo, and the given answers
   assert.deepEqual(qs.map((q) => q.given), [['5 km'], ['162 GPa', '0.51'], ['414 kNm', '7.8 x 10-3 rad'], ['46 mm']]);
   assert.doesNotMatch(qs.map((q) => q.text).join(' '), /Ans/, 'the answer is not shown with the question');
 });
+
+test('book questions: each example word for word up to its Solution, the solution kept, mentions skipped', async () => {
+  const { bookQuestions } = await import('../server/predict.js');
+  const book = 'Chapter 1. As in Example 1.3, the stress is uniform. Example 1.1. A square steel rod 20 mm × 20 mm in section carries an axial load of 100 kN. Calculate the shortening in a length of 50 mm. Solution. Area A = 0.0004 m 2, shortening = 0.0584 mm. Example 1.2 A hollow cast-iron cylinder 4 m long and 300 mm outer diameter carries a central load. Find the stress in the metal. Problem 1.4-4 A circular bar of magnesium alloy is 750 mm long and is loaded in tension to an elongation of 6.0 mm. (a) What is the permanent set? Solution 1.4-4 The permanent set is 4.8 mm.';
+  const qs = bookQuestions(book);
+  assert.deepEqual(qs.map((q) => q.label), ['Example 1.1', 'Example 1.2', 'Problem 1.4-4']);
+  assert.equal(qs[0].text, 'A square steel rod 20 mm × 20 mm in section carries an axial load of 100 kN. Calculate the shortening in a length of 50 mm.');
+  assert.match(qs[0].solution, /^Area A = 0.0004 m 2, shortening = 0.0584 mm\./);
+  assert.equal(qs[1].solution, '');
+  assert.equal(qs[2].solution, 'The permanent set is 4.8 mm.');
+});

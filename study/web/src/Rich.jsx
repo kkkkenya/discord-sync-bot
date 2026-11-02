@@ -49,7 +49,7 @@ function MathBit({ tex, display }) {
   if (!katex) return <code>{tex}</code>;
   let html;
   try { html = katex.renderToString(tex, { displayMode: display, throwOnError: false, output: 'html' }); } catch { return <code>{tex}</code>; }
-  return <span className={display ? 'mathblock' : 'math'} dangerouslySetInnerHTML={{ __html: html }} />;
+  return <span className={display ? 'mathblock' : 'math'} data-tex={tex} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 // one line: maths, then bold, code and values; a leading "Label:" (Spot it:, Final answer:) is bolded

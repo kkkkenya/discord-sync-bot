@@ -84,7 +84,7 @@ export default function PromptBuilder({ s, unit, target }) {
           <details className="disclosure" open={o.questionIds.length > 0 || undefined}>
             <summary>Past-paper questions to solve <span className="muted num">({o.questionIds.length ? `${o.questionIds.length} picked` : 'optional'})</span></summary>
             <PickList label="Past-paper questions" max={12} picked={new Set(o.questionIds)} set={(n) => setO((x) => ({ ...x, questionIds: [...n] }))}
-              items={qs.map((q) => ({ id: q.id, label: `${q.source} · Q${q.number}`, meta: q.marks ? `${q.marks} marks` : null, sub: q.text }))} />
+              items={qs.map((q) => ({ id: q.id, label: `${q.source} · ${q.label || `Q${q.number}`}`, meta: q.marks ? `${q.marks} marks` : null, sub: q.text }))} />
           </details>
         )}
         {files.length > 0 && (

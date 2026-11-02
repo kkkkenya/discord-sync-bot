@@ -81,6 +81,31 @@ export function parseQuestions(text) {
   return qs.map(lift).filter((q) => q.text.length >= 20);
 }
 
+// Worked examples and exercises in a book's text, word for word: "Example 4.2. A steel bar… Solution. …".
+// The question runs to the book's "Solution" (or the next example); the solution, when the book gives one, is kept
+// as it is printed. A mention like "as in Example 1.3, the…" isn't a question: a label must open a sentence.
+// [{ label, text, solution }]
+const BOOK_LABEL = /\b(Worked [Ee]xample|Illustrative [Ee]xample|Example|EXAMPLE|Exercise|EXERCISE|Problem|PROBLEM)\s*(\d+(?:[.-]\d+)*)\s*[.:]?(?=\s+[A-Z(])/g;
+const SOLUTION = /\b(?:Solution|SOLUTION|Sol\.)(?:\s*\d+(?:[.-]\d+)*)?\s*[.:]?\s/;
+export function bookQuestions(text) {
+  const src = String(text || '');
+  const hits = [...src.matchAll(BOOK_LABEL)];
+  const seen = new Set();
+  const out = [];
+  hits.forEach((m, i) => {
+    const kind = m[1].replace(/^(worked|illustrative)\s+/i, '');
+    const label = `${kind[0].toUpperCase()}${kind.slice(1).toLowerCase()} ${m[2]}`;
+    if (seen.has(label)) return;
+    const body = src.slice(m.index + m[0].length, Math.min(hits[i + 1]?.index ?? src.length, m.index + 9000)).trim();
+    const sol = body.match(SOLUTION);
+    const q = (sol ? body.slice(0, sol.index) : body.slice(0, 2500)).trim();
+    if (q.length < 60 || q.length > 3500) return;
+    seen.add(label);
+    out.push({ label, text: q, solution: sol ? body.slice(sol.index + sol[0].length).trim().slice(0, 6000) : '' });
+  });
+  return out;
+}
+
 // From a file name or label: { year, type: 'Tutorial'|'CAT1'|'CAT2'|'CAT'|'Exam' }.
 export function paperInfo(name) {
   const s = String(name || '');

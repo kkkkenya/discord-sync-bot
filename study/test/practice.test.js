@@ -230,3 +230,22 @@ test('several questions are solved 2-4 a call, sized by marks, and kept', async 
   assert.deepEqual(await explainBatch({ unit: 'EMM 302', questionIds: ids }, { explain, ready: () => true }), { done: [], left: [] });
   assert.equal(sent.length, 1);
 });
+
+// A topic's study guide: made once, kept on the topic, shared; a classmate's is used for free
+const { makeGuideFor } = await import('../server/guide.js');
+test('a study guide is made once, kept on the topic and shared; a shared one costs nothing', async () => {
+  const topic = data.topics.find((t) => t.unit === 'EMM 302') || (data.topics.push({ id: 't-guide', unit: 'EMM 302', name: 'Direct stress' }), data.topics.at(-1));
+  const store = new Map();
+  const shared = { get: async (k) => store.get(k) || null, put: async (k, u, g) => { store.set(k, g); } };
+  let made = 0;
+  const make = async (input) => { made += 1; assert.equal(input.topic, topic.name); return { overview: 'o', outline: [], exam: 'e', plan: [], checklist: [] }; };
+  delete topic.guide;
+  assert.equal((await makeGuideFor({ unit: 'EMM 302', topicId: topic.id }, { make, ready: () => false, shared })).needAi, true);
+  const g = await makeGuideFor({ unit: 'EMM 302', topicId: topic.id }, { make, ready: () => true, shared });
+  assert.deepEqual([g.overview, made, store.size], ['o', 1, 1]);
+  delete topic.guide; // a classmate: no guide of their own, the shared one comes free
+  assert.equal((await makeGuideFor({ unit: 'EMM 302', topicId: topic.id }, { make, ready: () => false, shared })).overview, 'o');
+  assert.equal(made, 1);
+  await makeGuideFor({ unit: 'EMM 302', topicId: topic.id, fresh: true }, { make, ready: () => true, shared });
+  assert.equal(made, 2);
+});

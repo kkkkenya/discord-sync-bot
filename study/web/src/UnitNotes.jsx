@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, prepareUnit } from './api.js';
+import OpenAt from './OpenAt.jsx';
 
 const status = (f) => (f.chars > 0 ? ['good', 'Read'] : f.synced ? ['warn', 'No text'] : [null, 'Not read']);
 
@@ -71,6 +72,7 @@ export default function UnitNotes(props) {
                 <span className="row-main"><span className="filename">{f.name}</span><span className="row-sub">{f.paper ? 'Paper' : 'Notes'}{f.pages ? ` · ${f.pages} pages` : ''}</span></span>
                 <span className={`chip ${tone || ''}`}>{label}</span>
                 {f.url && <a className="btn" href={f.url} target="_blank" rel="noreferrer">Open in Discord</a>}
+                <OpenAt fileId={f.id} label="Open" />
                 {f.url && /^\d+$/.test(f.id) && <button className="btn plain" onClick={() => download(f)}>Download</button>}
               </div>
             );

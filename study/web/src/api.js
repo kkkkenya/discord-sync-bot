@@ -82,3 +82,27 @@ export async function prepareUnit(unit, onProgress = () => {}) {
     await new Promise((ok) => setTimeout(ok, 3000));
   }
 }
+
+// A hub file opened at a page (#page=N works in browser PDF viewers). Discord's file links last about a day, so one is
+// kept per file for 20 hours: opening the same book again, at another page, doesn't use another of today's downloads.
+// Opens the tab straight away (so the browser allows it) and fills it in when the link comes.
+const LINKS = 'crux-file-links';
+export async function openFile(fileId, page) {
+  const win = window.open('about:blank', '_blank');
+  let links = {};
+  try { links = JSON.parse(localStorage.getItem(LINKS) || '{}'); } catch { /* private window */ }
+  try {
+    let url = links[fileId]?.until > Date.now() ? links[fileId].url : null;
+    if (!url) {
+      url = (await api('GET', `files/${fileId}/download`)).url;
+      links[fileId] = { url, until: Date.now() + 20 * 3600e3 };
+      try { localStorage.setItem(LINKS, JSON.stringify(links)); } catch { /* not kept: the next open asks again */ }
+    }
+    const to = page ? `${url}#page=${page}` : url;
+    if (win) win.location.href = to; else window.location.href = to;
+  } catch (e) {
+    win?.close();
+    throw new Error(e.message === 'download-limit' ? "Today's downloads are used: more tomorrow, or open the file in Discord." : e.message);
+  }
+}
+export const hubFile = (id) => /^\d+$/.test(String(id ?? ''));

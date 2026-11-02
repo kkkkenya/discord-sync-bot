@@ -652,3 +652,11 @@ body:has(.notesbar):has(.focusbar) .main { padding-bottom: calc(var(--tabs) + 14
 .guide-check { list-style: none; margin: 0; padding: 0; display: grid; }
 .guide-check .check { align-items: flex-start; min-height: 36px; }
 .guide-check input { margin-top: 4px; }
+/* "Open in book · p. 112" (OpenAt.jsx) */
+.openat { display: inline-flex; align-items: center; gap: var(--s2); flex-wrap: wrap; }
+.openat .btn { display: inline-flex; align-items: center; gap: var(--s2); padding-inline: 0; }
+.openat .icon { width: 16px; height: 16px; }
+.qbox-tools { display: flex; flex-wrap: wrap; gap: var(--s3); }
+.q-tools { display: flex; flex-direction: column; align-items: flex-end; gap: var(--s1); flex: none; }
+.list-item { display: grid; }
+.list-item > .openat { padding: 0 var(--s4) var(--s2); }

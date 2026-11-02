@@ -399,8 +399,9 @@ const PLACE = {
     book: { type: 'string', description: 'The file name of one of the listed books or notes, exactly as given.' },
     where: { type: 'string', description: 'Chapter, section and page numbers as the book prints them, e.g. "Ch. 3, §3.4-3.6, pp. 112-121". Only places the material shows; never invent a page.' },
     focus: { type: 'string', description: 'What to read there for: the derivation, the worked examples, a table.' },
+    page: { type: 'integer', description: 'The PDF page to open it at: a page number from the "pages that mention the topic" list for this book (those are PDF pages), else 0. Never a printed page number.' },
   },
-  required: ['book', 'where', 'focus'],
+  required: ['book', 'where', 'focus', 'page'],
   additionalProperties: false,
 };
 const GUIDE_SCHEMA = {

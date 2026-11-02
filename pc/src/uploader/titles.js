@@ -33,7 +33,8 @@ function words(text) {
   return out;
 }
 
-const catalogue = UNITS.map((u) => ({ ...u, w: words(u.title) }));
+// a unit is found by its official title or any older name (aliases), and always comes back under the official one
+const catalogue = UNITS.flatMap((u) => [u.title, ...(u.aliases || [])].map((t) => ({ ...u, w: words(t) })));
 
 function score(f, t) {
   const shared = [...f.content].filter((w) => t.content.has(w)).length;

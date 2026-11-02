@@ -229,15 +229,243 @@
  },
  {
   "codes": [
+   "EBE 200"
+  ],
+  "title": "Computer Programming I"
+ },
+ {
+  "codes": [
+   "EBE 201"
+  ],
+  "title": "Computer Aided Engineering Drawing"
+ },
+ {
+  "codes": [
+   "EBE 202"
+  ],
+  "title": "Fluid Mechanics I"
+ },
+ {
+  "codes": [
+   "EBE 203"
+  ],
+  "title": "Engineering Thermodynamics I"
+ },
+ {
+  "codes": [
+   "EBE 204"
+  ],
+  "title": "Electrical Engineering I"
+ },
+ {
+  "codes": [
+   "EBE 205"
+  ],
+  "title": "Workshop Process and Practice I"
+ },
+ {
+  "codes": [
+   "EBE 300"
+  ],
+  "title": "Soil Mechanics"
+ },
+ {
+  "codes": [
+   "EBE 301"
+  ],
+  "title": "Engineering Design I"
+ },
+ {
+  "codes": [
+   "EBE 302"
+  ],
+  "title": "Engineering Hydrology"
+ },
+ {
+  "codes": [
+   "EBE 303"
+  ],
+  "title": "Principles of Crop Production"
+ },
+ {
+  "codes": [
+   "EBE 304"
+  ],
+  "title": "Mechanics of Machines II"
+ },
+ {
+  "codes": [
+   "EBE 305"
+  ],
+  "title": "Engineering Thermodynamics III"
+ },
+ {
+  "codes": [
+   "EBE 306"
+  ],
+  "title": "Solid and Structural Mechanics I"
+ },
+ {
+  "codes": [
+   "EBE 401"
+  ],
+  "title": "Irrigation and Drainage"
+ },
+ {
+  "codes": [
+   "EBE 402"
+  ],
+  "title": "Agricultural Process Engineering I"
+ },
+ {
+  "codes": [
+   "EBE 403"
+  ],
+  "title": "Refrigeration and Air Conditioning"
+ },
+ {
+  "codes": [
+   "EBE 404"
+  ],
+  "title": "Farm Power and Machinery I"
+ },
+ {
+  "codes": [
+   "EBE 405"
+  ],
+  "title": "Water Resources Engineering"
+ },
+ {
+  "codes": [
+   "EBE 406"
+  ],
+  "title": "Agricultural Animal Production and Husbandry"
+ },
+ {
+  "codes": [
+   "EBE 500"
+  ],
+  "title": "Land Use Planning and Photogrammetry"
+ },
+ {
+  "codes": [
+   "EBE 501"
+  ],
+  "title": "Engineering Design Project I"
+ },
+ {
+  "codes": [
+   "EBE 502"
+  ],
+  "title": "Environmental Impact Assessment"
+ },
+ {
+  "codes": [
+   "EBE 503"
+  ],
+  "title": "Quality Control Methods"
+ },
+ {
+  "codes": [
+   "EBE 504"
+  ],
+  "title": "Instrumentation and Control"
+ },
+ {
+  "codes": [
+   "EBE 505"
+  ],
+  "title": "Safety Engineering"
+ },
+ {
+  "codes": [
+   "EBE 506"
+  ],
+  "title": "Renewable Energy"
+ },
+ {
+  "codes": [
+   "EBM 200"
+  ],
+  "title": "Biomaterials"
+ },
+ {
+  "codes": [
+   "EBM 300"
+  ],
+  "title": "Foundations of Human Biology"
+ },
+ {
+  "codes": [
+   "EBM 301"
+  ],
+  "title": "Properties of Biomaterials"
+ },
+ {
+  "codes": [
+   "EBM 302"
+  ],
+  "title": "Basics of Medical Biochemistry"
+ },
+ {
+  "codes": [
+   "EBM 402"
+  ],
+  "title": "Medical Physiology for Biomedical Engineers I"
+ },
+ {
+  "codes": [
+   "EBM 501"
+  ],
+  "title": "Biomedical Instrumentation II"
+ },
+ {
+  "codes": [
+   "EBM 502"
+  ],
+  "title": "Introduction to Bioinformatics"
+ },
+ {
+  "codes": [
+   "EBM 503"
+  ],
+  "title": "Digital Imaging Processing"
+ },
+ {
+  "codes": [
+   "EBM 504"
+  ],
+  "title": "Biosensors"
+ },
+ {
+  "codes": [
+   "EBM 505"
+  ],
+  "title": "Medical Physiology and Anatomy for Biomedical Engineers II"
+ },
+ {
+  "codes": [
+   "EBM 506"
+  ],
+  "title": "Biomechanics II"
+ },
+ {
+  "codes": [
    "ECU 100"
   ],
-  "title": "Chemistry I"
+  "title": "Chemistry for Engineers I",
+  "aliases": [
+   "Chemistry I"
+  ]
  },
  {
   "codes": [
    "ECU 101"
   ],
-  "title": "Physics I"
+  "title": "Physics for Engineers I",
+  "aliases": [
+   "Physics I"
+  ]
  },
  {
   "codes": [
@@ -255,13 +483,19 @@
   "codes": [
    "ECU 104"
   ],
-  "title": "Analytical Geometry"
+  "title": "Engineering Mathematics I",
+  "aliases": [
+   "Analytical Geometry"
+  ]
  },
  {
   "codes": [
    "ECU 105"
   ],
-  "title": "Algebra"
+  "title": "Engineering Mathematics II",
+  "aliases": [
+   "Algebra"
+  ]
  },
  {
   "codes": [
@@ -277,15 +511,27 @@
  },
  {
   "codes": [
+   "ECU 109"
+  ],
+  "title": "Fundamentals of Computing"
+ },
+ {
+  "codes": [
    "ECU 200"
   ],
-  "title": "Calculus II"
+  "title": "Engineering Mathematics V",
+  "aliases": [
+   "Calculus II"
+  ]
  },
  {
   "codes": [
    "ECU 201"
   ],
-  "title": "Statistics And Probability"
+  "title": "Engineering Mathematics VI",
+  "aliases": [
+   "Statistics And Probability"
+  ]
  },
  {
   "codes": [
@@ -303,7 +549,10 @@
   "codes": [
    "ECU 300"
   ],
-  "title": "Engineering Maths IX"
+  "title": "Engineering Mathematics IX",
+  "aliases": [
+   "Engineering Maths IX"
+  ]
  },
  {
   "codes": [
@@ -315,7 +564,10 @@
   "codes": [
    "ECU 302"
   ],
-  "title": "Entrepreneurship"
+  "title": "Innovation and Entrepreneurship for Engineers",
+  "aliases": [
+   "Entrepreneurship"
+  ]
  },
  {
   "codes": [
@@ -334,6 +586,48 @@
    "ECU 500"
   ],
   "title": "Engineering Practice And Ethics"
+ },
+ {
+  "codes": [
+   "ECV 101"
+  ],
+  "title": "Material Science"
+ },
+ {
+  "codes": [
+   "ECV 200"
+  ],
+  "title": "Engineering Drawing II"
+ },
+ {
+  "codes": [
+   "ECV 201"
+  ],
+  "title": "Surveying I"
+ },
+ {
+  "codes": [
+   "ECV 202"
+  ],
+  "title": "Fluid Mechanics I"
+ },
+ {
+  "codes": [
+   "ECV 203"
+  ],
+  "title": "Strength of Materials I"
+ },
+ {
+  "codes": [
+   "ECV 204"
+  ],
+  "title": "Theory of Structures I"
+ },
+ {
+  "codes": [
+   "ECV 205"
+  ],
+  "title": "Civil Engineering Materials I"
  },
  {
   "codes": [
@@ -379,11 +673,273 @@
  },
  {
   "codes": [
+   "ECV 400"
+  ],
+  "title": "Traffic Engineering I"
+ },
+ {
+  "codes": [
+   "ECV 401"
+  ],
+  "title": "Highway Engineering I"
+ },
+ {
+  "codes": [
+   "ECV 402"
+  ],
+  "title": "Irrigation Engineering I"
+ },
+ {
+  "codes": [
+   "ECV 403"
+  ],
+  "title": "Foundation Engineering I"
+ },
+ {
+  "codes": [
+   "ECV 404"
+  ],
+  "title": "Structural Design I (Studio)"
+ },
+ {
+  "codes": [
+   "ECV 405"
+  ],
+  "title": "Theory of Structures V"
+ },
+ {
+  "codes": [
+   "ECV 500"
+  ],
+  "title": "Civil Engineering Project I"
+ },
+ {
+  "codes": [
+   "ECV 501"
+  ],
+  "title": "Structural Design III (Studio)"
+ },
+ {
+  "codes": [
+   "ECV 502"
+  ],
+  "title": "Water Resources Engineering I"
+ },
+ {
+  "codes": [
+   "ECV 503"
+  ],
+  "title": "Highway Materials"
+ },
+ {
+  "codes": [
+   "ECV 504"
+  ],
+  "title": "Construction Management"
+ },
+ {
+  "codes": [
+   "ECV 505"
+  ],
+  "title": "Environmental Engineering"
+ },
+ {
+  "codes": [
+   "ECV 506"
+  ],
+  "title": "Public Health Engineering III"
+ },
+ {
+  "codes": [
+   "EEE 100"
+  ],
+  "title": "Engineering Drawing I"
+ },
+ {
+  "codes": [
+   "EEE 200"
+  ],
+  "title": "Introduction to Material Science"
+ },
+ {
+  "codes": [
+   "EEE 201"
+  ],
+  "title": "Thermodynamics"
+ },
+ {
+  "codes": [
+   "EEE 202"
+  ],
+  "title": "Computer Programming II"
+ },
+ {
+  "codes": [
+   "EEE 203"
+  ],
+  "title": "Circuit Theory I"
+ },
+ {
+  "codes": [
+   "EEE 205"
+  ],
+  "title": "Physical Electronics"
+ },
+ {
+  "codes": [
+   "EEE 212"
+  ],
+  "title": "Mechanics of Machines"
+ },
+ {
+  "codes": [
+   "EEE 300"
+  ],
+  "title": "Electrical Machines II"
+ },
+ {
+  "codes": [
+   "EEE 302"
+  ],
+  "title": "Electromagnetic Fields"
+ },
+ {
+  "codes": [
+   "EEE 304"
+  ],
+  "title": "Electrical Engineering Materials"
+ },
+ {
+  "codes": [
+   "EEE 305"
+  ],
+  "title": "Digital Electronics I"
+ },
+ {
+  "codes": [
+   "EEE 308"
+  ],
+  "title": "Analogue Electronics I"
+ },
+ {
+  "codes": [
+   "EEE 310"
+  ],
+  "title": "Control Systems I"
+ },
+ {
+  "codes": [
+   "EEE 400"
+  ],
+  "title": "Communication Systems I"
+ },
+ {
+  "codes": [
+   "EEE 402"
+  ],
+  "title": "Complex Analysis for Engineers"
+ },
+ {
+  "codes": [
+   "EEE 403"
+  ],
+  "title": "Analogue Electronics III"
+ },
+ {
+  "codes": [
+   "EEE 404"
+  ],
+  "title": "Power Systems II"
+ },
+ {
+  "codes": [
+   "EEE 405"
+  ],
+  "title": "Power Electronics"
+ },
+ {
+  "codes": [
+   "EEE 406"
+  ],
+  "title": "Microprocessor Systems and Applications"
+ },
+ {
+  "codes": [
+   "EEE 410"
+  ],
+  "title": "Signals and Systems"
+ },
+ {
+  "codes": [
+   "EEE 501"
+  ],
+  "title": "Renewable Energy Technology"
+ },
+ {
+  "codes": [
+   "EEE 502"
+  ],
+  "title": "Power Systems Analysis"
+ },
+ {
+  "codes": [
+   "EEE 504"
+  ],
+  "title": "Power Transmission and Distribution"
+ },
+ {
+  "codes": [
+   "EEE 507"
+  ],
+  "title": "Energy Management and Environmental Protection"
+ },
+ {
+  "codes": [
+   "EEE 509"
+  ],
+  "title": "Mobile and Wireless Communication"
+ },
+ {
+  "codes": [
+   "EEE 541"
+  ],
+  "title": "Utilization of Electrical Energy"
+ },
+ {
+  "codes": [
+   "EEE 544"
+  ],
+  "title": "Teletraffic Engineering"
+ },
+ {
+  "codes": [
+   "EEE 545"
+  ],
+  "title": "Satellite Communication"
+ },
+ {
+  "codes": [
+   "EEE 553"
+  ],
+  "title": "Radio Communication Engineering"
+ },
+ {
+  "codes": [
+   "EEE 556"
+  ],
+  "title": "Programmable Logic Controllers"
+ },
+ {
+  "codes": [
    "EMM 100",
    "EAR 100",
    "EBE 100"
   ],
-  "title": "Drawing I"
+  "title": "Engineering Drawing I",
+  "aliases": [
+   "Drawing I",
+   "Engineering Drawing and Design I"
+  ]
  },
  {
   "codes": [
@@ -432,13 +988,19 @@
    "EMM 203",
    "EAR 203"
   ],
-  "title": "Thermodynamics I"
+  "title": "Engineering Thermodynamics I",
+  "aliases": [
+   "Thermodynamics I"
+  ]
  },
  {
   "codes": [
    "EMM 204"
   ],
-  "title": "Fluid Mechanics"
+  "title": "Fluid Mechanics I",
+  "aliases": [
+   "Fluid Mechanics"
+  ]
  },
  {
   "codes": [
@@ -458,7 +1020,10 @@
   "codes": [
    "EMM 210"
   ],
-  "title": "Engineering Mechanics"
+  "title": "Engineering Mechanics I",
+  "aliases": [
+   "Engineering Mechanics"
+  ]
  },
  {
   "codes": [
@@ -472,7 +1037,10 @@
    "EMM 212",
    "EAR 205"
   ],
-  "title": "Workshop Processes And Practices"
+  "title": "Workshop Processes and Practice II",
+  "aliases": [
+   "Workshop Processes And Practices"
+  ]
  },
  {
   "codes": [
@@ -500,7 +1068,10 @@
   "codes": [
    "EMM 218"
   ],
-  "title": "Engineering Materials I"
+  "title": "Engineering Materials",
+  "aliases": [
+   "Engineering Materials I"
+  ]
  },
  {
   "codes": [
@@ -519,13 +1090,19 @@
   "codes": [
    "EMM 301"
   ],
-  "title": "Kinematic Pairs Chains And Mechanisms"
+  "title": "Mechanics of Machines I",
+  "aliases": [
+   "Kinematic Pairs Chains And Mechanisms"
+  ]
  },
  {
   "codes": [
    "EMM 302"
   ],
-  "title": "Strength of Materials"
+  "title": "Solid and Structural Mechanics I",
+  "aliases": [
+   "Strength of Materials"
+  ]
  },
  {
   "codes": [
@@ -564,7 +1141,10 @@
    "EMM 318",
    "EAR 306"
   ],
-  "title": "Machine Design"
+  "title": "Principles of Engineering Design",
+  "aliases": [
+   "Machine Design"
+  ]
  },
  {
   "codes": [
@@ -683,13 +1263,19 @@
    "UCU 100",
    "UCU 110"
   ],
-  "title": "Communication Skills"
+  "title": "Communication and Collaboration Skills",
+  "aliases": [
+   "Communication Skills"
+  ]
  },
  {
   "codes": [
    "UCU 111"
   ],
-  "title": "Critical Thinking & Problem Solving"
+  "title": "Critical Thinking and Problem Solving",
+  "aliases": [
+   "Critical Thinking & Problem Solving"
+  ]
  },
  {
   "codes": [

@@ -8,15 +8,24 @@ const read = (f) => JSON.parse(readFileSync(new URL(`../../lib/${f}`, import.met
 const ALL = catalogue(read('units.json'), read('threads.json'));
 const codes = (list) => list.map((u) => u.code);
 
-test('EMM · Year 3 loads the 3rd-year Mechanical units plus shared maths/common units', () => {
+test('EMM · Year 3 loads its timetabled units (plus EAR 307, where its files sit) and the other shared units', () => {
   const { core, shared } = cohortUnits(ALL, { course: 'EMM', year: 3 });
-  assert.ok(core.length >= 10);
-  assert.ok(codes(core).every((c) => /^EMM 3\d\d$/.test(c) || c === 'EAR 307'), codes(core).join());
-  assert.ok(codes(core).includes('EMM 302'));
-  assert.ok(codes(core).includes('EAR 307'), 'EAR 307 sits in mech-year-3');
-  assert.ok(!codes(core).includes('EMM 400'), 'a 4th-year unit cross-listed with a 3rd-year EAR code is not EMM year 3');
-  assert.deepEqual(codes(shared).filter((c) => c.startsWith('ECU')), ['ECU 300', 'ECU 301', 'ECU 302']);
+  assert.deepEqual(codes(core), ['EAR 307', 'ECU 300', 'EMM 301', 'EMM 302', 'EMM 305', 'EMM 308', 'EMM 312', 'EMM 314', 'EMM 318']);
+  assert.equal(core.find((u) => u.code === 'EMM 302').title, 'Solid and Structural Mechanics I');
+  assert.deepEqual(codes(shared).filter((c) => c.startsWith('ECU')), ['ECU 301', 'ECU 302']);
   assert.ok(codes(shared).includes('SMA 330'));
+});
+
+test('without a timetable a cohort is guessed from the codes: the year digit and the course', () => {
+  const { core } = cohortUnits(ALL, { course: 'EMM', year: 3 }, null);
+  assert.ok(codes(core).every((c) => /^EMM 3\d\d$/.test(c) || c === 'EAR 307'), codes(core).join());
+  assert.ok(!codes(core).includes('EMM 400'), 'a 4th-year unit cross-listed with a 3rd-year EAR code is not EMM year 3');
+});
+
+test('Biomedical year 3 takes Electrical units too, by their EEE codes and official titles', () => {
+  const { core } = cohortUnits(ALL, { course: 'EBM', year: 3 });
+  assert.ok(codes(core).includes('EEE 305'));
+  assert.equal(core.find((u) => u.code === 'EBM 301').title, 'Properties of Biomaterials');
 });
 
 test('cross-listed units use the code the course knows them by', () => {
@@ -31,7 +40,7 @@ test('every course with units in the catalogue is offered', () => {
   assert.ok(cohortUnits(ALL, { course: 'EEE', year: 3 }).core.length > 0);
   assert.ok(cohortUnits(ALL, { course: 'ECV', year: 3 }).core.length > 0);
   // units with only a forum thread come through without a title
-  assert.ok(cohortUnits(ALL, { course: 'EBM', year: 3 }).core.some((u) => u.code === 'EBM 304' && u.title === ''));
+  assert.ok(cohortUnits(ALL, { course: 'EBM', year: 3 }, null).core.some((u) => u.code === 'EBM 304' && u.title === ''));
 });
 
 test('year 1 shares the university common units; an empty cohort is just empty', () => {

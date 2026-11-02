@@ -1,6 +1,7 @@
 // Builds lib/units.json, the unit catalogue the uploader uses to recognise folders named by title
 // ("Fluid Mechanics 2", "Heat Transfer") instead of code. Sources: the website's unit pages
-// (engstudyhub/public/redesign/units/<codes>-<title>) and the titled posts in lib/threads.json.
+// (engstudyhub/public/redesign/units/<codes>-<title>), the titled posts in lib/threads.json, and the official titles
+// in lib/timetable.json (KU's semester timetables), which win: an older name stays on as an alias.
 //   node make-units.js [path to the engstudyhub repo]
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,6 +33,16 @@ if (existsSync(dir)) {
     add(codes, title);
   }
 } else console.warn(`Website repo not found at ${site}; using lib/threads.json titles only.`);
+
+// the timetable's official titles win; the name the unit had before is kept as an alias for folder matching
+const timetable = JSON.parse(readFileSync(new URL('../lib/timetable.json', import.meta.url), 'utf8'));
+for (const [code, title] of Object.entries(timetable.titles)) {
+  const key = [...units.keys()].find((k) => units.get(k).codes.includes(code));
+  const old = key && units.get(key);
+  if (!old) { units.set(code, { codes: [code], title }); continue; }
+  if (old.title.toLowerCase() === title.toLowerCase()) continue;
+  units.set(key, { ...old, title, aliases: [...new Set([...(old.aliases || []), old.title])] });
+}
 
 const list = [...units.values()].sort((a, b) => a.codes[0].localeCompare(b.codes[0]));
 writeFileSync(new URL('../lib/units.json', import.meta.url), `${JSON.stringify(list, null, 1)}\n`);

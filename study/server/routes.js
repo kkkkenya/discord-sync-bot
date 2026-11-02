@@ -390,11 +390,11 @@ const routes = {
       const questions = predictedMock(predictFor(unit, nairobiDay()), data.paperq.filter((x) => x.unit === unit && !isBook(x)))
         // the answer key saved by "Check my answer" when there is one; without, the mock is self-marked (see submitMock)
         .map((x) => (x.key
-          ? { q: x.q, a: `Final answer (${KEY_LABEL[x.key.source]}): ${x.key.answer}`, marks: x.marks, topic: x.topic }
-          : { q: x.q, a: `No answer key yet: mark it against the ${x.source || 'paper'} marking scheme, or check it in Check answer first.`, marks: x.marks, topic: x.topic, noKey: true }));
+          ? { q: x.q, a: `Final answer (${KEY_LABEL[x.key.source]}): ${x.key.answer}`, marks: x.marks, topic: x.topic, fileId: x.fileId, page: x.page }
+          : { q: x.q, a: `No answer key yet: mark it against the ${x.source || 'paper'} marking scheme, or check it in Check answer first.`, marks: x.marks, topic: x.topic, fileId: x.fileId, page: x.page, noKey: true }));
       if (!questions.length) throw Object.assign(new Error('No past-paper questions mapped to topics yet. In Predictions, read the past papers and check their topics.'), { status: 400 });
       const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} predicted mock`, questions, predicted: true });
-      return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
+      return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks, fileId, page, book }) => ({ q, marks, fileId, page, book })) };
     }
     const count = body.count ? clamp(body.count, 1, 10) : 5;
     const bank = data.questions.filter((x) => x.unit === unit).sort(() => Math.random() - 0.5);
@@ -402,7 +402,7 @@ const routes = {
     const topicName = (id) => data.topics.find((t) => t.id === id)?.name || '';
     const books = data.paperq.filter((x) => x.unit === unit && isBook(x)).sort((a, b) => Number(Boolean(b.bookSolution)) - Number(Boolean(a.bookSolution)) || Math.random() - 0.5);
     questions = questions.concat(books.slice(0, count - questions.length).map((x) => ({
-      q: x.text, marks: 10, topic: topicName(x.topicId), source: `${x.source}, ${x.label}`,
+      q: x.text, marks: 10, topic: topicName(x.topicId), source: `${x.source}, ${x.label}`, fileId: x.fileId, page: x.page || null, book: true,
       a: x.bookSolution ? `The book's solution (${x.label}):\n${x.bookSolution}` : `The book gives no worked solution for ${x.label}. Open it in Practise for a full worked solution.`,
     })));
     if (questions.length < count && aiReady()) {
@@ -411,7 +411,7 @@ const routes = {
     }
     if (!questions.length) throw Object.assign(new Error(aiReady() ? 'Nothing to build a mock from. Add topics in Units, or add questions from your notes (below).' : 'No banked questions for this unit and no AI key to write some. Use the Prompt Builder (Mock exam questions) in another AI, or add a key.'), { status: 400 });
     const mock = add('mocks', { unit, name: body.name?.trim() || `${unit} mock`, questions });
-    return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks }) => ({ q, marks })) };
+    return { id: mock.id, unit: mock.unit, name: mock.name, at: mock.at, questions: mock.questions.map(({ q, marks, fileId, page, book }) => ({ q, marks, fileId, page, book })) };
   },
   // Build a self-contained prompt to paste into any other AI chat, grounded in the synced library.
   'POST /api/prompt': (q, body) => buildPrompt(body || {}),

@@ -12,7 +12,7 @@ test('catalog follows the requested cohort', async () => {
   const { body } = await srv.call('GET', 'catalog?course=EMM&year=3');
   assert.equal(body.course, 'EMM');
   assert.ok(body.core.some((u) => u.code === 'EMM 302'));
-  assert.ok(body.shared.some((u) => u.code === 'ECU 300'));
+  assert.ok(body.core.some((u) => u.code === 'ECU 300')); // timetabled this semester
   assert.ok(body.courses.length >= 7);
   const ear = (await srv.call('GET', 'catalog?course=EAR&year=3')).body;
   assert.ok(ear.core.some((u) => u.code === 'EAR 302'));

@@ -37,7 +37,7 @@ function numbered(src, re, number, replace = true) {
     const head = body.match(/^[\s:.\-–(]*(\d{1,3})\s*(?:marks?|mks?)\s*\)?/i);
     const parts = [...body.matchAll(SUB_MARKS)].reduce((n, m) => n + Number(m[1]), 0);
     const rest = head ? body.slice(head[0].length) : body;
-    return { number: s.n, marks: head ? Number(head[1]) : parts || null, text: cap(rest.replace(/^[\s:.\-–]+/, '')) };
+    return { number: s.n, marks: head ? Number(head[1]) : parts || null, text: cap(rest.replace(/^[\s:.\-–]+/, '')), offset: s.at };
   });
 }
 
@@ -49,11 +49,12 @@ function byMarks(src) {
   let from = 0;
   for (const m of src.matchAll(SUB_MARKS)) {
     const text = cap(src.slice(from, m.index).trim());
+    const offset = from;
     from = m.index + m[0].length;
     const key = text.replace(/\s+/g, '').toLowerCase(); // extracted text spaces words unevenly ("D etermine")
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ number: out.length + 1, marks: Number(m[1]), text });
+    out.push({ number: out.length + 1, marks: Number(m[1]), text, offset });
   }
   return out;
 }
@@ -101,7 +102,7 @@ export function bookQuestions(text) {
     const q = (sol ? body.slice(0, sol.index) : body.slice(0, 2500)).trim();
     if (q.length < 60 || q.length > 3500) return;
     seen.add(label);
-    out.push({ label, text: q, solution: sol ? body.slice(sol.index + sol[0].length).trim().slice(0, 6000) : '' });
+    out.push({ label, text: q, solution: sol ? body.slice(sol.index + sol[0].length).trim().slice(0, 6000) : '', offset: m.index });
   });
   return out;
 }
@@ -196,7 +197,7 @@ export function predictedMock(ranked, questions, { share = 0.65, max = 6 } = {})
   for (const r of live) {
     if (picked.length >= max || (total && covered >= total * share)) break;
     const q = questions.filter((x) => x.topicId === r.topicId).sort((a, b) => (b.year || 0) - (a.year || 0))[0];
-    picked.push({ q: q.text, marks: q.marks || DEFAULT_MARKS, topic: r.name, year: q.year, source: q.source, key: q.key ? { answer: q.key.answer, source: q.key.source } : null });
+    picked.push({ q: q.text, marks: q.marks || DEFAULT_MARKS, topic: r.name, year: q.year, source: q.source, fileId: q.fileId || null, page: q.page || null, key: q.key ? { answer: q.key.answer, source: q.key.source } : null });
     covered += r.weight;
   }
   return picked;

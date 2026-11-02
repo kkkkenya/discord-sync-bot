@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import OpenAt from './OpenAt.jsx';
 import Rich from './Rich.jsx';
 import { api } from './api.js';
 
@@ -94,7 +95,10 @@ export default function UnitPapers({ s, unit, refresh, go, notify }) {
                   <span className="row-sub">{[q.source, q.year, q.type, q.marks && `${q.marks} marks`].filter(Boolean).join(' · ')}</span>
                   <Rich text={q.text} as="span" className="qtext" />
                 </span>
-                <button className="btn" onClick={() => go('practice', { unit, questionId: q.id })}>Practise</button>
+                <span className="q-tools">
+                  <button className="btn" onClick={() => go('practice', { unit, questionId: q.id })}>Practise</button>
+                  <OpenAt fileId={q.fileId} page={q.page} book={q.type === 'Book'} />
+                </span>
               </div>
             ))}
           </details>

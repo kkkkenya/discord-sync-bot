@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, useElapsed } from './api.js';
+import OpenAt from './OpenAt.jsx';
 import Rich, { layoutParts } from './Rich.jsx';
 
 // Study this topic: notes and worked examples from your own files first, questions later. Built without AI from the
@@ -15,6 +16,7 @@ function Ref({ r, i }) {
       </div>
       {!pages && r.find && <p className="muted small">Look for “{r.find}…”{r.local ? ' · on this computer' : ''}</p>}
       <p className="muted small">{r.snippet}</p>
+      <OpenAt fileId={r.fileId} page={r.pages?.[0]} book label={r.pages ? `Open at page ${r.pages[0]}` : 'Open the file'} />
       <details className="disclosure small"><summary>Read it here</summary><p className="excerpt">{r.excerpt}</p></details>
     </li>
   );
@@ -22,7 +24,8 @@ function Ref({ r, i }) {
 
 // The topic's study guide: what the course expects for each sub-topic, its formulas, where in your books to read and
 // what to skip; then how it's examined, a study order and an "I can…" checklist.
-function Guide({ g, remake, busy }) {
+function Guide({ g, remake, busy, books = [] }) {
+  const fileOf = (name) => books.find((b) => b.name === name)?.id;
   return (
     <div className="guide stack-s">
       <Rich text={g.overview} />
@@ -36,7 +39,7 @@ function Guide({ g, remake, busy }) {
                 {o.formulas.length > 0 && <ul className="guide-formulas">{o.formulas.map((f) => <li key={f}><Rich text={f} as="span" /></li>)}</ul>}
                 {o.read.length > 0 && (
                   <ul className="guide-read">
-                    {o.read.map((r) => <li key={r.book + r.where}><b>{r.book.replace(/\.[a-z0-9]+$/i, '').replace(/\(?z-?library\)?/gi, '').replace(/_/g, ' ').trim()}</b> · <span className="num">{r.where}</span><span className="muted">: {r.focus}</span></li>)}
+                    {o.read.map((r) => <li key={r.book + r.where}><b>{r.book.replace(/\.[a-z0-9]+$/i, '').replace(/\(?z-?library\)?/gi, '').replace(/_/g, ' ').trim()}</b> · <span className="num">{r.where}</span><span className="muted">: {r.focus}</span> <OpenAt fileId={fileOf(r.book)} page={r.page || null} book label={r.page ? `Open at page ${r.page}` : 'Open the book'} /></li>)}
                   </ul>
                 )}
                 {o.skip && <p className="muted small"><span className="guide-k">Skip</span> {o.skip}</p>}
@@ -105,7 +108,7 @@ export default function Learn({ s, unit, go, focus }) {
           <div className="stack-s">
             <h3 className="sub-title">Study guide</h3>
             {guideBusy ? <><div className="skeleton" style={{ height: 140 }} /><p className="muted small" role="status">Reading your outline, papers and books… {waited}s</p></>
-              : path.guide ? <Guide g={path.guide} busy={guideBusy} remake={() => makeGuide(true)} />
+              : path.guide ? <Guide g={path.guide} books={path.books} busy={guideBusy} remake={() => makeGuide(true)} />
                 : (
                   <div className="stack-s">
                     <p className="muted small">What the course expects on “{path.topic.name}”, the formulas, and exactly where in your books to read (and what to skip), so you don't search a 500-page book.</p>
@@ -138,12 +141,15 @@ export default function Learn({ s, unit, go, focus }) {
             {path.attempt.length ? (
               <div className="list flat">
                 {path.attempt.map((q) => (
-                  <button key={q.id} type="button" className="list-row" onClick={() => go('practice', { unit, questionId: q.id })}>
+                  <div key={q.id} className="list-item">
+                  <button type="button" className="list-row" onClick={() => go('practice', { unit, questionId: q.id })}>
                     <span className="row-main">
                       <span>{q.source} · {q.label || `Q${q.number}`}{q.marks ? ` · ${q.marks} marks` : ''}{q.hasKey && <span className="chip good">Answer on file</span>}</span>
                       <Rich text={layoutParts(q.text)} as="span" className="row-sub qtext" />
                     </span>
                   </button>
+                  <OpenAt fileId={q.fileId} page={q.page} book={q.type === 'Book'} />
+                  </div>
                 ))}
               </div>
             ) : <p className="muted small">No past-paper or tutorial questions are tagged with this topic yet. They're tagged as papers are read.</p>}

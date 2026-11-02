@@ -3,6 +3,7 @@ import { api } from './api.js';
 import Busy from './Busy.jsx';
 import { Icon } from './icons.jsx';
 import LimitNote from './LimitNote.jsx';
+import OpenAt from './OpenAt.jsx';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
 const MINUTE = 60000;
@@ -115,7 +116,9 @@ export default function Mock({ s, unit, refresh, focus, go, notify }) {
           {left <= 0 && <p className="notice bad" role="status">Time's up. Finish the line you're on and submit.</p>}
           {mock.questions.map((q, i) => (
             <section className="stack" key={i}>
-              <QuestionBox text={q.q} label={`Question ${i + 1}`} marks={q.marks} />
+              <QuestionBox text={q.q} label={`Question ${i + 1}`} marks={q.marks}>
+                {q.fileId && <div className="qbox-tools"><OpenAt fileId={q.fileId} page={q.page} book={q.book} /></div>}
+              </QuestionBox>
               <label className="field"><span className="visually-hidden">Answer to question {i + 1}</span>
                 <textarea rows={4} placeholder="Your answer" value={answers[i]} onChange={(e) => setAnswers(answers.map((a, j) => (j === i ? e.target.value : a)))} />
               </label>

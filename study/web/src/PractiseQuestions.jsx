@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, useElapsed } from './api.js';
 import { photoData } from './media.js';
 import FreeBody from './FreeBody.jsx';
+import OpenAt from './OpenAt.jsx';
 import PickList from './PickList.jsx';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 
@@ -132,7 +133,9 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       </details>
 
       {q && (
-        <QuestionBox text={q.text} meta={[q.source, q.label, q.year, q.type]} marks={q.marks} />
+        <QuestionBox text={q.text} meta={[q.source, q.label, q.year, q.type]} marks={q.marks}>
+          <div className="qbox-tools"><OpenAt fileId={q.fileId} page={q.page} book={q.type === 'Book'} /></div>
+        </QuestionBox>
       )}
 
       {q && !res && (

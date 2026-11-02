@@ -1,7 +1,11 @@
 // Course + year → the units a student is likely taking, from the Study Hub catalogue (lib/units.json). Pure: the
 // catalogue is passed in. A unit's year is the first digit of its code (EMM 302 → year 3), which matches the
 // server's year forums. The catalogue has no semester, so a cohort lists the whole year and the student unticks
-// what they aren't sitting this semester.
+// what they aren't sitting this semester. Where KU's timetable for the semester is known (lib/timetable.json), a
+// cohort gets exactly its timetabled units instead, including other courses' units it takes (Biomedical's EEE ones).
+import { readFileSync } from 'node:fs';
+
+const TIMETABLE = JSON.parse(readFileSync(new URL('../../lib/timetable.json', import.meta.url), 'utf8'));
 
 export const COURSES = {
   EMM: 'Mechanical', EAR: 'Aerospace', EBE: 'Agricultural & Biosystems', ECV: 'Civil',
@@ -31,11 +35,18 @@ export const courses = (all) =>
   Object.entries(COURSES).filter(([c]) => all.some((u) => u.codes.some((x) => prefix(x) === c))).map(([code, name]) => ({ code, name }));
 
 // { core, shared }: each [{ code, codes, title }], sorted by code. `core` is the course's own year units.
-export function cohortUnits(all, { course, year }) {
+export function cohortUnits(all, { course, year }, timetable = TIMETABLE) {
   const extra = EXTRA[`${course} ${year}`] || [];
   const pick = (u) => ({ code: codeFor(u, course), codes: u.codes, title: u.title });
   const byCode = (a, b) => a.code.localeCompare(b.code);
-  const core = all.filter((u) => u.codes.some((c) => (prefix(c) === course && yearOf(c) === year) || extra.includes(c))).map(pick).sort(byCode);
+  const listed = timetable?.cohorts?.[`${course} ${year}`];
+  // timetabled: those units (by the code the timetable gives), plus any forum this cohort keeps its files in
+  const fromTable = listed && [...listed, ...extra].map((c) => {
+    const u = all.find((x) => x.codes.includes(c));
+    return { code: c, codes: u?.codes || [c], title: timetable.titles[c] || u?.title || '' };
+  });
+  const core = fromTable ? fromTable.filter((u, i) => fromTable.findIndex((x) => x.code === u.code) === i).sort(byCode)
+    : all.filter((u) => u.codes.some((c) => (prefix(c) === course && yearOf(c) === year) || extra.includes(c))).map(pick).sort(byCode);
   const taken = new Set(core.map((u) => u.code));
   const shared = all
     .filter((u) => u.codes.some((c) => SHARED.includes(prefix(c)) && yearOf(c) === year))

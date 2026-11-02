@@ -126,3 +126,12 @@ test('book questions: each example word for word up to its Solution, the solutio
   assert.equal(qs[1].solution, '');
   assert.equal(qs[2].solution, 'The permanent set is 4.8 mm.');
 });
+
+test('each question remembers where it starts, so its page can be found', async () => {
+  const { bookQuestions } = await import('../server/predict.js');
+  const paper = 'EMM 302 CAT 1. Q1. Derive the Lame equations for a thick cylinder under internal pressure [15 marks] Q2. Draw Mohr circle for the stress state given and find principal stresses (10 marks)';
+  const qs = parseQuestions(paper);
+  assert.equal(paper.slice(qs[1].offset, qs[1].offset + 3), 'Q2.');
+  const book = 'Preface. Chapter one. Example 1.1. A square steel rod 20 mm by 20 mm carries an axial load of 100 kN. Find the shortening in 50 mm.';
+  assert.equal(book.slice(bookQuestions(book)[0].offset).slice(0, 11), 'Example 1.1');
+});

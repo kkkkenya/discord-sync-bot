@@ -37,9 +37,17 @@ export function loadDoc(url) {
   return docs.get(url);
 }
 const dropDoc = (url) => { const d = docs.get(url); docs.delete(url); d?.then((r) => r.doc?.destroy()).catch(() => {}); };
+// each page's text once, for Find (pages are only fetched as the search reaches them)
+const texts = new WeakMap();
+async function pageText(doc, n) {
+  if (!texts.has(doc)) texts.set(doc, new Map());
+  const m = texts.get(doc);
+  if (!m.has(n)) m.set(n, (await (await doc.getPage(n)).getTextContent()).items.map((it) => it.str).join(' ').replace(/\s+/g, ' ').toLowerCase());
+  return m.get(n);
+}
 const short = (name) => String(name || 'File').replace(/\.[a-z0-9]+$/i, '').replace(/\(?z-?library\)?/gi, '').replace(/_/g, ' ').trim();
 
-function Page({ doc, n, width, ratio, onSeen, marks, onMark }) {
+function Page({ doc, n, width, ratio, onSeen, marks, onMark, hit }) {
   const box = useRef(null);
   const canvas = useRef(null);
   const text = useRef(null);
@@ -69,10 +77,18 @@ function Page({ doc, n, width, ratio, onSeen, marks, onMark }) {
       t.replaceChildren();
       t.style.setProperty('--scale-factor', scale);
       layer = new pdfjs.TextLayer({ textContentSource: p.streamTextContent(), container: t, viewport: p.getViewport({ scale }) });
-      layer.render().catch(() => {});
+      layer.render().then(() => t.dispatchEvent(new Event('drawn'))).catch(() => {});
     });
     return () => { gone = true; task?.cancel(); layer?.cancel(); };
   }, [near, width, doc, n]);
+  // what Find found on this page, lit in the text layer
+  useEffect(() => {
+    const t = text.current;
+    const light = () => t.querySelectorAll('span').forEach((x) => x.classList.toggle('pdf-hit', Boolean(hit) && x.textContent.toLowerCase().includes(hit)));
+    light();
+    t.addEventListener('drawn', light);
+    return () => t.removeEventListener('drawn', light);
+  }, [hit]);
   return (
     <div ref={box} className="pdf-page" data-page={n} style={{ width, height: width * ratio }}>
       <canvas ref={canvas} aria-label={`Page ${n}`} />
@@ -97,6 +113,10 @@ function Reader({ tab, onPage, marks, setMarks, onProblem }) {
   const [open, setOpen] = useState(null); // the highlight tapped: { m, x, y }
   const scroller = useRef(null);
   const jumped = useRef(false);
+  const [goTo, setGoTo] = useState('');
+  const [find, setFind] = useState('');
+  const [found, setFound] = useState(null); // { q, page } | { q, none: true } | { q, looking: page }
+  const findBox = useRef(null);
 
   useEffect(() => {
     let gone = false;
@@ -117,6 +137,25 @@ function Reader({ tab, onPage, marks, setMarks, onProblem }) {
     if (doc && fit && !jumped.current) { jumped.current = true; requestAnimationFrame(() => go(Math.min(tab.page || 1, doc.numPages))); }
   }, [doc, fit, tab.page]);
   useEffect(() => { onPage(at); }, [at]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Ctrl+F finds in the file, not the page behind it
+  useEffect(() => {
+    const key = (e) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); findBox.current?.focus(); findBox.current?.select(); } };
+    document.addEventListener('keydown', key);
+    return () => document.removeEventListener('keydown', key);
+  }, []);
+  // the next page after the one shown (or after the last match) with the words on it, round to the start once
+  const search = async (e) => {
+    e.preventDefault();
+    const q = find.trim().toLowerCase().replace(/\s+/g, ' ');
+    if (!q || !doc) return;
+    const from = found?.q === q && found.page ? found.page : at - 1;
+    for (let i = 1; i <= doc.numPages; i++) {
+      const n = ((from + i - 1) % doc.numPages) + 1;
+      if (i % 10 === 1) setFound({ q, looking: n });
+      try { if ((await pageText(doc, n)).includes(q)) { setFound({ q, page: n }); go(n); return; } } catch { /* a page that won't load is skipped */ }
+    }
+    setFound({ q, none: true });
+  };
 
   // "Highlight" from the selection toolbar (StickyBar's PinButton): the selected lines, as fractions of the page
   useEffect(() => {
@@ -155,10 +194,18 @@ function Reader({ tab, onPage, marks, setMarks, onProblem }) {
       {doc && (
         <div className="pdf-tools">
           <button type="button" className="iconbtn" aria-label="Previous page" disabled={at <= 1} onClick={() => go(at - 1)}><Icon name="down" /></button>
-          <span className="num pdf-at">{at} / {doc.numPages}</span>
+          <form className="pdf-goto" onSubmit={(e) => { e.preventDefault(); const n = Math.round(Number(goTo)); if (n >= 1 && n <= doc.numPages) go(n); setGoTo(''); }}>
+            <input className="num" inputMode="numeric" value={goTo} onChange={(e) => setGoTo(e.target.value.replace(/\D/g, ''))} placeholder={String(at)} aria-label={`Go to page (1 to ${doc.numPages})`} title="Type a page and press Enter" />
+            <span className="num muted">/ {doc.numPages}</span>
+          </form>
           <button type="button" className="iconbtn" aria-label="Next page" disabled={at >= doc.numPages} onClick={() => go(at + 1)}><Icon name="down" /></button>
           <button type="button" className="btn plain" aria-label="Smaller" onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}>−</button>
           <button type="button" className="btn plain" aria-label="Larger" onClick={() => setZoom((z) => Math.min(3, z + 0.25))}>+</button>
+          <form className="pdf-find" role="search" onSubmit={search}>
+            <Icon name="search" />
+            <input ref={findBox} value={find} onChange={(e) => { setFind(e.target.value); setFound(null); }} placeholder="Find in file" aria-label="Find in this file" />
+            {found && <span className="small muted pdf-found" role="status">{found.looking ? `p. ${found.looking}…` : found.none ? 'Not found' : `p. ${found.page} · Enter for next`}</span>}
+          </form>
         </div>
       )}
       <div className="pdf-scroll" ref={scroller} onScroll={() => setOpen(null)}>
@@ -167,7 +214,7 @@ function Reader({ tab, onPage, marks, setMarks, onProblem }) {
         {!doc && !problem && !notPdf && <div className="pdf-loading"><div className="skeleton" style={{ height: 420, width: Math.min(fit || 600, 600) }} /><p className="small">Opening{tab.page ? ` at page ${tab.page}` : ''}…</p></div>}
         {doc && Array.from({ length: doc.numPages }, (_, i) => (
           <Page key={i + 1} doc={doc} n={i + 1} width={width} ratio={ratio} onSeen={setAt}
-            marks={mine.filter((m) => m.page === i + 1)} onMark={(m, r) => setOpen({ m, x: r.left + r.width / 2, y: r.bottom + 6 })} />
+            marks={mine.filter((m) => m.page === i + 1)} hit={found?.page ? found.q : ''} onMark={(m, r) => setOpen({ m, x: r.left + r.width / 2, y: r.bottom + 6 })} />
         ))}
       </div>
       {open && (

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
 import ImportNotes from './ImportNotes.jsx';
+import { KEEP_CHOICES, keptPages, memoryUse, setKeptPages } from './keep.js';
 import { getLook, setLook } from './look.js';
 
 const TIER = { owner: 'Owner', premium: 'Premium', basic: 'Basic', trial: 'Free trial' };
@@ -35,6 +36,15 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
   useEffect(() => { api('GET', 'usage').then(setUsage).catch(() => {}); }, []);
   const setting = (body) => api('POST', 'settings', body).then(refresh).catch((e) => onProblem(e.message));
   const [look, setLookState] = useState(getLook);
+  const [keep, setKeep] = useState(keptPages);
+  const [mem, setMem] = useState(memoryUse);
+  // the offline copies of pages and API answers (the service worker's cache) and the hidden pages
+  const clearCache = async () => {
+    try { for (const k of await caches.keys()) await caches.delete(k); } catch { /* no cache */ }
+    window.dispatchEvent(new CustomEvent('crux-keep', { detail: { all: true } }));
+    setTimeout(() => setMem(memoryUse()), 500);
+    notify('Cleared. Pages you open next load fresh.');
+  };
   return (
     <>
       <div className="scrim" onClick={onClose} />
@@ -82,6 +92,16 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
             <input type="checkbox" checked={look.motion === 'on'} onChange={(e) => setLookState(setLook({ motion: e.target.checked ? 'on' : 'off' }))} />
             Moving wallpaper
           </label>
+        </div>
+        <div className="card">
+          <label className="field">Pages kept open
+            <select value={keep} onChange={(e) => { const n = Number(e.target.value); setKeep(n); setKeptPages(n); }}>
+              {KEEP_CHOICES.map((n) => <option key={n} value={n}>{n === 1 ? 'None: every page loads fresh' : `Up to ${n}`}</option>)}
+            </select>
+            <span className="hint">Pages you leave stay loaded, so going to your notes and back finds the question where you left it. Fewer uses less memory on an older phone.{mem ? ` Crux is using ${mem.mb} MB now.` : ''}</span>
+          </label>
+          {mem?.high && <p className="notice" role="status">That's a lot for this device. Keep fewer pages open, or clear the cache.</p>}
+          <div className="actions start"><button type="button" className="btn" onClick={clearCache}>Clear cache</button></div>
         </div>
         {s.data.units.length > 0 && <ImportNotes s={s} unit={unit} refresh={refresh} notify={notify} onProblem={onProblem} />}
         <div className="card">

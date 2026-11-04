@@ -249,3 +249,18 @@ test('a study guide is made once, kept on the topic and shared; a shared one cos
   await makeGuideFor({ unit: 'EMM 302', topicId: topic.id, fresh: true }, { make, ready: () => true, shared });
   assert.equal(made, 2);
 });
+
+// Ask about this: the chat travels with the request, the AI sees the saved solution, and the private working is dropped
+const { askAbout } = await import('../server/practice.js');
+test('a follow-up question is answered from the question and its saved solution', async () => {
+  let seen = null;
+  const ask = async (x) => { seen = x; return { work: 'scratch', reply: 'Mohr\'s circle and the formula agree; the formula is quicker here.' }; };
+  const notes = () => 'Notes on principal stresses';
+  const messages = [{ role: 'student', text: 'Why not use Mohr\'s circle?' }];
+  assert.equal((await askAbout({ unit: 'EMM 302', questionId: 'q1', messages }, { ask, ready: () => false, notes })).needAi, true);
+  const r = await askAbout({ unit: 'EMM 302', questionId: 'q1', messages }, { ask, ready: () => true, notes });
+  assert.deepEqual(Object.keys(r), ['reply']);
+  assert.equal(seen.solution, data.paperq.find((x) => x.id === 'q1').explain.breakdown);
+  assert.equal(seen.history.at(-1).text, 'Why not use Mohr\'s circle?');
+  await assert.rejects(askAbout({ unit: 'EMM 302', questionId: 'q1', messages: [{ role: 'tutor', text: 'hi' }] }, { ask, ready: () => true, notes }), /Type your question/);
+});

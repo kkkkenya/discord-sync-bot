@@ -3,6 +3,7 @@
 // questions, ones with a printed answer first. Then: AI-made material only where your own files fall short.
 // Pure: give it the lists.
 import { words } from './analysis.js';
+import { isListing, sectionsAbout } from './sections.js';
 
 const WINDOW = 1500; // a file without page numbers (Word, text) is read in pieces this long
 const OUTLINE = /outline|syllabus|course[\s_-]*(content|description)/i;
@@ -37,6 +38,7 @@ export function learnPath({ topic, subtopics = [], files = [], questions = [], m
   const hits = [];
   for (const f of files.filter((x) => x.text && !x.paper && !OUTLINE.test(x.name))) {
     for (const p of piecesOf(f)) {
+      if (p.n && isListing(p.text)) continue; // the contents or index names the topic; the page to read is elsewhere
       const found = new Set(words(p.text).filter((w) => terms.has(w)));
       const own = [...found].filter((w) => topicTerms.has(w)).length;
       if (!own || found.size < need) continue; // only real matches
@@ -55,13 +57,20 @@ export function learnPath({ topic, subtopics = [], files = [], questions = [], m
       else ranges.push({ f, from: h.n, to: h.n, score: h.score, text: h.text });
     }
   }
+  // a book's own section on the topic, from its headings on every page: the text kept stops after the first pages
+  for (const f of files.filter((x) => x.sections?.length && !x.paper && !OUTLINE.test(x.name))) {
+    for (const sec of sectionsAbout(f.sections, terms, topicTerms).slice(0, 2)) {
+      const covered = ranges.some((r) => r.f === f && r.from && r.from <= sec.to && r.to >= sec.from);
+      if (!covered) ranges.push({ f, from: sec.from, to: sec.to, score: sec.score * 2 + 4, text: `§${sec.title}`, section: true });
+    }
+  }
   ranges.sort((a, b) => Number(Boolean(b.f.own)) - Number(Boolean(a.f.own)) || b.score - a.score); // your own notes first
   const ref = (r) => ({
     fileId: r.f.id, name: r.f.name, url: r.f.url || null, local: Boolean(r.f.local), own: Boolean(r.f.own),
     pages: r.from ? [r.from, r.to] : null,
     find: r.from ? null : snippetOf(r.text, terms, phrase).slice(0, 60).replace(/\s+\S*$/, ''),
-    snippet: snippetOf(r.text, terms, phrase),
-    excerpt: r.text.slice(0, 2500),
+    snippet: r.section ? `Section ${r.text.slice(1)}` : snippetOf(r.text, terms, phrase),
+    excerpt: r.section ? '' : r.text.slice(0, 2500),
   });
   // a range that works an example goes under Examples; the rest is reading. At most 2 of each per file.
   const pick = (list, n) => { const per = {}; return list.filter((r) => (per[r.f.id] = (per[r.f.id] || 0) + 1) <= 2).slice(0, n).map(ref); };

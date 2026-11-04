@@ -4,13 +4,14 @@ import { useElapsed } from './api.js';
 // what each kind of request actually goes through; one moves on every few seconds and the last one stays.
 const STEPS = {
   check: ['Reading your answer', 'Finding the answer key', 'Solving it step by step', 'Comparing your answer', 'Writing the checkpoints'],
-  solution: ['Reading the question', 'Listing what is given', 'Setting up the free body diagram', 'Working through the steps', 'Checking units and the answer', 'Laying out the solution'],
+  solution: ['Reading the question', 'Listing what is given', 'Setting up the free body diagram', 'Working through the steps', 'Checking every step again', 'Laying out the checked solution'],
   batch: ['Reading the questions', 'Solving them one at a time', 'Drawing the diagrams', 'Checking each answer', 'Saving the solutions'],
   guide: ['Reading the course outline', 'Going through your books’ contents', 'Finding the pages on this topic', 'Looking at the past papers', 'Writing the study guide'],
   kit: ['Reading your notes and papers', 'Picking the methods that come up', 'Writing the worked examples', 'Checking the answers', 'Laying out the sheet'],
   mock: ['Picking the topics', 'Choosing questions from papers and books', 'Setting the marks'],
   marking: ['Reading your answers', 'Marking against the model answers', 'Adding up the marks', 'Writing the feedback'],
   teach: ['Reading your explanation', 'Checking it against the topic', 'Finding what is missing', 'Writing the feedback'],
+  ask: ['Reading your question', 'Going back over the solution', 'Checking it against your notes', 'Writing the answer'],
 };
 const EVERY = 6; // seconds a step stays
 

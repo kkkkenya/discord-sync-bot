@@ -18,7 +18,7 @@ function Ref({ r, i }) {
       {!pages && r.find && <p className="muted small">Look for “{r.find}…”{r.local ? ' · on this computer' : ''}</p>}
       <p className="muted small">{r.snippet}</p>
       <OpenAt fileId={r.fileId} page={r.pages?.[0]} book label={r.pages ? `Open at page ${r.pages[0]}` : 'Open the file'} />
-      <details className="disclosure small"><summary>Read it here</summary><p className="excerpt">{r.excerpt}</p></details>
+      {r.excerpt && <details className="disclosure small"><summary>Read it here</summary><p className="excerpt">{r.excerpt}</p></details>}
     </li>
   );
 }

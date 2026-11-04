@@ -1,7 +1,8 @@
-import { Component, Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { Component, Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { api, flushOutbox, openFile, outbox, prepareUnit } from './api.js';
 import { adoptFocus } from './focus-store.js';
 import { adoptLook } from './look.js';
+import { keptPages, memoryUse } from './keep.js';
 import { onSync, pull, push } from './sync.js';
 import Focus, { FocusBar } from './Focus.jsx';
 import StickyBar from './StickyBar.jsx';
@@ -173,6 +174,33 @@ export default function App({ user }) {
   // a unit page sets the current unit
   useEffect(() => { if (route.name === 'unit' && route.rest[0]) setUnit(unitCode(route.rest[0])); }, [route, setUnit]);
 
+  // Pages stay loaded after you leave them (Settings sets how many), hidden, with their scroll position: going to the
+  // notes and back finds the question where you left it. alive: [{ key, route, unit, focus }], newest first.
+  const alive = useRef([]);
+  const scrolls = useRef({});
+  const shownKey = useRef('');
+  const [, setTrimmed] = useState(0);
+  useEffect(() => {
+    const save = () => { if (shownKey.current) scrolls.current[shownKey.current] = window.scrollY; };
+    window.addEventListener('scroll', save, { passive: true });
+    // Settings' "Free memory" and a lower limit: drop the hidden pages
+    const trim = (e) => { alive.current = alive.current.slice(0, e.detail?.all ? 1 : keptPages()); setTrimmed((n) => n + 1); };
+    window.addEventListener('crux-keep', trim);
+    return () => { window.removeEventListener('scroll', save); window.removeEventListener('crux-keep', trim); };
+  }, []);
+  useLayoutEffect(() => {
+    const k = alive.current[0]?.key;
+    if (!k || k === shownKey.current) return;
+    shownKey.current = k;
+    window.scrollTo(0, scrolls.current[k] || 0);
+  });
+  // a lot of memory in use (Chrome and Edge say how much): offer to drop the hidden pages
+  const [heavy, setHeavy] = useState(null);
+  useEffect(() => {
+    const t = setInterval(() => { const m = memoryUse(); setHeavy(m && m.high && alive.current.length > 1 ? m : null); }, 30e3);
+    return () => clearInterval(t);
+  }, []);
+
   if (error) return <main className="main bare"><p className="notice bad">{error} <button className="btn plain" onClick={() => { setError(''); refresh(); }}>Try again</button></p></main>;
   if (!s) return <main className="main bare" aria-busy="true"><div className="skeleton" style={{ height: 34, width: 160 }} /><div className="skeleton" style={{ height: 180 }} /></main>;
 
@@ -184,60 +212,78 @@ export default function App({ user }) {
     setFocus({ section, ...extra, at: Date.now() });
     const [name, tab] = PLACE[section] || ['today'];
     goTo(name === 'unit' ? href('unit', unitSlug(target), tab) : href(name, tab));
-    setTimeout(() => document.getElementById(section)?.scrollIntoView({ block: 'start' }), 50);
+    setTimeout(() => document.querySelector(`.page:not([hidden]) #${CSS.escape(section)}`)?.scrollIntoView({ block: 'start' }), 50);
   };
   const props = { s, refresh, go, focus, notify, unit, setUnit, user };
   const settingsOpen = route.name === 'settings';
   const page = settingsOpen ? 'today' : route.name;
   const bare = !s.data.units.length; // the first run: no tabs until there are units
 
-  let content;
-  if (page === 'unit') {
-    const code = unitCode(route.rest[0]);
-    const u = s.data.units.find((x) => x.code === code);
-    const tab = UNIT_TABS.some((t) => t.id === route.rest[1]) ? route.rest[1] : 'topics';
-    content = !u ? (
-      <div className="empty"><h1>Not one of your units</h1><a className="btn" href={href('units')}>See your units</a></div>
-    ) : (
-      <>
-        <header className="page-head"><span className="eyebrow num"><span className="udot" />{u.code}</span><h1>{u.title || u.code}</h1></header>
-        <nav className="segmented" aria-label={`${u.code} sections`}>
-          {UNIT_TABS.map((t) => <a key={t.id} href={href('unit', unitSlug(u.code), t.id)} aria-current={tab === t.id ? 'page' : undefined}>{t.label}</a>)}
-        </nav>
-        <AutoRead s={s} unit={u.code} refresh={refresh} />
-        {tab === 'topics' && <UnitTopics {...props} unit={u.code} />}
-        {tab === 'papers' && <UnitPapers {...props} unit={u.code} />}
-        {tab === 'notes' && <UnitNotes {...props} unit={u.code} />}
-        {tab === 'sheet' && <div className="sheet-tab"><Kit {...props} unit={u.code} /></div>}
-      </>
-    );
-  } else if (page === 'units') {
-    content = <Units {...props} />;
-  } else if (page === 'practise') {
-    const mode = MODES.some((m) => m.id === route.rest[0]) ? route.rest[0] : 'questions';
-    content = (
-      <>
-        <header className="page-head practise-head"><a className="btn" href={href('deeper')}>Prompt builder</a><h1>Practise</h1><p><span className="num">{unit}</span> · {s.data.units.find((x) => x.code === unit)?.title}</p></header>
-        <nav className="segmented" aria-label="Ways to practise">
-          {MODES.map((m) => <a key={m.id} href={href('practise', m.id)} aria-current={mode === m.id ? 'page' : undefined}>{m.label}</a>)}
-        </nav>
-        {mode === 'questions' && <PractiseQuestions key={unit} {...props} />}
-        {mode === 'explain' && <Teach {...props} />}
-        {mode === 'timed' && <Mock {...props} />}
-      </>
-    );
-  } else if (page === 'deeper') {
-    content = <PromptBuilder {...props} target={deeper} />;
-  } else if (page === 'focus') {
-    content = <Focus {...props} />;
-  } else if (page === 'insights') {
-    content = <><header className="page-head"><h1>Insights</h1></header><Insights {...props} deeper={setDeeper} /></>;
-  } else {
-    content = <Today {...props} />;
-  }
+  // one page's content for its route and unit (a kept page keeps the unit it was opened with)
+  const pageFor = (r, pu, pfocus) => {
+    const props = { s, refresh, go, focus: pfocus, notify, unit: pu, setUnit, user };
+    const page = r.name === 'settings' ? 'today' : r.name;
+    let content;
+    if (page === 'unit') {
+      const code = unitCode(r.rest[0]);
+      const u = s.data.units.find((x) => x.code === code);
+      const tab = UNIT_TABS.some((t) => t.id === r.rest[1]) ? r.rest[1] : 'topics';
+      content = !u ? (
+        <div className="empty"><h1>Not one of your units</h1><a className="btn" href={href('units')}>See your units</a></div>
+      ) : (
+        <>
+          <header className="page-head"><span className="eyebrow num"><span className="udot" />{u.code}</span><h1>{u.title || u.code}</h1></header>
+          <nav className="segmented" aria-label={`${u.code} sections`}>
+            {UNIT_TABS.map((t) => <a key={t.id} href={href('unit', unitSlug(u.code), t.id)} aria-current={tab === t.id ? 'page' : undefined}>{t.label}</a>)}
+          </nav>
+          <AutoRead s={s} unit={u.code} refresh={refresh} />
+          {tab === 'topics' && <UnitTopics {...props} unit={u.code} />}
+          {tab === 'papers' && <UnitPapers {...props} unit={u.code} />}
+          {tab === 'notes' && <UnitNotes {...props} unit={u.code} />}
+          {tab === 'sheet' && <div className="sheet-tab"><Kit {...props} unit={u.code} /></div>}
+        </>
+      );
+    } else if (page === 'units') {
+      content = <Units {...props} />;
+    } else if (page === 'practise') {
+      const mode = MODES.some((m) => m.id === r.rest[0]) ? r.rest[0] : 'questions';
+      content = (
+        <>
+          <header className="page-head practise-head"><a className="btn" href={href('deeper')}>Prompt builder</a><h1>Practise</h1><p><span className="num">{pu}</span> · {s.data.units.find((x) => x.code === pu)?.title}</p></header>
+          <nav className="segmented" aria-label="Ways to practise">
+            {MODES.map((m) => <a key={m.id} href={href('practise', m.id)} aria-current={mode === m.id ? 'page' : undefined}>{m.label}</a>)}
+          </nav>
+          {mode === 'questions' && <PractiseQuestions key={pu} {...props} />}
+          {mode === 'explain' && <Teach {...props} />}
+          {mode === 'timed' && <Mock {...props} />}
+        </>
+      );
+    } else if (page === 'deeper') {
+      content = <PromptBuilder {...props} target={deeper} />;
+    } else if (page === 'focus') {
+      content = <Focus {...props} />;
+    } else if (page === 'insights') {
+      content = <><header className="page-head"><h1>Insights</h1></header><Insights {...props} deeper={setDeeper} /></>;
+    } else {
+      content = <Today {...props} />;
+    }
+    return content;
+  };
+  const key = `${page}/${route.rest.join('/')}${page === 'unit' ? '' : `|${unit}`}`;
+  alive.current = [{ key, route, unit, focus }, ...alive.current.filter((x) => x.key !== key)].slice(0, Math.max(1, keptPages()));
+  let content = (
+    <>
+      {alive.current.map((x) => (
+        <div key={x.key} className="page" hidden={x.key !== key || undefined}>
+          <Guard>{pageFor(x.route, x.unit, x.key === key ? focus : x.focus)}</Guard>
+        </div>
+      ))}
+    </>
+  );
   if (bare) {
     content = <Today {...props} />; // whatever the route: there's nothing else to show yet
   }
+  const freeMemory = () => { alive.current = alive.current.slice(0, 1); setHeavy(null); setTrimmed((n) => n + 1); };
 
   return (
     <>
@@ -246,6 +292,11 @@ export default function App({ user }) {
         <header className="bare-head"><span className="wordmark">Crux</span><a className="navbtn" href={href('settings')} aria-label="Settings"><Icon name="settings" /></a></header>
       ) : <Nav s={s} unit={unit} setUnit={setUnit} page={page} tab={route.rest[1]} />}
       <main className={bare ? 'main bare' : 'main'} id="main" tabIndex={-1}>
+          {!bare && (
+            <button type="button" className="topsearch" onClick={() => window.dispatchEvent(new Event('crux-search'))} aria-label="Search Crux (Ctrl+K)">
+              <Icon name="search" /><span className="topsearch-text">Search units, topics, sub-topics…</span><kbd>Ctrl K</kbd>
+            </button>
+          )}
           {newer && <p className="notice good" role="status">A new version of Crux is ready. <button type="button" className="btn plain" onClick={() => window.location.reload()}>Load it</button></p>}
           {!online && <p className="notice" role="status">Offline. You're seeing your last saved data. Changes that don't need AI are kept on this device and sent when you're back.</p>}
           {queued > 0 && <p className="notice" role="status"><span className="num">{queued}</span> change{queued === 1 ? '' : 's'} waiting to sync.</p>}
@@ -254,7 +305,8 @@ export default function App({ user }) {
               {problem.startsWith("Today's AI limit") ? <button className="btn plain" onClick={() => { setProblem(''); setDeeper({ unit }); }}>Go deeper</button> : <button className="btn plain" onClick={refresh}>Try again</button>}
             </p>
           )}
-          <Guard key={`${page}|${unit}`}>{content}</Guard>
+          {heavy && <p className="notice" role="status">Crux is using {heavy.mb} MB of memory with {alive.current.length} pages kept open, which can slow this device down. <button type="button" className="btn plain" onClick={freeMemory}>Close the hidden pages</button></p>}
+          {bare ? <Guard>{content}</Guard> : content}
         </main>
       {!bare && page !== 'focus' && <FocusBar />}
       {!bare && <StickyBar s={s} unit={unit} onProblem={setProblem} />}

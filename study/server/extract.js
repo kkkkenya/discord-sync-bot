@@ -4,9 +4,12 @@
 import JSZip from 'jszip';
 import mammoth from 'mammoth';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { sectionsOf } from './sections.js';
 
 const MAX_TEXT = 50000; // ~12k tokens per file is plenty for grounding; keeps the cache small
 const MAX_PAGES = 100;
+const HEADINGS_PAGES = 1500; // past the text kept, every page is still read for its section headings…
+const HEADINGS_MS = 25e3; // …for this long at most (a request has 60s)
 // Word's Symbol font stores Greek letters and maths signs as private-use characters (U+F020-U+F0FF): "ΔC" arrives as
 // "C" and an α vanishes from view. Map them back to the real characters.
 const SYMBOL = {
@@ -35,20 +38,25 @@ async function pdfText(buf) {
   const doc = await getDocument({ data: new Uint8Array(buf), isEvalSupported: false, disableFontFace: true, useSystemFonts: true, verbosity: 0 }).promise;
   try {
     const pages = [];
+    const all = []; // every page's text, for the headings
     let size = 0;
-    for (let n = 1; n <= Math.min(MAX_PAGES, doc.numPages) && size < MAX_TEXT; n++) {
+    const started = Date.now();
+    for (let n = 1; n <= Math.min(HEADINGS_PAGES, doc.numPages); n++) {
+      if (size >= MAX_TEXT && Date.now() - started > HEADINGS_MS) break;
       const page = await doc.getPage(n);
-      const content = await page.getTextContent();
-      pages.push(content.items.map((it) => it.str).join(' '));
-      size += pages.at(-1).length;
+      const text = squash((await page.getTextContent()).items.map((it) => it.str).join(' '));
+      page.cleanup();
+      all.push(text);
+      if (n <= MAX_PAGES && size < MAX_TEXT) { pages.push(text); size += text.length; }
     }
-    return { pages: doc.numPages, ...joinPages(pages) };
+    return { pages: doc.numPages, ...joinPages(pages), sections: sectionsOf(all) };
   } finally {
     await doc.destroy();
   }
 }
 
-// buf: downloaded bytes, name: filename. Returns { pages, text, pageStarts? } (pageStarts for PDFs and slides). Images and scanned PDFs yield empty text.
+// buf: downloaded bytes, name: filename. Returns { pages, text, pageStarts?, sections? } (pageStarts for PDFs and slides,
+// sections for PDFs with numbered headings). Images and scanned PDFs yield empty text.
 export async function extract(buf, name) {
   const ext = (name.split('.').pop() || '').toLowerCase();
   try {

@@ -6,9 +6,9 @@
 // failure) or 'disputed' (the student says the checkpoints are wrong: nothing is held against them).
 import { compareAnswers } from './answer.js';
 import { aiReady, canRead, provider } from './ai.js';
-import { compareWorking, explainSolution, explainSolutions, readWorking, solveWithCheckpoints } from './brain.js';
+import { compareWorking, explainSolution, explainSolutions, followUp, readWorking, solveWithCheckpoints } from './brain.js';
 import { ERROR_TYPES } from './defs.js';
-import { library } from './ingest.js';
+import { contextFor, library } from './ingest.js';
 import { paperInfo } from './predict.js';
 import { shareSolution, sharedSolution } from './shared.js';
 import { add, data, patch, save } from './store.js';
@@ -208,7 +208,7 @@ export async function explainBatch({ unit, questionIds = [] }, { explain = expla
   let room = SCHEME_BUDGET;
   const schemeText = schemes.map((x) => { const t = x.text.slice(0, Math.max(room, 0)); room -= t.length; return t; }).filter(Boolean);
   const items = batch.map((r) => ({ id: r.id, topic: data.topics.find((t) => t.id === r.topicId)?.name || '', question: r.text, expected: r.key?.answer || '' }));
-  const out = await explain({ unit, items, schemes: schemeText, maxTokens: Math.min(16000, Math.round(tokens * 1.6)) });
+  const out = await explain({ unit, items, schemes: schemeText, maxTokens: Math.min(24000, Math.round(tokens * 2.2)) });
   const done = [];
   for (const sol of out.solutions || []) {
     const row = batch.find((r) => r.id === sol.id);
@@ -216,6 +216,25 @@ export async function explainBatch({ unit, questionIds = [] }, { explain = expla
   }
   if (!done.length) throw bad('The AI sent back no usable solutions. Try again, or solve them one at a time.', 502);
   return { done, left: todo.filter((r) => !r.explain).map((r) => r.id) };
+}
+
+// "Ask about this": body { unit, questionId, messages: [{ role, text }] } → { reply }. The chat lives in the app; each
+// message is one AI action, grounded in the question, its saved solution and the unit's notes on the topic.
+export async function askAbout({ unit, questionId, messages = [] }, { ask = followUp, ready = aiReady, notes = contextFor } = {}) {
+  const row = data.paperq.find((x) => x.id === questionId && x.unit === unit);
+  if (!row) throw bad('Pick a question first.');
+  const history = (Array.isArray(messages) ? messages : []).slice(-12)
+    .map((m) => ({ role: m.role === 'tutor' ? 'tutor' : 'student', text: String(m.text || '').trim().slice(0, 4000) })).filter((m) => m.text);
+  if (history.at(-1)?.role !== 'student') throw bad('Type your question first.');
+  if (!ready()) return { needAi: true, message: 'Asking about a solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
+  const topic = data.topics.find((t) => t.id === row.topicId);
+  const sol = row.explain;
+  const steps = (row.key?.checkpoints || []).map((c) => `${c.n}. ${c.step} ${c.equation} = ${c.value}`).join('\n');
+  const out = await ask({
+    unit, topic: topic?.name || '', question: row.text, solution: sol?.breakdown || steps, answer: sol?.answer || row.key?.answer || '',
+    notes: topic ? notes(unit, topic.name, 4000) : '', history,
+  });
+  return { reply: String(out.reply || '').trim() };
 }
 
 // "Broke here": the student found the checkpoint where their paper diverged. This is the only thing that counts as a

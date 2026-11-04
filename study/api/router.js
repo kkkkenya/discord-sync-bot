@@ -1,7 +1,7 @@
 // The whole Crux API as one Vercel function: /api/* and /auth/* are rewritten here (study/vercel.json).
 // Each request loads the signed-in student's document, runs the route with it as `data`, and saves it once.
 import { db } from '../../lib/db.js';
-import { authRoute, memberOf, readSession, RECHECK_MS, rememberUser, sessionCookie, tierFor } from '../server/auth.js';
+import { authRoute, avatarOf, memberOf, readSession, RECHECK_MS, rememberUser, sessionCookie, tierFor } from '../server/auth.js';
 import { runBackup, supabaseStorage } from '../server/backup.js';
 import { docStore, withSavedDoc } from '../server/doc-store.js';
 import { fileBytes } from '../server/file-bytes.js';
@@ -19,7 +19,7 @@ async function recheck(session, { db, member }) {
   if (Date.now() - (session.checked || 0) < RECHECK_MS) return { user: session };
   let m;
   try { m = await member(session.id); } catch (e) { console.error('role check:', e.message); return { user: session }; } // Discord down: keep the tier, try again next request
-  const user = { id: session.id, name: m?.nick || session.name, tier: tierFor(m, session.id) };
+  const user = { id: session.id, name: m?.nick || session.name, tier: tierFor(m, session.id), avatar: avatarOf(m?.user) || session.avatar };
   await rememberUser(db, user).catch((e) => console.error('crux_users:', e.message));
   return { user, cookie: sessionCookie(user) };
 }

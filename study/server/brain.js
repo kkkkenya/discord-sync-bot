@@ -171,6 +171,7 @@ export async function solveWithCheckpoints({ unit, topic = '', question, subtopi
   const schema = {
     type: 'object',
     properties: {
+      work: WORK,
       answer: { type: 'string', description: 'The final answer: the number then its unit, for example "142.5 MPa". Nothing else.' },
       checkpoints: {
         type: 'array',
@@ -189,7 +190,7 @@ export async function solveWithCheckpoints({ unit, topic = '', question, subtopi
         },
       },
     },
-    required: ['answer', 'checkpoints'],
+    required: ['work', 'answer', 'checkpoints'],
     additionalProperties: false,
   };
   const content = [
@@ -199,8 +200,9 @@ export async function solveWithCheckpoints({ unit, topic = '', question, subtopi
     expected ? `The answer key says the final answer is ${expected}. Make the checkpoints lead to it.` : '',
     `Question:\n${question}`,
     'Solve it in 3 to 6 numbered checkpoints, SI units carried through every step, assumptions and sign convention stated in the first checkpoint. If you are not sure of the final answer, still give your best working.',
+    CLEAN,
   ].filter(Boolean).join('\n\n');
-  return structured(schema, TUTOR, content, 4000);
+  return structured(schema, TUTOR, content, 6000);
 }
 
 // The full worked solution, for reading: a structured breakdown, plus a free body diagram when forces act on a body.
@@ -223,7 +225,12 @@ const FBD_SCHEMA = {
   required: ['kind', 'length', 'supports', 'loads', 'reactions'],
   additionalProperties: false,
 };
+// Worked first, shown second: the AI solves and checks in `work` (never shown, dropped before saving), so the
+// breakdown the student reads is the settled solution, not the AI changing its mind halfway through.
+const WORK = { type: 'string', description: 'Private scratch working, never shown to the student. Solve it fully here first, then check it: every step, the units, the order of magnitude, and the final answer by a second route where there is one. Fix any mistake here, before writing the other fields. Keep it brief.' };
+const CLEAN = 'The fields after work are the clean, final, checked solution: write them only once work is settled. Never think aloud in them: no "wait", "actually", "let me recheck", "correction", no second attempt and nothing that contradicts an earlier step.';
 const SOLUTION_FIELDS = {
+  work: WORK,
   breakdown: { type: 'string', description: 'The full worked solution, formatted as the system prompt says.' },
   fbd: { type: 'string', description: 'The free body diagram in words: the body, every force and moment with its point of action and direction, and the support reactions. Empty when the question has no forces on a body.' },
   diagram: FBD_SCHEMA,
@@ -236,6 +243,7 @@ const HOW_TO_SOLVE = `Write the full worked solution a student can learn from, i
 ## Solution (numbered steps; each step says what is done, the equation in $$...$$, then the numbers substituted and the result in bold)
 ## Check (a quick sanity check: units, order of magnitude, or a second route)
 Do not repeat the final answer under its own heading: the answer field holds it. Add a Trap: line for the mistake students usually make here.
+${CLEAN}
 For the diagram: when the question has a beam, shaft or bar, fill it in with every support, load and reaction placed by distance from the left end; otherwise kind none with empty lists.`;
 
 // Several questions solved in one call (2 to 4, sized by the caller): items [{ id, topic, question, expected }],
@@ -243,7 +251,7 @@ For the diagram: when the question has a beam, shaft or bar, fill it in with eve
 export async function explainSolutions({ unit, items, schemes = [], maxTokens = 16000 }) {
   const schema = {
     type: 'object',
-    properties: { solutions: { type: 'array', description: 'One solution per question, in the order given.', items: { type: 'object', properties: { id: { type: 'string', description: 'The question id exactly as given.' }, ...SOLUTION_FIELDS }, required: ['id', 'breakdown', 'fbd', 'diagram', 'answer'], additionalProperties: false } } },
+    properties: { solutions: { type: 'array', description: 'One solution per question, in the order given.', items: { type: 'object', properties: { id: { type: 'string', description: 'The question id exactly as given.' }, ...SOLUTION_FIELDS }, required: ['id', 'work', 'breakdown', 'fbd', 'diagram', 'answer'], additionalProperties: false } } },
     required: ['solutions'],
     additionalProperties: false,
   };
@@ -265,7 +273,31 @@ export async function explainSolution({ unit, topic = '', question, expected = '
     `Question:\n${question}`,
     HOW_TO_SOLVE,
   ].filter(Boolean).join('\n\n');
-  return structured(schema, TUTOR, content, 8000);
+  return structured(schema, TUTOR, content, 12000);
+}
+
+// "Ask about this": a follow-up on one question and its worked solution ("why this formula and not that one?",
+// "explain step 3"). history: [{ role: 'student' | 'tutor', text }], the last one the student's new question.
+export async function followUp({ unit, topic = '', question, solution = '', answer = '', notes = '', history = [] }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      work: { ...WORK, description: 'Private scratch thinking, never shown. Work out the answer and check it against the question and the solution before you write the reply.' },
+      reply: { type: 'string', description: 'The answer to the student\'s last message, formatted as the system prompt says. Usually under 250 words.' },
+    },
+    required: ['work', 'reply'],
+    additionalProperties: false,
+  };
+  const content = [
+    `Unit: ${unit}${topic ? `\nTopic: ${topic}` : ''}`,
+    `Question:\n${question}`,
+    solution ? `The worked solution the student is reading:\n${solution}` : '',
+    answer ? `Final answer: ${answer}` : '',
+    notes ? `From the unit's notes and books (use their symbols and methods where they fit):\n${notes}` : '',
+    `The conversation so far:\n${history.map((m) => `${m.role === 'tutor' ? 'Tutor' : 'Student'}: ${m.text}`).join('\n\n')}`,
+    `Answer the student's last message about this question as their tutor. When they ask why one formula or method and not another, say what each assumes and when each applies, then why this question needs this one. When they ask you to explain a step, go through it slowly with the numbers. If the worked solution has a mistake, say so plainly and give the correction. ${CLEAN.replace('The fields after work are', 'The reply is')}`,
+  ].filter(Boolean).join('\n\n');
+  return structured(schema, TUTOR, content, 4000);
 }
 
 // Study material matched to the stage (Phase 10). kind: 'ladder' (Adequate Prep: worked → faded → solo, plus
@@ -320,8 +352,21 @@ const KIT_SCHEMA = {
       title: { type: 'string' },
       formulas: {
         type: 'array',
-        description: 'At most 14 formulas, the ones this unit\'s CATs use most.',
-        items: { type: 'object', properties: { name: { type: 'string' }, formula: { type: 'string', description: 'Plain text with ^ and _.' }, symbols: { type: 'string', description: 'Each symbol with its SI unit, short.' }, notWhen: { type: 'string', description: 'When this formula does NOT apply.' } }, required: ['name', 'formula', 'symbols', 'notWhen'], additionalProperties: false },
+        description: 'Every formula the listed questions need (usually 15-30), grouped by topic in outline order: the core ones each topic rests on, AND the ones only particular questions use (a derived result, a special case, a table value, a geometric relation). Read every question listed and include what solving it takes.',
+        items: {
+          type: 'object',
+          properties: {
+            topic: { type: 'string', description: 'The topic it belongs to, as named in the list of topics.' },
+            name: { type: 'string' },
+            formula: { type: 'string', description: 'In LaTeX inside $...$.' },
+            symbols: { type: 'string', description: 'Each symbol with its SI unit, short, symbols in $...$.' },
+            notWhen: { type: 'string', description: 'When this formula does NOT apply, or its assumptions.' },
+            usedIn: { type: 'array', items: { type: 'string' }, description: 'The listed questions that use it, by their label exactly as given (e.g. "CAT 1 2023 Q2b"). Empty if none of them do.' },
+            special: { type: 'boolean', description: 'true when only particular questions need it (not a core formula of the topic): say which in usedIn.' },
+          },
+          required: ['topic', 'name', 'formula', 'symbols', 'notWhen', 'usedIn', 'special'],
+          additionalProperties: false,
+        },
       },
       conventions: { ...STEP, description: 'At most 5 sign conventions and unit checks.' },
       shortcuts: { ...STEP, description: 'At most 5 shortcuts.' },
@@ -332,7 +377,7 @@ const KIT_SCHEMA = {
   },
 };
 
-export async function makeKit({ kind, unit, topic = '', focus = [], subtopics = [], traps = [], context = '' }) {
+export async function makeKit({ kind, unit, topic = '', focus = [], subtopics = [], traps = [], context = '', questions = '' }) {
   const content = [
     `Unit: ${unit}`,
     topic && `Topic: ${topic}`,
@@ -340,8 +385,9 @@ export async function makeKit({ kind, unit, topic = '', focus = [], subtopics = 
     subtopics.length && `The student's sub-topics (with their self-rating): ${subtopics.join('; ')}`,
     traps.length && `The student's recurring mistakes (warn about these first): ${traps.join('; ')}`,
     context && `\nThe student's course material — use THIS course's notation and methods:\n${context}`,
+    questions && `\nThis unit's past-paper and CAT questions on these topics (label: question). The sheet must cover every formula they need, and say which questions use each:\n${questions}`,
   ].filter(Boolean).join('\n');
-  return structured(KIT_SCHEMA[kind], TUTOR, content, 8000);
+  return structured(KIT_SCHEMA[kind], TUTOR, content, kind === 'sheet' ? 14000 : 8000);
 }
 
 // Phase 9: a photo of handwritten working → what is on it, transcribed, not corrected.

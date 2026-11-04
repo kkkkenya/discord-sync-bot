@@ -15,6 +15,7 @@ import { PARSER_VERSION, hintFields, isBook, parsePapers, pastePaper, predictFor
 import { predictedMock } from './predict.js';
 import { GOALS, STYLES, buildPack } from './context-pack.js';
 import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
+import { todayBoard } from './board.js';
 import { buildPrompt } from './prompt.js';
 import { nextActions } from './next.js';
 import { insights } from './insights.js';
@@ -29,8 +30,8 @@ import { newMaterial } from './inbox.js';
 import { makeGuideFor } from './guide.js';
 import { finishUpload, myUploads, startUpload } from './hub-uploads.js';
 import { rewardInfo } from './rewards.js';
-import { learnFor } from './learn-store.js';
-import { KEY_LABEL, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
+import { learnFor, topicPlaces } from './learn-store.js';
+import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
 
 // The retired flashcards (cards, reviews) stay in study.json but never go to the dashboard; only their count does,
@@ -46,7 +47,7 @@ const state = () => {
     styles: Object.entries(STYLES).map(([id, x]) => ({ id, name: x.name })),
     today, data: shown, calendar, next: nextAssessment(today), plan: todayPlan(today), stats: stats(today),
     retiredCards: cards?.length || 0, coach: coachReady(), ai: aiReady(), media: { image: canRead('image'), audio: canRead('audio') }, provider: provider(), settings: data.settings,
-    mastery: masteryMap(today), library: libraryMeta(),
+    mastery: masteryMap(today), library: libraryMeta(), board: todayBoard(today),
     next: nextActions(today, { prepared: new Set(Object.values(library.files).filter((e) => e.text).map((e) => e.unit)) }),
   };
 };
@@ -275,6 +276,9 @@ const routes = {
       failures: data.attempts.filter((a) => a.verdict === 'wrong' && Date.parse(a.at) >= since && (ids.has(a.subtopicId) || (topic && a.topicId === topic.id))).map(breakOf),
       files: Object.entries(library.files).filter(([id, e]) => e.unit === unit.code && (!only || only.has(id))).map(([, e]) => ({ name: e.name, paper: e.paper, text: e.text || '' })),
       today: nairobiDay(),
+      guide: topic?.guide || null,
+      places: topic ? topicPlaces(unit.code, topic) : [],
+      unitTopics: data.topics.filter((t) => t.unit === unit.code).sort((a, b) => (a.order || 0) - (b.order || 0)).map((t) => t.name),
     });
   },
   // Checkpoint feedback: { unit, questionId? | question?, topicId?, answer, operations?, key?, showCheckpoints? } →
@@ -300,6 +304,8 @@ const routes = {
   'POST /api/attempts/explain': async (q, body) => explainQuestion(body || {}),
   // Solve several: { unit, questionIds } → the next 2-4 solved in one AI call; { done, left }.
   'POST /api/attempts/explain-batch': async (q, body) => explainBatch(body || {}),
+  // "Ask about this": { unit, questionId, messages } → { reply }, a follow-up on the question and its solution
+  'POST /api/attempts/ask': async (q, body) => askAbout(body || {}),
   'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
   'POST /api/attempts/flag': (q, body) => flagCheckpoint(body || {}),
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
@@ -533,10 +539,10 @@ async function importData(file, userId) {
 // One request: method + path → a handler (query, body, ctx). ctx = { user: { id, name, tier }, today }.
 // Errors carry .status; the dev server and the Vercel router turn them into { error }.
 // Routes that ground their work in the student's own notes: those notes are loaded into the request first.
-const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints|explain|explain-batch))/;
+const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints|explain|explain-batch|ask))/;
 
 // Routes that use the AI: each request is one "AI action" against the member's daily limit.
-const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch)|learn\/guide|predict\/map)$/;
+const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch|ask)|learn\/guide|predict\/map)$/;
 export const AI_LIMIT_MESSAGE = "Today's AI limit is used. Take this pack to any AI.";
 
 export async function dispatch(method, pathname, query, body, ctx) {

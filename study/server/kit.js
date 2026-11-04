@@ -19,6 +19,21 @@ const bad = (message, status = 400) => Object.assign(new Error(message), { statu
 
 // body: { unit, kind?, topicId? }. kind defaults to the unit's stage. A ladder is about one topic (the one asked
 // for, else the top weakspot's, else the most likely to come); recipes and sheets cover the likely topics.
+// A formula sheet reads the unit's questions on its topics, so the formulas are the ones the papers need, with the
+// questions that use each: "label: text", newest papers first, about 14k characters.
+export function sheetQuestions(unit, topicIds, max = 14000) {
+  const want = new Set(topicIds.filter(Boolean));
+  const qs = data.paperq.filter((q) => q.unit === unit && q.type !== 'Book' && (!want.size || want.has(q.topicId)))
+    .sort((a, b) => (b.year || 0) - (a.year || 0));
+  let out = '';
+  for (const q of qs) {
+    const line = `${q.source} ${q.label || `Q${q.number}`}: ${q.text.replace(/\s+/g, ' ').slice(0, 500)}\n`;
+    if (out.length + line.length > max) break;
+    out += line;
+  }
+  return out;
+}
+
 export async function makeKitFor({ unit, kind, topicId, fresh = false }, { make = makeKit, ready = aiReady, shared = { get: sharedKit, put: shareKit } } = {}) {
   const u = data.units.find((x) => x.code === unit);
   if (!u) throw bad('Pick one of your units first.');
@@ -46,6 +61,7 @@ export async function makeKitFor({ unit, kind, topicId, fresh = false }, { make 
     subtopics: subs.map((s) => `${s.name} (${s.audit || 'untested'})`),
     traps: errors.counts.map((e) => `${e.label} (${e.n}×)`),
     context: contextFor(unit, topic?.name || ranked[0]?.name || '', 10000),
+    questions: k === 'sheet' ? sheetQuestions(unit, topic ? [topic.id] : ranked.slice(0, 6).map((r) => r.topicId)) : '',
   });
   if (key) await shared.put(key, unit, content);
   return add('materials', { unit, topicId: topic?.id || null, kind: k, stage, content, edited: false });

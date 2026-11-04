@@ -36,10 +36,12 @@ create table if not exists crux_file_text (
   chars      integer,
   text       text,
   page_starts integer[],                             -- where each page starts in text (for "read pages 3-5")
+  sections   jsonb,                                  -- [[page, "3.4", "Shear Stress"]]: every numbered heading, all pages
   error      text,
   updated_at timestamptz not null default now()
 );
 create index if not exists crux_file_text_unit_idx on crux_file_text (unit_code);
+alter table crux_file_text add column if not exists sections jsonb;
 create table if not exists crux_usage (
   user_id text not null,                             -- Discord id, or 'global'
   day     date not null,                             -- Nairobi day

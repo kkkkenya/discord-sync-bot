@@ -15,6 +15,13 @@ const ACTIONS = [
   ['Explain it', href('practise', 'explain')], ['Timed paper', href('practise', 'timed')], ['Insights', href('insights')],
   ['Focus timer', href('focus')], ['Prompt builder', href('deeper')], ['Settings', href('settings')], ['Wallpaper', href('settings')], ['Import notes', href('settings')], ['Export my data', href('settings')],
 ];
+// the part of a result that matches what you typed, lit
+function Lit({ text, q }) {
+  const t = String(text || '');
+  const i = q ? t.toLowerCase().indexOf(q) : -1;
+  if (i < 0) return t;
+  return <>{t.slice(0, i)}<mark>{t.slice(i, i + q.length)}</mark>{t.slice(i + q.length)}</>;
+}
 const inDays = (d) => (d === 0 ? 'today' : d === 1 ? 'tomorrow' : `in ${d} days`);
 const daysText = (d) => (d == null ? 'TBA' : d < 0 ? 'Passed' : d === 0 ? 'Today' : `${d} day${d === 1 ? '' : 's'}`);
 
@@ -100,12 +107,24 @@ export default function Nav({ s, unit, setUnit, page, tab }) {
   useIndicator(rail, page, true);
   // picking a unit keeps you where you are: a unit page moves to the same tab of the new unit, other pages just follow it
   const pickUnit = (code) => { setUnit(code); setOpen(null); if (page === 'unit') go(href('unit', unitSlug(code), tab || 'topics')); };
-  const toggle = (what) => { setOpen((o) => (o === what ? null : what)); setQuery(''); };
+  const toggle = (what) => { setOpen((o) => (o === what ? null : what)); setQuery(''); setPick(0); };
+  const [pick, setPick] = useState(0); // the result the arrow keys are on
   useEffect(() => { setOpen(null); }, [page, unit]);
+  // the search bar at the top of each page, Ctrl+K (⌘K) and "/" open search
+  useEffect(() => {
+    const show = () => { setOpen('search'); setQuery(''); setPick(0); };
+    const key = (e) => {
+      const typing = e.target.closest?.('input, textarea, select, [contenteditable="true"]');
+      if (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') || (e.key === '/' && !typing)) { e.preventDefault(); show(); }
+    };
+    window.addEventListener('crux-search', show);
+    document.addEventListener('keydown', key);
+    return () => { window.removeEventListener('crux-search', show); document.removeEventListener('keydown', key); };
+  }, []);
   useEffect(() => {
     if (!open) return;
     const esc = (e) => { if (e.key === 'Escape') setOpen(null); };
-    const away = (e) => { if (!e.target.closest('.panel, .topbar, .rail')) setOpen(null); };
+    const away = (e) => { if (!e.target.closest('.panel, .topbar, .rail, .topsearch')) setOpen(null); };
     document.addEventListener('keydown', esc); document.addEventListener('pointerdown', away);
     return () => { document.removeEventListener('keydown', esc); document.removeEventListener('pointerdown', away); };
   }, [open]);
@@ -138,15 +157,23 @@ export default function Nav({ s, unit, setUnit, page, tab }) {
     const has = (t) => String(t || '').toLowerCase().includes(q);
     return [
       ...s.data.units.filter((u) => has(u.code) || has(u.title)).map((u) => ({ icon: 'units', label: u.code, sub: u.title, to: href('unit', unitSlug(u.code), 'topics') })),
-      ...s.data.topics.filter((t) => has(t.name)).map((t) => ({ icon: 'practise', label: t.name, sub: t.unit, to: href('unit', unitSlug(t.unit), 'topics') })),
+      ...s.data.topics.filter((t) => has(t.name)).map((t) => ({ icon: 'practise', label: t.name, sub: `Topic · ${t.unit}`, to: href('unit', unitSlug(t.unit), 'topics') })),
+      ...s.data.subtopics.filter((x) => has(x.name)).map((x) => ({ icon: 'notes', label: x.name, sub: `Sub-topic · ${x.unit} · ${s.data.topics.find((t) => t.id === x.topicId)?.name || ''}`, to: href('unit', unitSlug(x.unit), 'topics') })),
       ...ACTIONS.filter(([l]) => has(l)).map(([l, to]) => ({ icon: 'chevron', label: l, sub: 'Go to', to })),
-    ].slice(0, 8);
-  }, [query, s.data.units, s.data.topics]);
+    ].slice(0, 10);
+  }, [query, s.data.units, s.data.topics, s.data.subtopics]);
+  const q = query.trim().toLowerCase();
 
   const searchBox = (
-    <form className={`searchbox${wide ? ' inpanel' : ''}`} role="search" onSubmit={(e) => { e.preventDefault(); if (results[0]) { go(results[0].to); setOpen(null); } }}>
+    <form className={`searchbox${wide ? ' inpanel' : ''}`} role="search" onSubmit={(e) => { e.preventDefault(); const r = results[pick] || results[0]; if (r) { go(r.to); setOpen(null); } }}>
       <Icon name="search" />
-      <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Units, topics, actions" aria-label="Search Crux" autoFocus />
+      <input type="search" value={query} onChange={(e) => { setQuery(e.target.value); setPick(0); }} placeholder="Units, topics, sub-topics, actions" aria-label="Search Crux" autoFocus
+        role="combobox" aria-expanded={results.length > 0} aria-controls="search-results" aria-activedescendant={results.length ? `sr-${pick}` : undefined}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') { e.preventDefault(); setPick((i) => Math.min(results.length - 1, i + 1)); }
+          if (e.key === 'ArrowUp') { e.preventDefault(); setPick((i) => Math.max(0, i - 1)); }
+        }} />
+      {wide && <kbd>Esc</kbd>}
     </form>
   );
   const bellBtn = (
@@ -186,7 +213,6 @@ export default function Nav({ s, unit, setUnit, page, tab }) {
         <span className="sep" />
         <a className="navbtn" href={href('focus')} aria-label="Focus timer" data-tip="Focus" aria-current={page === 'focus' ? 'page' : undefined}><Icon name="timer" /></a>
         <a className="navbtn" href={href('deeper')} aria-label="Prompt builder" data-tip="Prompt builder" aria-current={page === 'deeper' ? 'page' : undefined}><Icon name="prompt" /></a>
-        <button className="navbtn" type="button" aria-label="Search" aria-expanded={open === 'search'} onClick={() => toggle('search')} data-tip="Search"><Icon name="search" /></button>
         {bellBtn}
         <a className="navbtn" href={href('settings')} aria-label="Settings" data-tip="Settings"><Icon name="settings" /></a>
       </nav>
@@ -204,17 +230,28 @@ export default function Nav({ s, unit, setUnit, page, tab }) {
           <a className="row" href={href('units')}><span className="row-main">Add or change units</span><Icon name="chevron" /></a>
         </div>
       )}
+      {open === 'search' && wide && <div className="palette-scrim" aria-hidden="true" onClick={() => setOpen(null)} />}
       {open === 'search' && (
-        <div className="panel glass" role="dialog" aria-label="Search">
+        <div className="panel glass palette" role="dialog" aria-label="Search">
           {wide && searchBox}
-          {!query.trim() && <p className="none">Type a unit code, a topic or what you want to do, like “export”.</p>}
-          {query.trim() && !results.length && <p className="none">Nothing matches “{query.trim()}”.</p>}
-          {results.map((r) => (
-            <a key={r.to + r.label} className="row" href={r.to} onClick={() => setOpen(null)}>
-              <span className="ricon"><Icon name={r.icon} /></span>
-              <span className="row-main"><span>{r.label}</span><span className="row-sub">{r.sub}</span></span>
-            </a>
-          ))}
+          {!q && (
+            <div className="palette-hints">
+              <p className="none">Jump to a unit, a topic or a sub-topic, or something to do.</p>
+              <div className="chips">{['Practise questions', 'Timed paper', 'Prompt builder', 'Focus timer', 'Export my data'].map((l) => (
+                <a key={l} className="chip" href={ACTIONS.find(([x]) => x === l)[1]} onClick={() => setOpen(null)}>{l}</a>
+              ))}</div>
+            </div>
+          )}
+          {q && !results.length && <p className="none">Nothing matches “{query.trim()}”.</p>}
+          <div id="search-results" role="listbox" aria-label="Results">
+            {results.map((r, i) => (
+              <a key={r.to + r.label + r.sub} id={`sr-${i}`} role="option" aria-selected={i === pick} className="row" href={r.to} onClick={() => setOpen(null)} onMouseEnter={() => setPick(i)}>
+                <span className="ricon"><Icon name={r.icon} /></span>
+                <span className="row-main"><span><Lit text={r.label} q={q} /></span><span className="row-sub"><Lit text={r.sub} q={q} /></span></span>
+                {i === pick && <span className="row-go" aria-hidden="true">↵</span>}
+              </a>
+            ))}
+          </div>
         </div>
       )}
       {open === 'bell' && (

@@ -14,6 +14,18 @@ export default function Gate() {
       setWho(r.ok ? 'in' : r.status === 403 ? 'no-access' : r.status === 401 ? 'out' : 'in');
     }).catch(() => setWho('in')); // offline: the app shows its own message
   }, []);
+  // Signed out and back from Discord: its 2FA step often finishes the sign-in in another tab, so look again on return.
+  useEffect(() => {
+    if (who !== 'out') return undefined;
+    const look = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetch('/api/me').then(async (r) => { if (r.ok) { setUser(await r.json()); setWho('in'); } }).catch(() => {});
+    };
+    document.addEventListener('visibilitychange', look);
+    addEventListener('focus', look);
+    addEventListener('pageshow', look);
+    return () => { document.removeEventListener('visibilitychange', look); removeEventListener('focus', look); removeEventListener('pageshow', look); };
+  }, [who]);
   if (who === 'loading') return null;
   if (who === 'in') return <App user={user} />;
   const problem = PROBLEMS[new URLSearchParams(location.hash.split('?')[1] || '').get('problem')];

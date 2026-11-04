@@ -35,9 +35,11 @@ const slug = (s) => String(s || '').replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-
 //   unit { code, title }, cohort { name, year, sem } | null, stage (id), topic { id, name } | null,
 //   subtopics (the topic's), weak (weakspot rows for the topic), errors (counts), hints, questions (paperq on the
 //   topic), question (the target paperq row) | null, failures (recent wrong attempts, with their checkpoints),
-//   files [{ name, paper, text }] (the unit's synced library; text '' = scanned), goal, budget (tokens), today.
+//   files [{ name, paper, text }] (the unit's synced library; text '' = scanned), goal, budget (tokens), today,
+//   guide (the topic's study guide) | null, places [{ book, title, page }] (the topic's sections in the books),
+//   unitTopics (the unit's topic names, in course order).
 export function buildPack(input) {
-  const { unit, cohort, stage = 'adequate', topic, subtopics = [], weak = [], errors = [], hints = [], questions = [], question = null, targets: given = null, failures = [], files = [], budget = 120000, today = '' } = input;
+  const { unit, cohort, stage = 'adequate', topic, subtopics = [], weak = [], errors = [], hints = [], questions = [], question = null, targets: given = null, failures = [], files = [], budget = 120000, today = '', guide = null, places = [], unitTopics = [] } = input;
   const targets = (given || (question ? [question] : [])).filter(Boolean);
   const goal = GOALS[input.goal] ? input.goal : defaultGoal(stage, targets.length > 0);
   const style = STYLES[input.style] ? input.style : null;
@@ -54,6 +56,16 @@ export function buildPack(input) {
     'You are a tough but fair engineering tutor at Kenyatta University, preparing me for a KU CAT/exam. Be technically exact at KU exam level.',
     `## Who I am\n${who}\nStudy stage: ${stageName(stage)} (${st?.window || ''}). ${STAGE_TONE[stage] || ''}`,
     `## What I need (${GOALS[goal].name})\n${GOALS[goal].ask}${style ? `\n\nHow to explain: ${STYLES[style].ask}` : ''}${focus ? `\n\nKey focus: ${focus}` : ''}${targets.map((t, i) => `\n\nTarget question${targets.length > 1 ? ` ${i + 1}` : ''} (${t.source}, ${t.label || `Q${t.number}`}${t.marks ? `, ${t.marks} marks` : ''}):\n${t.text}`).join('')}`,
+    topic ? `## The topic: ${topic.name}\n${[
+      unitTopics.length > 1 ? `It is topic ${unitTopics.indexOf(topic.name) + 1} of ${unitTopics.length} in ${unit.code} (${unitTopics.join('; ')}), so build on the ones before it and don't teach the ones after.` : '',
+      guide?.overview || '',
+      subtopics.length ? `Its sub-topics, in the order the course teaches them:\n${subtopics.map((s, i) => {
+        const part = guide?.outline?.find((o) => o.name.toLowerCase() === s.name.toLowerCase()) || guide?.outline?.[i];
+        return `${i + 1}. ${s.name} (I rate it: ${s.audit || 'untested'})${part?.expect ? `. The course expects me to: ${part.expect}` : ''}${part?.formulas?.length ? `. Formulas: ${part.formulas.join('; ')}` : ''}`;
+      }).join('\n')}` : '',
+      guide?.exam ? `How the papers examine it: ${guide.exam}` : '',
+      places.length ? `Where it is in my books (PDF pages):\n${places.map((p) => `- ${p.book}: ${p.title}, page ${p.page}`).join('\n')}` : '',
+    ].filter(Boolean).join('\n\n')}` : '',
     hints.length ? `## What my lecturer said (verbatim)\n${hints.map((h) => `- "${h.text}"${h.kind === 'focus' ? ' (focus)' : h.kind === 'exclude' ? ' (skip)' : ''}`).join('\n')}` : '',
     `## My weakspots${topic ? ` on ${topic.name}` : ''}\n${[
       by('stuck').length ? `- Stuck (don't get the concept or steps): ${by('stuck').join('; ')}` : '',
@@ -63,7 +75,7 @@ export function buildPack(input) {
       weak.length ? `- Highest risk first: ${weak.slice(0, 5).map((w) => w.name).join('; ')}` : '',
       by('solid').length ? `- Already solid (don't spend effort re-teaching): ${by('solid').join('; ')}` : '',
     ].filter(Boolean).join('\n') || '- Not audited yet: start from the fundamentals and check my understanding as you go.'}\nSpend your effort on the stuck and shaky ones.`,
-    `## Rules for your answer\n1. Number every step as a checkpoint: "Checkpoint n — what you do: equation = value [SI unit]", so I can compare my handwritten working line by line. Write equations in LaTeX ($...$ inline, $$...$$ on their own line) and bold the given values and every result.\n2. Carry SI units through every line; convert units before substituting (mm to m, kN to N, MPa to Pa).\n3. State every assumption, the sign convention you use, and when the method stops applying.\n4. Use the attached ${filename} as the source of truth for notation, the syllabus and the lecturer's emphasis. If something isn't in it, say so instead of guessing.\n5. If a question needs a figure I haven't attached, ask for it before solving.\n6. Finish by testing me: 3 questions on my weak sub-topics, one at a time, waiting for my answer and marking it.`,
+    `## Rules for your answer\n1. Number every step as a checkpoint: "Checkpoint n — what you do: equation = value [SI unit]", so I can compare my handwritten working line by line. Write equations in LaTeX ($...$ inline, $$...$$ on their own line) and bold the given values and every result.\n2. Carry SI units through every line; convert units before substituting (mm to m, kN to N, MPa to Pa).\n3. State every assumption, the sign convention you use, and when the method stops applying.\n4. Use the attached ${filename} as the source of truth for notation, the syllabus and the lecturer's emphasis. If something isn't in it, say so instead of guessing.\n5. If a question needs a figure I haven't attached, ask for it before solving.\n6. ${topic && subtopics.length ? `Cover every sub-topic under "The topic" in that order (more depth on my stuck and shaky ones): the idea in plain words, each formula with where it comes from and when it does not apply, a worked example at KU exam level with numbers, and the trap that costs marks. ` : ''}Work each answer out and check it before you write it, so what I read is the final method: no second attempts or corrections halfway through.\n7. Finish by testing me: 3 questions on my weak sub-topics, one at a time, waiting for my answer and marking it.`,
   ].filter(Boolean).join('\n\n');
 
   // ---- the .md pack: the fixed sections first, then course material until the budget runs out ----
@@ -71,6 +83,7 @@ export function buildPack(input) {
   sec.push(`# ${unit.code} — ${topicName}: context pack\n\nMade by Study Desk on ${today} for ${cohort ? `${cohort.name} ${cohort.year}.${cohort.sem}` : 'a KU engineering student'}. Study stage: ${stageName(stage)}. Goal: ${GOALS[goal].name}.`);
   if (targets.length) sec.push(`## Target question${targets.length > 1 ? 's' : ''}\n\n${targets.map((t) => `**${t.source}, ${t.label || `Q${t.number}`}${t.marks ? ` (${t.marks} marks)` : ''}**\n\n${t.text}`).join('\n\n')}`);
   sec.push(`## My weakspot profile\n\n${subtopics.length ? subtopics.map((s) => `- ${s.name} (${s.kind || 'concept'}): **${s.audit}**`).join('\n') : '_No sub-topics listed yet._'}${errLine ? `\n\nRecurring mistakes (last 30 days): ${errLine}.` : ''}${weak.length ? `\n\nFix first: ${weak.slice(0, 5).map((w) => `${w.name} (${w.reason})`).join('; ')}.` : ''}`);
+  if (guide) sec.push(`## Study guide for ${topicName}\n\n${guide.overview}\n\n${guide.outline.map((o) => `### ${o.name}\n\n${o.expect}${o.formulas.length ? `\n\n${o.formulas.map((f) => `- ${f}`).join('\n')}` : ''}${o.read.length ? `\n\nRead: ${o.read.map((r) => `${r.book}, ${r.where}`).join('; ')}` : ''}${o.skip ? `\n\nSkip: ${o.skip}` : ''}`).join('\n\n')}\n\n**How it's examined:** ${guide.exam}`);
   if (hints.length) sec.push(`## What the lecturer said\n\n${hints.map((h) => `- "${h.text}" (${h.kind}, ${String(h.at || '').slice(0, 10)})`).join('\n')}`);
   if (questions.length) sec.push(`## Past-paper and CAT questions on ${topicName}\n\n${[...questions].sort((a, b) => (b.year || 0) - (a.year || 0)).map((q) => `### ${q.source} · ${q.label || `Q${q.number}`}${q.marks ? ` · ${q.marks} marks` : ''}\n\n${q.text}`).join('\n\n')}`);
   if (failures.length) sec.push(`## Where my working broke recently\n\n${failures.map((f) => `- ${String(f.at || '').slice(0, 10)}: ${f.question || 'a question'}${f.brokeAt ? ` — broke at checkpoint ${f.brokeAt}${f.checkpoint ? ` (${f.checkpoint})` : ''}` : ''}${f.errorType ? `, ${f.errorType}` : ''}${f.answer ? `; my answer: ${f.answer}` : ''}`).join('\n')}`);

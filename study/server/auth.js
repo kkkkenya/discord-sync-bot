@@ -21,7 +21,9 @@ export function tierFor(member, userId, ownerId = process.env.OWNER_ID) {
 }
 
 export const sessionCookie = (user, now = Date.now()) => cookieHeader('crux_session',
-  sign({ id: user.id, name: user.name, tier: user.tier, checked: now, exp: now + SESSION_DAYS * 864e5 }), SESSION_DAYS * 86400);
+  sign({ id: user.id, name: user.name, tier: user.tier, ...(user.avatar && { avatar: user.avatar }), checked: now, exp: now + SESSION_DAYS * 864e5 }), SESSION_DAYS * 86400);
+// a Discord user's picture (Today's greeting), or null when they use the default one
+export const avatarOf = (u) => (u?.id && u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=96` : null);
 export const readSession = (request) => verify(readCookie(request, 'crux_session'));
 
 // The member's server record (roles, nickname), or null when they aren't in the server.
@@ -37,6 +39,12 @@ export const rememberUser = (db, user) => db.upsert('crux_users', [{
   id: user.id, name: user.name, tier: user.tier, tier_checked_at: new Date().toISOString(), last_seen: new Date().toISOString(),
 }], 'id');
 
+// The sign-in's state is signed and lasts 15 minutes, so Discord's reply is accepted in whichever browser it opens:
+// on phones the Discord app and its 2FA step often hand back to a different tab or browser than the one that started.
+const STATE_MS = 15 * 60e3;
+export const signInState = (now = Date.now()) => sign({ n: randomBytes(12).toString('hex'), exp: now + STATE_MS });
+export const stateOk = (state) => Boolean(state && verify(state)?.n);
+
 const redirect = (to, cookies = []) => {
   const headers = new Headers({ Location: to });
   for (const c of cookies) headers.append('Set-Cookie', c);
@@ -49,15 +57,15 @@ export async function authRoute(action, request, { db }) {
   const clientId = process.env.CRUX_DISCORD_CLIENT_ID;
 
   if (action === 'login') {
-    const state = randomBytes(16).toString('hex');
+    const state = signInState();
     const params = new URLSearchParams({ client_id: clientId, response_type: 'code', scope: 'identify', redirect_uri: redirectUri, state, prompt: 'none' });
-    return redirect(`https://discord.com/oauth2/authorize?${params}`, [cookieHeader('crux_state', state, 600)]);
+    return redirect(`https://discord.com/oauth2/authorize?${params}`);
   }
 
   if (action === 'callback') {
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
-    if (!code || !state || state !== readCookie(request, 'crux_state')) return redirect('/#/signin?problem=expired');
+    if (!code || !stateOk(state)) return redirect('/#/signin?problem=expired');
     const token = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -66,7 +74,7 @@ export async function authRoute(action, request, { db }) {
     if (!token.access_token) return redirect('/#/signin?problem=discord');
     const me = await fetch(`${DISCORD}/users/@me`, { headers: { Authorization: `Bearer ${token.access_token}` } }).then((r) => r.json());
     const member = await memberOf(me.id);
-    const user = { id: me.id, name: member?.nick || me.global_name || me.username, tier: tierFor(member, me.id) };
+    const user = { id: me.id, name: member?.nick || me.global_name || me.username, tier: tierFor(member, me.id), avatar: avatarOf(me) };
     await rememberUser(db, user);
     return redirect('/', [sessionCookie(user), cookieHeader('crux_state', '', 0)]);
   }

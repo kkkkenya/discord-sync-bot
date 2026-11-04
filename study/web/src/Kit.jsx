@@ -98,19 +98,28 @@ function Sheet({ c, edit, save }) {
   const list = (key, label) => c[key].length > 0 && (
     <div><h4>{label}</h4><ul>{c[key].map((_, i) => <li key={i}><Field value={c[key][i]} path={[key, i]} edit={edit} save={save} /></li>)}</ul></div>
   );
+  // by topic (older sheets have none: one group), the question-specific ones after each topic's core ones
+  const topics = [...new Set(c.formulas.map((fm) => fm.topic || ''))];
+  const row = (fm) => {
+    const i = c.formulas.indexOf(fm);
+    return (
+      <tr key={i} className={fm.special ? 'special' : undefined}>
+        <td><b><Field value={fm.name} path={['formulas', i, 'name']} edit={edit} save={save} /></b>{fm.special && <span className="chip warn">Specific questions</span>}<br /><Field value={fm.formula} path={['formulas', i, 'formula']} edit={edit} save={save} className="eq" /></td>
+        <td><Field value={fm.symbols} path={['formulas', i, 'symbols']} edit={edit} save={save} /></td>
+        <td><Field value={fm.notWhen} path={['formulas', i, 'notWhen']} edit={edit} save={save} />{fm.usedIn?.length > 0 && <p className="used-in small">Used in {fm.usedIn.join(', ')}</p>}</td>
+      </tr>
+    );
+  };
   return (
     <>
       <table className="formulas">
-        <thead><tr><th>Formula</th><th>Symbols and units</th><th>Not when</th></tr></thead>
-        <tbody>
-          {c.formulas.map((fm, i) => (
-            <tr key={i}>
-              <td><b><Field value={fm.name} path={['formulas', i, 'name']} edit={edit} save={save} /></b><br /><Field value={fm.formula} path={['formulas', i, 'formula']} edit={edit} save={save} className="eq" /></td>
-              <td><Field value={fm.symbols} path={['formulas', i, 'symbols']} edit={edit} save={save} /></td>
-              <td><Field value={fm.notWhen} path={['formulas', i, 'notWhen']} edit={edit} save={save} /></td>
-            </tr>
-          ))}
-        </tbody>
+        <thead><tr><th>Formula</th><th>Symbols and units</th><th>Not when · used in</th></tr></thead>
+        {topics.map((t) => (
+          <tbody key={t}>
+            {t && <tr className="formulas-topic"><th colSpan={3}>{t}</th></tr>}
+            {c.formulas.filter((fm) => (fm.topic || '') === t).sort((a, b) => Number(Boolean(a.special)) - Number(Boolean(b.special))).map(row)}
+          </tbody>
+        ))}
       </table>
       <div className="sheetcols">{list('traps', 'Your traps')}{list('conventions', 'Conventions and unit checks')}{list('shortcuts', 'Shortcuts')}</div>
     </>
@@ -130,7 +139,7 @@ function printKit(id) {
 h3{font:700 13pt 'IBM Plex Sans Condensed',sans-serif;margin:0 0 4px}h4{font:600 9.5pt 'IBM Plex Sans Condensed',sans-serif;margin:6px 0 2px}
 p{margin:2px 0}ol,ul{margin:2px 0;padding-left:16px}li{margin:1px 0}.eyebrow{font:600 7pt 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#444}
 table{width:100%;border-collapse:collapse}th,td{text-align:left;vertical-align:top;padding:2px 4px;border-bottom:.5pt solid #999}th{font:600 7pt 'IBM Plex Mono',monospace;text-transform:uppercase}
-.eq{font-family:'IBM Plex Mono',monospace}.sheetcols{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.recipe{break-inside:avoid;border-top:.5pt solid #999;padding-top:3px}
+.eq{font-family:'IBM Plex Mono',monospace}.formulas-topic th{padding-top:5px;font:700 8.5pt 'IBM Plex Sans Condensed',sans-serif;text-transform:none}.used-in{margin:1px 0 0;color:#444;font-size:7pt}.chip{margin-left:4px;font-size:6.5pt;border:.5pt solid #999;border-radius:3px;padding:0 3px}.sheetcols{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.recipe{break-inside:avoid;border-top:.5pt solid #999;padding-top:3px}
 .recipes-body{columns:2;column-gap:12px}.gap{border-bottom:1px solid #000;display:inline-block;min-width:120px;color:transparent}.warm{color:#000}.kit-tools{display:none}</style>
 </head><body>${el.outerHTML}<script>document.fonts.ready.then(()=>{print();});<\/script></body></html>`);
   w.document.close();

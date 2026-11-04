@@ -27,25 +27,33 @@ export function saveLibrary() {
 export const remote = () => Boolean(process.env.VERCEL) || process.env.CRUX_REMOTE_LIBRARY === '1';
 const loadedAt = new Map(); // unit → when its text was loaded into library.files on this instance
 const TTL = 10 * 60e3;
-const entryOf = (r) => ({ unit: r.unit_code, name: r.name, paper: r.paper, pages: r.pages || 0, chars: r.chars || 0, text: r.text || '', status: r.status, method: r.method, at: r.updated_at, ...(r.page_starts && { pageStarts: r.page_starts }) });
+const entryOf = (r) => ({ unit: r.unit_code, name: r.name, paper: r.paper, pages: r.pages || 0, chars: r.chars || 0, text: r.text || '', status: r.status, method: r.method, at: r.updated_at, ...(r.page_starts && { pageStarts: r.page_starts }), ...(r.sections && { sections: r.sections }) });
 
 // Before a request runs: the text of these units' files, from Supabase (no-op locally).
 export async function ensureLibrary(units) {
   const stale = [...new Set(units.filter(Boolean))].filter((u) => !(Date.now() - (loadedAt.get(u) || 0) < TTL));
   if (!remote() || !stale.length) return;
-  const rows = await db.select('crux_file_text', `unit_code=in.(${stale.map((u) => `"${enc(u)}"`).join(',')})&select=file_id,unit_code,name,paper,pages,chars,text,status,method,page_starts,updated_at`);
+  const rows = await db.select('crux_file_text', `unit_code=in.(${stale.map((u) => `"${enc(u)}"`).join(',')})&select=*`); // * : the sections column is newer than some databases
   for (const [id, e] of Object.entries(library.files)) if (stale.includes(e.unit)) delete library.files[id];
   for (const row of rows) library.files[row.file_id] = entryOf(row);
   for (const u of stale) loadedAt.set(u, Date.now());
 }
 
+let noSections = false;
 async function saveEntry(id, e, method, error = null) {
   library.files[id] = e;
   if (!remote()) return saveLibrary();
-  await db.upsert('crux_file_text', [{
+  const row = {
     file_id: Number(id), unit_code: e.unit, name: e.name, paper: Boolean(e.paper), status: e.status, method, pages: e.pages || null,
     chars: e.text.length, text: e.text.replace(/\u0000/g, '') || null, page_starts: e.pageStarts || null, error, updated_at: new Date().toISOString(), // Postgres text can't hold NUL
-  }], 'file_id');
+  };
+  // the headings go in their own column; a database without it yet still keeps the text
+  if (noSections) return db.upsert('crux_file_text', [row], 'file_id');
+  await db.upsert('crux_file_text', [{ ...row, sections: e.sections || null }], 'file_id').catch((err) => {
+    if (!/sections/.test(err.message)) throw err;
+    noSections = true; // until supabase/crux.sql adds the column, books aren't read again for headings
+    return db.upsert('crux_file_text', [row], 'file_id');
+  });
 }
 
 export const libraryMeta = () =>
@@ -131,9 +139,9 @@ export async function addLocalFile(unit, name, buf) {
   const id = `local-${createHash('sha1').update(buf).digest('hex').slice(0, 12)}`;
   const had = library.files[id];
   if (had) return { id, name: had.name, chars: had.chars, paper: had.paper, duplicate: true };
-  const { pages, text, pageStarts } = await extract(buf, name);
+  const { pages, text, pageStarts, sections } = await extract(buf, name);
   const paper = PAPER_NAME.test(name) && !OUTLINE.test(name);
-  library.files[id] = { unit, name, kind: 'local', paper, pages, at: new Date().toISOString(), chars: text.length, text, local: true, ...(pageStarts && { pageStarts }) };
+  library.files[id] = { unit, name, kind: 'local', paper, pages, at: new Date().toISOString(), chars: text.length, text, local: true, ...(pageStarts && { pageStarts }), ...(sections && { sections }) };
   saveLibrary();
   return { id, name, chars: text.length, paper };
 }
@@ -178,10 +186,13 @@ async function ocrAllowed() {
 }
 
 // A file still to read: never read, waiting for OCR, a scan read before OCR existed, failed more than a day ago, or
-// read before page numbers were kept (PDFs and slides are read again once, so "Learn a topic" can cite pages).
+// read before page numbers were kept (PDFs and slides are read again once, so "Learn a topic" can cite pages), or a
+// book read before its section headings were (read again once, so a topic opens at its section).
 export const needsReading = (f, e = library.files[f.id]) => !e || ['new', 'queued'].includes(e.status) || (!e.status && !e.text)
   || (e.status === 'error' && Date.now() - Date.parse(e.at || 0) > 864e5)
-  || (e.text && !e.pageStarts && e.method !== 'ocr' && /\.(pdf|pptx)$/i.test(f.name));
+  || (e.text && !e.pageStarts && e.method !== 'ocr' && /\.(pdf|pptx)$/i.test(f.name))
+  || (e.text && !e.paper && !e.sections && !noSections && e.method === 'pdf' && e.pages > MAX_TEXT_PAGES);
+const MAX_TEXT_PAGES = 60; // a PDF longer than this has pages past the text kept
 
 // Ingest one file record (from library.js filesFor) into the library. Returns { id, name, chars, cached, error }.
 // A file with no text even after OCR is still recorded, so it isn't downloaded again every time.
@@ -203,7 +214,7 @@ export async function ingestFile(f, unitCode) {
   const dl = await fetch(att.url);
   if (!dl.ok) return failed(`download ${dl.status}`);
   const buf = Buffer.from(await dl.arrayBuffer());
-  let { pages, text, pageStarts } = await extract(buf, att.filename);
+  let { pages, text, pageStarts, sections } = await extract(buf, att.filename);
   const ext = (att.filename.split('.').pop() || '').toLowerCase();
   let method = { pdf: 'pdf', docx: 'docx', pptx: 'pptx' }[ext] || (text ? 'text' : 'none');
   let status = 'done';
@@ -221,7 +232,7 @@ export async function ingestFile(f, unitCode) {
     }
   }
   if (!text && status === 'done') method = 'none';
-  const entry = { unit: unitCode, name: f.name, kind: f.kind, paper: f.paper, pages, at: new Date().toISOString(), chars: text.length, text, status, method, ...(pageStarts && { pageStarts }) };
+  const entry = { unit: unitCode, name: f.name, kind: f.kind, paper: f.paper, pages, at: new Date().toISOString(), chars: text.length, text, status, method, ...(pageStarts && { pageStarts }), ...(sections && { sections }) };
   await saveEntry(f.id, entry, method, error);
   return { id: f.id, name: f.name, chars: text.length, method, error: error || (status === 'queued' ? 'waiting for tomorrow\'s OCR' : text.length ? null : 'no text (scanned?)') };
 }

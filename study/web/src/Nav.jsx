@@ -84,7 +84,8 @@ function useIndicator(ref, page, vertical) {
       const i = tabs.findIndex((t) => t.getAttribute('aria-current') === 'page');
       const full = (t) => 44 + t.querySelector('.lab').scrollWidth + 7;
       ind.style.opacity = i < 0 ? 0 : 1;
-      if (i < 0) return;
+      // a page with no tab of its own (Focus, Prompt builder): every tab back to an icon, no empty gap left behind
+      if (i < 0) { if (!vertical) tabs.forEach((t) => { t.style.width = '44px'; }); return; }
       if (vertical) { ind.style.top = `${tabs[i].offsetTop}px`; ind.style.width = `${full(tabs[i])}px`; return; }
       let left = 4;
       tabs.forEach((t, j) => { const w = j === i ? full(t) : 44; t.style.width = `${w}px`; if (j < i) left += w; });
@@ -92,6 +93,8 @@ function useIndicator(ref, page, vertical) {
     };
     place();
     document.fonts?.ready.then(place);
+    addEventListener('resize', place); // turning the phone, or a tablet crossing into the phone layout
+    return () => removeEventListener('resize', place);
   }, [ref, page, vertical]);
 }
 

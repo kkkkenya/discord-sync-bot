@@ -598,7 +598,7 @@ input.narrow { width: 88px; }
 /* the notes bar (StickyBar.jsx): a strip above the bottom nav on phones and tablets, pulled up to read; a column on
    the right on laptops that stays open */
 .notesbar { position: fixed; z-index: 18; left: var(--nav-gap); right: var(--nav-gap); bottom: calc(14px + var(--tabs) + 8px + env(safe-area-inset-bottom));
-  border-radius: var(--radius-nav); display: grid; overflow: hidden; max-height: 48px; transition: max-height 0.32s var(--spring); }
+  border-radius: var(--radius-nav); display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; max-height: 48px; transition: max-height 0.32s var(--spring); }
 .notesbar.is-open { max-height: min(72dvh, 560px); }
 .notes-strip { display: flex; align-items: center; gap: var(--s2); min-height: 46px; padding: 0 var(--s3); border: 0; background: none; color: var(--text); cursor: pointer; text-align: left; font: inherit; position: relative; }
 .notes-strip .icon { width: 18px; height: 18px; flex: none; color: var(--text-2); }
@@ -782,7 +782,7 @@ html[data-motion="off"] .aiwait-bar::after { animation: none; width: 100%; opaci
 .mini-at { font-size: var(--t-xs); color: rgba(255, 255, 255, 0.75); }
 .mini-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
 .mini-tabs .chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 0; cursor: pointer; background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.8); font: inherit; font-size: 11px; }
-@media (min-width: 1100px) { body:has(#notes-reading > .mini-reader) .pdf-dock { display: none; } }
+@media (min-width: 1100px) { body:has(.notesbar:not(.is-folded) #notes-reading > .mini-reader) .pdf-dock { display: none; } } /* folded notes: the dock comes back */
 @media (prefers-reduced-motion: reduce) { .mini-live, .mini-page.next, .mini-page.prev { animation: none; } .mini-page, .mini-go { transition: none; } }
 html[data-motion="off"] .mini-live { animation: none; }
 
@@ -964,3 +964,49 @@ button.chip:active, a.chip:active { transform: scale(.95); }
   .pdf-find { margin-left: 0; flex: 1 1 100%; }
   .pdf-find input { width: 100%; }
 }
+
+/* Folding columns on laptops: the notes column folds into a slim rail on the right and the Practise question list into
+   one on the left, so the page and the solution get the width. Each choice is remembered. Phones keep the strip and
+   the drawer. */
+.notes-rail, .notes-fold, .qnav-rail, .qnav-fold { display: none; }
+.qnav-search { display: flex; gap: var(--s1); align-items: center; }
+.qnav-search input { flex: 1; min-width: 0; }
+.notes-rail, .qnav-rail { flex-direction: column; align-items: center; gap: var(--s2); width: 100%; height: 100%; padding: var(--s3) 0;
+  border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; border-radius: inherit; }
+.notes-rail:hover, .qnav-rail:hover { background: var(--surface-2); }
+.notes-rail .icon, .qnav-rail .icon { width: 18px; height: 18px; color: var(--text-2); }
+.notes-rail-word, .qnav-rail-word { writing-mode: vertical-rl; font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.06em; color: var(--text-2); }
+.qnav-rail .icon { transform: none; }
+.notes-rail .chip, .qnav-rail .chip { padding-inline: 6px; }
+@media (min-width: 1100px) {
+  .notes-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+  .notes-fold { display: inline-grid; width: 36px; height: 36px; color: var(--text-2); }
+  .notes-fold .icon { width: 18px; height: 18px; }
+  .notesbar.is-folded { width: 56px; grid-template-rows: 1fr; }
+  .notesbar.is-folded .notes-head, .notesbar.is-folded .notes-body { display: none; }
+  .notesbar.is-folded .notes-rail { display: flex; }
+  body:has(.notesbar.is-folded) .main { padding-right: calc(56px + var(--s4) + var(--s6)); max-width: calc(1240px + 92px + 56px + var(--s4)); }
+  body:has(.notesbar.is-folded) .focusbar { right: calc(56px + var(--s4) * 2); }
+  body:has(.notesbar.is-folded) .toast { left: 50%; }
+  body:has(.notesbar.is-folded) .pdf-dock { max-width: calc(100vw - 92px - 56px - 4 * var(--s4)); }
+}
+@media (min-width: 1024px) {
+  .qnav-fold { display: inline-grid; width: 36px; height: 36px; flex: none; color: var(--text-2); }
+  .qnav-fold .icon { width: 18px; height: 18px; transform: rotate(180deg); }
+  .practise-layout:has(.qnav.is-folded) { grid-template-columns: 56px minmax(0, 1fr); }
+  .qnav.is-folded { grid-template-rows: 1fr; }
+  .qnav.is-folded .qnav-body { display: none; }
+  .qnav.is-folded .qnav-rail { display: flex; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .notes-rail, .qnav-rail { animation: fade 0.2s ease; }
+}
+/* typing on a phone (main.jsx sets body.typing): the bars at the bottom step aside for the keyboard */
+@media (max-width: 767px) {
+  body.typing .tabpill, body.typing .notesbar:not(.is-open), body.typing .focusbar { display: none; }
+  body.typing .main { padding-bottom: var(--s7); }
+}
+/* the plain sign-in screen (Gate.jsx): the installed app, a failed sign-in, or not a member yet */
+.gate { min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: var(--s3); padding: var(--s5) var(--s4); text-align: center; max-width: 420px; margin: 0 auto; }
+.gate p { color: var(--text-2); }
+.gate-actions { display: flex; gap: var(--s2); flex-wrap: wrap; justify-content: center; }

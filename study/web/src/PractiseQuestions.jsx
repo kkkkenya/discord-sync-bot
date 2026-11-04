@@ -53,6 +53,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const [filter, setFilter] = useState('');
   const [show, setShow] = useState('all'); // all | new | saved
   const [listOpen, setListOpen] = useState(false); // the drawer, on a phone
+  const [listFolded, setListFolded] = useState(() => { try { return localStorage.getItem('crux-qnav-folded') === '1'; } catch { return false; } }); // the column, on a laptop
+  const foldList = (f) => { setListFolded(f); try { localStorage.setItem('crux-qnav-folded', f ? '1' : '0'); } catch { /* private window */ } };
   const [notesOpen, setNotesOpen] = useState(false);
   const [chats, setChats] = useState({}); // question id → the follow-up chat
   const work = useRef(null);
@@ -149,13 +151,19 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const subs = (q?.subtopicIds || []).map(subName).filter(Boolean);
   return (
     <div className="practise-layout">
-      <aside className={`qnav card${listOpen ? ' is-open' : ''}`} aria-label="Questions">
+      <aside className={`qnav card${listOpen ? ' is-open' : ''}${listFolded ? ' is-folded' : ''}`} aria-label="Questions">
+        <button type="button" className="qnav-rail" aria-expanded="false" aria-label={`Show the questions (${order.length})`} title="Show the questions" onClick={() => foldList(false)}>
+          <Icon name="chevron" /><span className="chip num">{order.length}</span><span className="qnav-rail-word">Questions</span>
+        </button>
         <button type="button" className="qnav-toggle" aria-expanded={listOpen} onClick={() => setListOpen((o) => !o)}>
           <span className="row-main">{q ? qname(q) : 'Pick a question'}</span><span className="chip num">{order.length}</span><span className={`chev${listOpen ? ' open' : ''}`}><Icon name="chevron" /></span>
         </button>
         <div className="qnav-body">
           <div className="qnav-tools">
-            <input type="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search questions" aria-label="Search questions" />
+            <div className="qnav-search">
+              <input type="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search questions" aria-label="Search questions" />
+              <button type="button" className="iconbtn qnav-fold" aria-expanded="true" aria-label="Hide the questions" title="Hide the questions" onClick={() => foldList(true)}><Icon name="chevron" /></button>
+            </div>
             <div className="segmented small" role="group" aria-label="Show">
               {[['all', 'All'], ['new', 'Not tried'], ['saved', 'Solved']].map(([id, name]) => <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)}>{name}</button>)}
             </div>

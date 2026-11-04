@@ -4,8 +4,9 @@ import { Icon } from './icons.jsx';
 import Rich from './Rich.jsx';
 
 // The notes bar: clips pinned from anywhere in Crux and notes you write, kept in your account (data.stickies).
-// Laptop: a column fixed on the right that can't be closed. Phone and tablet: a strip above the bottom nav with the
-// newest note, pulled up to see them all. Each unit has its own notes; "All units" notes show everywhere.
+// Laptop: a column fixed on the right that folds into a slim rail (remembered), giving the page its width back.
+// Phone and tablet: a strip above the bottom nav with the newest note, pulled up to see them all. Each unit has its own notes; "All units" notes show everywhere.
+const FOLD = 'crux-notes-folded';
 const ordered = (list) => [...list].sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(b.at).localeCompare(String(a.at)));
 
 // The selected text as plain text, with typeset maths turned back into $…$ so it pastes into any AI.
@@ -103,6 +104,8 @@ export default function StickyBar({ s, unit, onProblem }) {
   useEffect(() => { setNotes(s.data.stickies); }, [s.data.stickies]);
   const [draft, setDraft] = useState('');
   const [open, setOpen] = useState(false); // the phone strip pulled up
+  const [folded, setFolded] = useState(() => { try { return localStorage.getItem(FOLD) === '1'; } catch { return false; } }); // the laptop column
+  const fold = (f) => { setFolded(f); try { localStorage.setItem(FOLD, f ? '1' : '0'); } catch { /* private window */ } };
   const dragged = useRef(null);
   const swipe = useRef(null); // where a touch on the phone strip started: swipe up opens, down closes
   const shown = useMemo(() => ordered(notes.filter((n) => !n.unit || n.unit === unit)), [notes, unit]);
@@ -148,7 +151,10 @@ export default function StickyBar({ s, unit, onProblem }) {
   return (
     <>
       <PinButton onPin={(range) => create(selectionText(range), sourceOf(range.startContainer, unit))} />
-      <aside className={`notesbar glass${open ? ' is-open' : ''}`} aria-label="Notes">
+      <aside className={`notesbar glass${open ? ' is-open' : ''}${folded ? ' is-folded' : ''}`} aria-label="Notes">
+        <button type="button" className="notes-rail" aria-expanded="false" aria-label={`Show notes (${shown.length})`} title="Show notes" onClick={() => fold(false)}>
+          <Icon name="notes" /><span className="chip num">{shown.length}</span><span className="notes-rail-word">Notes</span>
+        </button>
         <button type="button" className="notes-strip" aria-expanded={open} onClick={() => setOpen((o) => !o)}
           onTouchStart={(e) => { swipe.current = e.touches[0].clientY; }}
           onTouchEnd={(e) => { const dy = e.changedTouches[0].clientY - (swipe.current ?? e.changedTouches[0].clientY); if (Math.abs(dy) > 30) { e.preventDefault(); setOpen(dy < 0); } }}>
@@ -161,6 +167,7 @@ export default function StickyBar({ s, unit, onProblem }) {
           <div id="notes-reading" /> {/* the PDF you're reading, small (PdfViewer.jsx Mini) */}
           <div className="notes-head">
             <h2><Icon name="notes" /> Notes{unit ? <span className="muted"> · {unit}</span> : null}</h2>
+            <button type="button" className="iconbtn notes-fold" aria-expanded="true" aria-label="Hide notes" title="Hide notes" onClick={() => fold(true)}><Icon name="chevron" /></button>
           </div>
           <form className="notes-add" onSubmit={(e) => { e.preventDefault(); create(draft); setDraft(''); }}>
             <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} maxLength={2000} placeholder="Write or paste a note. Maths in $…$"

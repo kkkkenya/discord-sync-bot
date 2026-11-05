@@ -6,12 +6,12 @@ import { CHANNELS, GUILD_ID, MPESA, PRICES, ROLES, WHATSAPP } from '../lib/confi
 import { canSort, forwardTo, partsOf, postsFor } from '../lib/sorting.js';
 import { handleCommand, handleComponent } from '../lib/commands.js';
 import { handleLogAutocomplete } from '../lib/logbook.js';
+import { planName } from '../lib/plans.js';
 
 const ADMINISTRATOR = 1n << 3n;
 const MANAGE_ROLES = 1n << 28n;
 const json = (obj) => new Response(JSON.stringify(obj), { headers: { 'Content-Type': 'application/json' } });
 const ephemeral = (content) => json({ type: 4, data: { content, flags: 64, allowed_mentions: { parse: [] } } });
-const planName = (plan) => (plan === 'premium' ? 'Premium' : 'Basic');
 
 const paymentForm = {
   type: 9, // MODAL
@@ -21,7 +21,7 @@ const paymentForm = {
     components: [
       { type: 1, components: [{ type: 4, custom_id: 'code', label: 'M-Pesa code (start of the SMS)', style: 1, min_length: 8, max_length: 12, placeholder: 'e.g. TJK4ABC12D', required: true }] },
       { type: 1, components: [{ type: 4, custom_id: 'sender', label: 'Name the money was sent from', style: 1, max_length: 60, placeholder: 'As it appears on M-Pesa', required: true }] },
-      { type: 1, components: [{ type: 4, custom_id: 'plan', label: 'Plan: Basic (KES 50) or Premium (KES 800)', style: 1, value: 'Basic', max_length: 10, required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: 'plan', label: `Plan: Basic ${PRICES.basic}, Upgrade ${PRICES.upgrade} or Premium ${PRICES.premium}`, style: 1, value: 'Basic', max_length: 10, required: true }] },
     ],
   },
 };
@@ -39,10 +39,10 @@ const premiumGuide = [
 
 const receipt = (plan) => [
   `✅ **Payment confirmed: ${planName(plan)}** (KES ${PRICES[plan]})`,
-  plan === 'premium'
-    ? 'You now have Premium for life, plus all the unit libraries.'
-    : 'You now have full access to the unit libraries for this semester.',
-  ...(plan === 'premium' ? premiumGuide : []),
+  plan === 'premium' ? 'You now have Premium and all the unit libraries for this semester (120 days).'
+    : plan === 'upgrade' ? 'You now have Premium until your Basic semester ends.'
+      : 'You now have full access to the unit libraries for this semester.',
+  ...(plan !== 'basic' ? premiumGuide : []),
   'Thanks for supporting Engineering Study Hub. Good luck with your CATs!',
 ].join('\n');
 
@@ -115,7 +115,7 @@ export async function POST(request) {
       const original = i.message.content;
 
       if (action === 'approve') {
-        const roles = plan === 'premium' ? [ROLES.premium, ROLES.paid] : [ROLES.paid];
+        const roles = plan === 'basic' ? [ROLES.paid] : [ROLES.premium, ROLES.paid];
         for (const r of roles) await api('PUT', `/guilds/${GUILD_ID}/members/${uid}/roles/${r}`);
         await api('DELETE', `/guilds/${GUILD_ID}/members/${uid}/roles/${ROLES.trial}`).catch(() => {});
         const sent = await dm(uid, receipt(plan));
@@ -141,7 +141,8 @@ export async function POST(request) {
       if (!/^[A-Z0-9]{8,12}$/.test(code)) {
         return ephemeral('That doesn\'t look like an M-Pesa code. It\'s the letters and numbers at the very start of the M-Pesa SMS, like `TJK4ABC12D`. Press **I\'ve paid** and try again.');
       }
-      const plan = /prem/i.test(v.plan) ? 'premium' : 'basic';
+      const plan = /upg/i.test(v.plan) ? 'upgrade' : /prem/i.test(v.plan) ? 'premium' : 'basic';
+      const hasBasic = (i.member?.roles || []).includes(ROLES.paid);
       // flag a code that was already claimed (same SMS used twice)
       const recent = await api('GET', `/channels/${CHANNELS.payments}/messages?limit=100`);
       const reused = recent.find((m) => m.content.includes(`\`${code}\``));
@@ -149,6 +150,7 @@ export async function POST(request) {
         content: [
           `💰 **Payment claim** from <@${user.id}> (${user.username})`,
           `Plan: **${planName(plan)}** (KES ${PRICES[plan]})`,
+          ...(plan === 'upgrade' ? [hasBasic ? 'Has Basic now: yes' : '⚠️ Has Basic now: **no**. The upgrade price is for Basic members; ask for the rest of the Premium price.'] : []),
           `M-Pesa code: \`${code}\``,
           `Sent from: ${v.sender}`,
           reused ? `⚠️ This code was already claimed: ${reused.content.split('\n')[0]}` : `Check M-Pesa (${MPESA.number}) for this code and amount, then approve.`,

@@ -4,7 +4,8 @@
 //   POST /api/dash?op=sort     { fileMsgId, noteMsgId, targets: [{kind:'unit',code}|{kind:'shelf',id}|{kind:'library'}] }
 //   GET  /api/dash?op=stats    members, trials, payments, money this semester
 import { api, isoDay } from '../lib/discord.js';
-import { CHANNELS, EXISTING, GUILD_ID, PRICES, ROLES, SEMESTER_START, TRIAL_DAYS } from '../lib/config.js';
+import { CHANNELS, EXISTING, GUILD_ID, ROLES, SEMESTER_START, TRIAL_DAYS } from '../lib/config.js';
+import { priceOf } from '../lib/plans.js';
 import { allUnitPosts, forwardTo, normaliseCode, partsOf, postsFor, SHELVES } from '../lib/sorting.js';
 import { currentUser } from '../lib/session.js';
 
@@ -110,8 +111,8 @@ async function stats() {
     .map((t) => ({ name: t.name, ends: new Date(t.ends).toISOString() }));
 
   const payments = payMsgs.filter((m) => m.content.startsWith('💰')).map((m) => {
-    const ok = m.content.match(/✅ \*\*Approved (basic|premium)\*\* by <@\d+> on (\d{4}-\d{2}-\d{2})/);
-    const plan = ok ? ok[1] : /Plan: \*\*Premium/.test(m.content) ? 'premium' : 'basic';
+    const ok = m.content.match(/✅ \*\*Approved (basic|premium|upgrade)\*\* by <@\d+> on (\d{4}-\d{2}-\d{2})/);
+    const plan = ok ? ok[1] : /Plan: \*\*Upgrade/.test(m.content) ? 'upgrade' : /Plan: \*\*Premium/.test(m.content) ? 'premium' : 'basic';
     return {
       who: (m.content.match(/from <@\d+> \(([^)]+)\)/) || [])[1] || '?',
       plan,
@@ -131,7 +132,7 @@ async function stats() {
     payments: {
       pending: payments.filter((p) => p.status === 'pending').length,
       approvedThisSemester: approvedThisSemester.length,
-      revenueThisSemester: approvedThisSemester.reduce((s, p) => s + PRICES[p.plan], 0),
+      revenueThisSemester: approvedThisSemester.reduce((s, p) => s + priceOf(p.plan, new Date(`${p.date}T12:00:00+03:00`)), 0),
       recent: payments.slice(0, 10),
     },
     toSort: sortMsgs.filter(sortButton).length,

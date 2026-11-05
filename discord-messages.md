@@ -25,7 +25,7 @@ A 12-month challenge for the whole server. Every day you post what you worked on
 • Miss a day? The bot DMs you the next morning so you can still log it with `day: yesterday`.
 • Every Sunday the bot posts the week's top streaks and milestones in #daily-logs.
 
-**Free for everyone until 18 December.** After that, logging is part of Premium (KES 800, for life). Your streak and history carry over when you upgrade.
+**Free for everyone until 18 December.** After that, logging is part of Premium (KES 500 a semester, or KES 350 to upgrade from Basic). Your streak and history carry over when you upgrade.
 
 Start today with a warm-up log. The cycle officially begins Monday.
 
@@ -47,7 +47,7 @@ Board: https://discord-sync-bot.vercel.app/board/
 
 ## 3. Two weeks before Premium (4 December)
 
-Two weeks left of free Study Hub Milestones. From 19 December logging is part of Premium (KES 800, yours for life), and your streak and milestones carry straight over. Upgrade in #upgrade-to-premium. `/board` and the board page stay open to everyone.
+Two weeks left of free Study Hub Milestones. From 19 December logging is part of Premium (KES 500 a semester, or KES 350 to upgrade from Basic), and your streak and milestones carry straight over. Upgrade in #upgrade-to-premium. `/board` and the board page stay open to everyone.
 
 ---
 

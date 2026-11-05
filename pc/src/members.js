@@ -19,7 +19,7 @@ export function forumsFor(member, index) {
 
 export function welcomeGuide(name, ch) {
   const tips = [
-    `**Your free week.** You've got 7 days of full access to the unit libraries. After that it's KES ${PRICES.basic} a semester (Basic) or KES ${PRICES.premium} once for the whole degree (Premium). Pay in #upgrade-to-premium.`,
+    `**Your free week.** You've got 7 days of full access to the unit libraries. After that it's KES ${PRICES.basic} a semester (Basic) or KES ${PRICES.premium} a semester (Premium, with the full Crux study app). Already on Basic? Upgrade for KES ${PRICES.upgrade}. Pay in #upgrade-to-premium.`,
     "**Find your units.** Each course and year has a forum (like `mech-year-2`) with one post per unit: past papers, CATs and notes. Fastest way: type `/find resource EMM 305` anywhere.",
     '**Books.** Textbooks sit on the topic shelves and in #pdf-library.',
     ch.dailyChannel && `**Practise daily.** A new problem from real KU past papers lands in <#${ch.dailyChannel.id}> every morning. Answer to build a streak 🔥 Want a ping? \`/daily on\`.`,

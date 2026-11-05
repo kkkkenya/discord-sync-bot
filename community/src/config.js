@@ -9,6 +9,7 @@ export const MODEL = 'gemini-3.8-flash';       // Google's current stable Flash 
 // even when the PC is off; a late or missed run catches up on anything still due that day.
 export const SCHEDULE = [
   { job: 'trivia', at: '10:00' },  // question with 🇦🇧🇨🇩 reactions (reactions work while the bot is offline)
+  { job: 'crux', at: '12:00' },    // a Crux tip, Mondays and Thursdays only (src/crux.js)
   { job: 'video', at: '14:00' },
   { job: 'reveal', at: '16:00' },  // trivia answer and working
   { job: 'paper', at: '17:00' },   // research paper for the department of the day, pinging its role

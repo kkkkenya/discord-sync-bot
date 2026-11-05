@@ -7,6 +7,7 @@ name: Community posts
 on:
   schedule:
     - cron: '5 7 * * *'    # 10:05 trivia
+    - cron: '5 9 * * *'    # 12:05 Crux tip (Mon and Thu)
     - cron: '5 11 * * *'   # 14:05 video
     - cron: '5 13 * * *'   # 16:05 trivia answer
     - cron: '5 14 * * *'   # 17:05 research paper

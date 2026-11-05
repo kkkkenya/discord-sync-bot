@@ -6,6 +6,7 @@ import { latestNews, latestPapers, latestVideos } from './feeds.js';
 import { askJson } from './gemini.js';
 import { discord, load, nairobiDay, store } from './rest.js';
 import { revealReady } from './due.js';
+import { revealLine, tipFor, tipPost } from './crux.js';
 
 const LETTERS = ['🇦', '🇧', '🇨', '🇩'];
 const NONE = { parse: [] };
@@ -46,7 +47,7 @@ export async function trivia() {
     `Trivia: ${unit.title}`, q.discussion,
   );
   for (const e of LETTERS) await discord('PUT', `/channels/${CHANNEL}/messages/${msg.id}/reactions/${encodeURIComponent(e)}/@me`);
-  await store('trivia', { messageId: msg.id, threadId: thread.id, answer: order.indexOf(q.answer), choices, explanation: q.explanation, day: nairobiDay(), postedAt: Date.now() });
+  await store('trivia', { messageId: msg.id, threadId: thread.id, answer: order.indexOf(q.answer), choices, explanation: q.explanation, unit: unit.codes[0], day: nairobiDay(), postedAt: Date.now() });
   await remember('units', unit.codes[0]);
 }
 
@@ -63,7 +64,8 @@ export async function reveal() {
   const right = [...voters].filter(([, v]) => v.length === 1 && v[0] === t.answer).map(([id]) => id); // one letter only
   await discord('POST', `/channels/${t.threadId}/messages`, {
     content: [`✅ **Answer: ${LETTERS[t.answer]} ${t.choices[t.answer]}**`, t.explanation, '',
-      voters.size ? `${right.length} of ${voters.size} got it.${right.length ? ` 🎉 ${right.slice(0, 15).map((id) => `<@${id}>`).join(' ')}` : ''}` : 'Nobody answered this one. Tomorrow!'].join('\n').slice(0, 2000),
+      voters.size ? `${right.length} of ${voters.size} got it.${right.length ? ` 🎉 ${right.slice(0, 15).map((id) => `<@${id}>`).join(' ')}` : ''}` : 'Nobody answered this one. Tomorrow!',
+      ...(t.unit ? ['', revealLine(t.unit)] : [])].join('\n').slice(0, 2000),
     allowed_mentions: { users: right.slice(0, 15) },
   });
   await store('trivia', { ...t, revealed: true });
@@ -112,4 +114,10 @@ export async function news() {
   await remember('links', a.link);
 }
 
-export const JOBS = { trivia, video, reveal, paper, news };
+// Mondays and Thursdays: one thing Crux does, with the link (src/crux.js). Other days there's nothing to send.
+export async function crux() {
+  const tip = tipFor(nairobiDay());
+  if (tip) await post(tipPost(tip), `Crux tip: ${tip.title}`, tip.ask);
+}
+
+export const JOBS = { trivia, video, reveal, paper, news, crux };

@@ -1,5 +1,6 @@
 // Minimal Gemini client (REST, no SDK). ask() returns text; askJson() returns parsed JSON matching `schema`.
 import { MODEL } from './config.js';
+import { CRUX_FACTS } from './crux.js';
 
 const URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -10,7 +11,8 @@ How you talk:
 - Discord can't show LaTeX: write maths in plain text with Unicode (x², √, π, Δ, θ, Σ, ×, ≤) and short code blocks for working.
 - For a take-home CAT or assignment, guide with hints and the method rather than handing over the final answer.
 - If you're not sure of a fact, say so. Never make up references, past-paper questions or exam dates.
-- No @everyone or @here, ever.`;
+- No @everyone or @here, ever.
+${CRUX_FACTS}`;
 
 const FALLBACK = 'gemini-3.5-flash-lite'; // used when the main model is overloaded
 const BUSY = [429, 500, 502, 503, 504];

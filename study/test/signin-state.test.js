@@ -17,9 +17,9 @@ test('a callback in a browser without the starting cookie is not sent back as ex
   try {
     const url = `https://crux.test/auth/callback?code=abc&state=${encodeURIComponent(signInState())}`;
     const r = await authRoute('callback', new Request(url), { db: {} });
-    assert.equal(r.headers.get('Location'), '/#/signin?problem=discord');
+    assert.equal(r.headers.get('Location'), '/app#/signin?problem=discord');
     const bad = await authRoute('callback', new Request('https://crux.test/auth/callback?code=abc&state=nope'), { db: {} });
-    assert.equal(bad.headers.get('Location'), '/#/signin?problem=expired');
+    assert.equal(bad.headers.get('Location'), '/app#/signin?problem=expired');
   } finally {
     globalThis.fetch = realFetch;
   }

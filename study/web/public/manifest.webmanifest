@@ -2,7 +2,7 @@
   "name": "Crux",
   "short_name": "Crux",
   "description": "Study plans for KU engineering units, built from past papers.",
-  "start_url": "/#/today",
+  "start_url": "/app#/today",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f2f2f7",

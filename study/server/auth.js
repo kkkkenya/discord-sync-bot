@@ -65,13 +65,13 @@ export async function authRoute(action, request, { db }) {
   if (action === 'callback') {
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
-    if (!code || !stateOk(state)) return redirect('/#/signin?problem=expired');
+    if (!code || !stateOk(state)) return redirect('/app#/signin?problem=expired');
     const token = await fetch('https://discord.com/api/oauth2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: clientId, client_secret: process.env.CRUX_DISCORD_CLIENT_SECRET, grant_type: 'authorization_code', code, redirect_uri: redirectUri }),
     }).then((r) => r.json());
-    if (!token.access_token) return redirect('/#/signin?problem=discord');
+    if (!token.access_token) return redirect('/app#/signin?problem=discord');
     const me = await fetch(`${DISCORD}/users/@me`, { headers: { Authorization: `Bearer ${token.access_token}` } }).then((r) => r.json());
     const member = await memberOf(me.id);
     const user = { id: me.id, name: member?.nick || me.global_name || me.username, tier: tierFor(member, me.id), avatar: avatarOf(me) };

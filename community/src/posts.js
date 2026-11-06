@@ -2,7 +2,7 @@
 // Each opens a thread with a discussion question; the PC bot (when running) joins in.
 import UNITS from '../../lib/units.json' with { type: 'json' };
 import { CHANNEL, DEPARTMENTS } from './config.js';
-import { latestNews, latestPapers, latestVideos } from './feeds.js';
+import { latestNews, latestPapers, latestVideos, opens } from './feeds.js';
 import { askJson } from './gemini.js';
 import { discord, load, nairobiDay, store } from './rest.js';
 import { revealReady } from './due.js';
@@ -109,7 +109,9 @@ export async function news() {
   const items = (await latestNews()).filter((a) => !seen.includes(a.link)).slice(0, 30);
   if (!items.length) return;
   const p = await choose(items, 'These are new engineering news stories. Pick the ONE most interesting for KU engineering undergraduates (practical, surprising, or tied to what they study), then write about it.');
-  const a = items[p.index] || items[0];
+  let a;
+  for (const x of [items[p.index], ...items].filter(Boolean)) if (await opens(x.link)) { a = x; break; }
+  if (!a) return;
   await post(`📰 **${a.title}** (${a.source})\n${p.summary}\n${a.link}`, `News: ${a.title}`, p.discussion);
   await remember('links', a.link);
 }

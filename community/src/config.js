@@ -48,11 +48,12 @@ export const YOUTUBE = [
   { name: 'First Principles Engineering', id: 'UCZjXPcqOmUnd_IfFO8KJGHA' },
 ];
 
-// Engineering news feeds (links only; nothing is re-uploaded).
+// Engineering news feeds (links only; nothing is re-uploaded). TechXplore and Phys.org were dropped on 6 Nov 2026:
+// their article pages sit behind a Cloudflare check that blocks many readers.
 export const NEWS = [
-  { name: 'TechXplore', url: 'https://techxplore.com/rss-feed/engineering-news/' },
-  { name: 'TechXplore Energy', url: 'https://techxplore.com/rss-feed/energy-green-tech-news/' },
-  { name: 'TechXplore Robotics', url: 'https://techxplore.com/rss-feed/robotics-news/' },
-  { name: 'TechXplore Tech', url: 'https://techxplore.com/rss-feed/hi-tech-news/' },
-  { name: 'Phys.org Environment', url: 'https://phys.org/rss-feed/earth-news/environment/' },
+  { name: 'IEEE Spectrum', url: 'https://spectrum.ieee.org/feeds/feed.rss' },
+  { name: 'MIT News', url: 'https://news.mit.edu/rss/topic/engineering' },
+  { name: 'ScienceDaily', url: 'https://www.sciencedaily.com/rss/matter_energy/engineering.xml' },
+  { name: 'Interesting Engineering', url: 'https://interestingengineering.com/feed' },
+  { name: 'engineering.com', url: 'https://www.engineering.com/feed/' },
 ];

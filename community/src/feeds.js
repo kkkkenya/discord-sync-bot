@@ -28,6 +28,17 @@ export async function latestPapers(categories) {
   })).filter((p) => p.title && p.link);
 }
 
+// True when the article opens: a 200 and no bot check page. It catches dead links; a Cloudflare check that only
+// some readers get can't be seen from here, which is why the feeds in config.js are sites without one.
+const BROWSER = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36' };
+export async function opens(url) {
+  try {
+    const r = await fetch(url, { headers: BROWSER, redirect: 'follow', signal: AbortSignal.timeout(15000) });
+    if (!r.ok) return false;
+    return !/just a moment|cf-chl|checking your (browser|connection)/i.test((await r.text()).slice(0, 20000));
+  } catch { return false; }
+}
+
 export async function latestNews() {
   const out = [];
   for (const feed of NEWS) {

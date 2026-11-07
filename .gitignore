@@ -13,3 +13,12 @@ fixplan.md
 ops/data/
 ops/test/data/
 study/shots/
+
+# The Android app (study/android): only twa-manifest.json and the scripts are kept; the signing key, the built
+# APK/AAB and the generated Gradle project stay on this PC.
+study/android/*
+!study/android/twa-manifest.json
+!study/android/setup-key.js
+!study/android/build.js
+!study/android/.env.example
+!study/android/README.md

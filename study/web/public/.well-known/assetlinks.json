@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "site.engineeringhub.crux",
+      "sha256_cert_fingerprints": [
+        "8B:39:20:EA:82:5E:44:DB:8A:1F:23:BD:5F:E7:A6:E7:12:EE:66:A3:7B:08:A9:9C:5D:68:D8:5F:B2:2A:7D:4E"
+      ]
+    }
+  }
+]

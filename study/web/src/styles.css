@@ -232,6 +232,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .skeleton { border-radius: var(--radius); background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; min-height: 20px; }
 .progress { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .progress > span { display: block; height: 100%; background: var(--a2); border-radius: inherit; }
+/* Install Crux (Install.jsx): the iPhone Share steps and the one-time note on Today */
+.install-steps { margin: 0; padding-left: 20px; display: grid; gap: var(--s1); font-size: var(--t-s); }
+.install-note p { margin: 0; }
 .notice { padding: var(--s3) var(--s4); border-radius: 0; background: var(--surface-solid); border-left: 4px solid var(--warn); font-size: var(--t-s); }
 .notice.bad { border-left-color: var(--bad); }
 .notice.good { border-left-color: var(--good); }

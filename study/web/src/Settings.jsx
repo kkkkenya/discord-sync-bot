@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
 import ImportNotes from './ImportNotes.jsx';
+import { InstallCard } from './Install.jsx';
 import { KEEP_CHOICES, keptPages, memoryUse, setKeptPages } from './keep.js';
 import { getLook, setLook } from './look.js';
 
@@ -103,6 +104,7 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
           {mem?.high && <p className="notice" role="status">That's a lot for this device. Keep fewer pages open, or clear the cache.</p>}
           <div className="actions start"><button type="button" className="btn" onClick={clearCache}>Clear cache</button></div>
         </div>
+        <InstallCard notify={notify} />
         {s.data.units.length > 0 && <ImportNotes s={s} unit={unit} refresh={refresh} notify={notify} onProblem={onProblem} />}
         <div className="card">
           {user && <><p><b>{user.name}</b></p><p className="row-sub">{TIER[user.tier] || user.tier}</p></>}

@@ -1,6 +1,7 @@
 import FirstRun from './FirstRun.jsx';
 import PasteDates from './PasteDates.jsx';
 import { Icon } from './icons.jsx';
+import { InstallNote } from './Install.jsx';
 import { href, unitSlug } from './route.js';
 
 const daysText = (p) => (p.days == null ? 'TBA' : p.days < 0 ? 'Passed' : p.days === 0 ? 'Today' : `${p.days} day${p.days === 1 ? '' : 's'}`);
@@ -37,6 +38,7 @@ export default function Today({ s, go, refresh, notify, user }) {
           <p className="num">{dateText(s.today)} · {week ? `${week} unit${week === 1 ? '' : 's'} with a paper this week` : 'No papers this week'}</p>
         </div>
       </header>
+      <InstallNote notify={notify} />
       {board.urgent.length > 0 && (
         <section className="card urgent" aria-labelledby="urgent-title">
           <h2 className="card-title" id="urgent-title"><Icon name="bell" /> Urgent</h2>

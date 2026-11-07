@@ -4,6 +4,7 @@ import '@fontsource-variable/manrope';
 import './styles.css';
 import './wallpaper.css';
 import Gate from './Gate.jsx';
+import './install.js';
 import { applyLook } from './look.js';
 
 applyLook();

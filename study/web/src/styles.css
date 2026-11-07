@@ -91,6 +91,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .unitpill .icon { width: 16px; height: 16px; }
 .unitpill .num { white-space: nowrap; flex: none; }
 .unitpill .uname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--text-2); }
+@media (max-width: 430px) { .unitpill .uname { display: none; } }
+@media (max-width: 350px) { .topbar .navbtn[aria-label$="ull screen"] { display: none; } } /* no room for five buttons */ /* a phone has room for the code, not a stray letter of the name */
 .udot { width: 9px; height: 9px; border-radius: 3px; background: var(--a2); flex: none; }
 .navbtn { position: relative; display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--radius); background: none; color: var(--text-2); cursor: pointer; text-decoration: none; }
 .navbtn:hover { color: var(--text); background: var(--surface-2); }

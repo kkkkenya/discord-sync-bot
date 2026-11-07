@@ -232,13 +232,13 @@ const CLEAN = 'The fields after work are the clean, final, checked solution: wri
 const SOLUTION_FIELDS = {
   work: WORK,
   breakdown: { type: 'string', description: 'The full worked solution, formatted as the system prompt says.' },
-  fbd: { type: 'string', description: 'The free body diagram in words: the body, every force and moment with its point of action and direction, and the support reactions. Empty when the question has no forces on a body.' },
+  fbd: { type: 'string', description: 'The free body diagram in words: the body, every force and moment with its point of action and direction, and the support reactions. An empty string when the question has no forces on a body: never a note saying a diagram is not needed.' },
   diagram: FBD_SCHEMA,
   answer: { type: 'string', description: 'The final answer, number then unit, plain text.' },
 };
 const HOW_TO_SOLVE = `Write the full worked solution a student can learn from, in this order, each part under its own ## heading:
 ## Given (the data, symbols and SI units, as - bullets)
-## Free body diagram (only when forces act on a body: say what is drawn and why, the sign convention, then the equilibrium equations)
+## Free body diagram (only when forces act on a body: say what is drawn and why, the sign convention, then the equilibrium equations. When no forces act on a body, leave this heading out completely: never write that a diagram is not needed)
 ## Method (the idea in two or three sentences: which principle and why it applies)
 ## Solution (numbered steps; each step says what is done, the equation in $$...$$, then the numbers substituted and the result in bold)
 ## Check (a quick sanity check: units, order of magnitude, or a second route)

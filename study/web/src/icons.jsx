@@ -11,6 +11,8 @@ const P = {
   user: <><circle cx="12" cy="9" r="3.5" /><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" /></>,
   calendar: <><rect x="4" y="5.5" width="16" height="14" rx="2" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></>,
   close: <path d="M6 6l12 12M18 6L6 18" />,
+  expand: <path d="M4.5 9V4.5H9M15 4.5h4.5V9M19.5 15v4.5H15M9 19.5H4.5V15" />,
+  shrink: <path d="M9 4.5V9H4.5M19.5 9H15V4.5M15 19.5V15h4.5M4.5 15H9v4.5" />,
   chevron: <path d="M9 6l6 6-6 6" />,
   down: <path d="M7 10l5 5 5-5" />,
   timer: <><circle cx="12" cy="13" r="7.5" /><path d="M12 9.5V13l2 1.5M10 3h4" /></>,

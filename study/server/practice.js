@@ -166,17 +166,29 @@ export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, 
 export async function explainQuestion({ unit, questionId, fresh = false }, { explain = explainSolution, ready = aiReady } = {}) {
   const row = data.paperq.find((x) => x.id === questionId && x.unit === unit);
   if (!row) throw bad('Pick a question first.');
-  if (row.explain && !fresh) return row.explain;
+  if (row.explain && !fresh) return tidyExplain(row.explain);
   if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
   const topic = data.topics.find((t) => t.id === row.topicId);
   const out = await explain({ unit, topic: topic?.name || '', question: row.text, expected: row.key?.answer || '', scheme: schemeFor(row)?.text || '' });
   return keepSolution(row, out);
 }
 
+// A question with no forces on a body gets no free body diagram, and no line saying so: an fbd that only says it
+// isn't needed is dropped, and so is a "## Free body diagram" section that says the same. Saved solutions made before
+// this are tidied when read (routes.js).
+const NO_FBD = /\b(not (needed|required|applicable|relevant)|n\/?a\b|no (free[- ]body|fbd|forces?|diagram)|does not (need|require|apply)|isn'?t (needed|required)|unnecessary)/i;
+export function tidyExplain(e) {
+  if (!e) return e;
+  const fbd = String(e.fbd || '').trim();
+  const breakdown = String(e.breakdown || '').replace(/^##\s*free[- ]body diagram[^\n]*\n([\s\S]*?)(?=^##\s|$(?![\s\S]))/im,
+    (section, body) => (body.trim().length < 240 && NO_FBD.test(body) ? '' : section));
+  return { ...e, breakdown, fbd: fbd.length < 240 && NO_FBD.test(fbd) ? '' : fbd };
+}
+
 const keepSolution = (row, out) => {
   const d = out.diagram || {};
   const diagram = d.kind && d.kind !== 'none' && d.length > 0 ? d : null;
-  return patch('paperq', row.id, { explain: { breakdown: String(out.breakdown || ''), fbd: String(out.fbd || ''), diagram, answer: String(out.answer || '') } }).explain;
+  return patch('paperq', row.id, { explain: tidyExplain({ breakdown: String(out.breakdown || ''), fbd: String(out.fbd || ''), diagram, answer: String(out.answer || '') }) }).explain;
 };
 
 // How many questions one AI call solves: a full solution runs to about 900 tokens plus 150 a mark, and one call

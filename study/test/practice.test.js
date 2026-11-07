@@ -5,7 +5,7 @@ import { useStore } from './helpers.js';
 useStore('legacy-study.json');
 const { data } = await import('../server/store.js');
 const { weakness } = await import('../server/analysis.js');
-const { breakOf, checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke, schemeFor } = await import('../server/practice.js');
+const { breakOf, checkAnswer, ensureCheckpoints, flagCheckpoint, markBroke, schemeFor, tidyExplain } = await import('../server/practice.js');
 
 data.subtopics.push(
   { id: 's1', unit: 'EMM 302', topicId: 't1', name: 'Sign convention', audit: 'solid', at: 'x' },
@@ -263,4 +263,21 @@ test('a follow-up question is answered from the question and its saved solution'
   assert.equal(seen.solution, data.paperq.find((x) => x.id === 'q1').explain.breakdown);
   assert.equal(seen.history.at(-1).text, 'Why not use Mohr\'s circle?');
   await assert.rejects(askAbout({ unit: 'EMM 302', questionId: 'q1', messages: [{ role: 'tutor', text: 'hi' }] }, { ask, ready: () => true, notes }), /Type your question/);
+});
+
+test('a solution with no forces on a body says nothing about a free body diagram', () => {
+  const none = tidyExplain({
+    fbd: 'Not applicable: no forces act on a body here.',
+    breakdown: '## Given\n- d = 20 mm\n## Free body diagram\nA free body diagram is not needed for this question.\n## Method\nUse the formula.',
+  });
+  assert.equal(none.fbd, '');
+  assert.equal(none.breakdown, '## Given\n- d = 20 mm\n## Method\nUse the formula.');
+  const last = tidyExplain({ fbd: '', breakdown: '## Method\nArea ratio.\n## Free body diagram\nN/A' });
+  assert.equal(last.breakdown, '## Method\nArea ratio.\n');
+  const real = tidyExplain({
+    fbd: 'The beam AB, 4 m, pinned at A and on a roller at B, with 20 kN down at 1.5 m.',
+    breakdown: '## Free body diagram\nTake upward forces as positive.\n$$R_A + R_B = 20$$\n## Method\nMoments about A.',
+  });
+  assert.match(real.fbd, /20 kN/);
+  assert.match(real.breakdown, /## Free body diagram/);
 });

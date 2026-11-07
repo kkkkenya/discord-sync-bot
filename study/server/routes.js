@@ -31,7 +31,7 @@ import { makeGuideFor } from './guide.js';
 import { finishUpload, myUploads, startUpload } from './hub-uploads.js';
 import { rewardInfo } from './rewards.js';
 import { learnFor, topicPlaces } from './learn-store.js';
-import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke } from './practice.js';
+import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke, tidyExplain } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
 
 // The retired flashcards (cards, reviews) stay in study.json but never go to the dashboard; only their count does,
@@ -300,7 +300,7 @@ const routes = {
   'POST /api/attempts/photo': async (q, body) => checkPhoto(body || {}),
   'POST /api/attempts/checkpoints': async (q, body) => ensureCheckpoints(body || {}),
   // The full worked solution and free body diagram for a question: { unit, questionId, fresh? }.
-  'GET /api/attempts/explain': (q) => data.paperq.find((x) => x.id === q.get('questionId') && x.unit === q.get('unit'))?.explain || { none: true },
+  'GET /api/attempts/explain': (q) => tidyExplain(data.paperq.find((x) => x.id === q.get('questionId') && x.unit === q.get('unit'))?.explain) || { none: true },
   'POST /api/attempts/explain': async (q, body) => explainQuestion(body || {}),
   // Solve several: { unit, questionIds } → the next 2-4 solved in one AI call; { done, left }.
   'POST /api/attempts/explain-batch': async (q, body) => explainBatch(body || {}),

@@ -3,8 +3,9 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const run = (args) => spawn(process.execPath, args, { cwd: root, stdio: 'inherit' });
-const api = run(['--watch-path=server', 'server/index.js']);
+const run = (args, env) => spawn(process.execPath, args, { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } });
+const api = run(['--watch-path=server', 'server/index.js'], { PORT: '5190' }); // vite.config.js sends /api here, whatever PORT the shell has
+
 const web = run(['node_modules/vite/bin/vite.js']);
 const stop = () => { api.kill(); web.kill(); process.exit(0); };
 process.on('SIGINT', stop);

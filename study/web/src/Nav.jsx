@@ -36,6 +36,23 @@ function useWide() {
   return wide;
 }
 
+// Full screen, where the browser allows it (not iPhone Safari) and Crux isn't already an installed, full-screen app.
+const canFull = () => (document.fullscreenEnabled || document.webkitFullscreenEnabled) && !matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
+function useFullscreen() {
+  const [on, setOn] = useState(() => Boolean(document.fullscreenElement || document.webkitFullscreenElement));
+  useEffect(() => {
+    const sync = () => setOn(Boolean(document.fullscreenElement || document.webkitFullscreenElement));
+    document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+    return () => { document.removeEventListener('fullscreenchange', sync); document.removeEventListener('webkitfullscreenchange', sync); };
+  }, []);
+  const toggle = () => {
+    const d = document, el = d.documentElement;
+    if (d.fullscreenElement || d.webkitFullscreenElement) (d.exitFullscreen || d.webkitExitFullscreen).call(d);
+    else (el.requestFullscreen || el.webkitRequestFullscreen).call(el)?.catch?.(() => { /* refused: nothing to do */ });
+  };
+  return { show: canFull(), on, toggle };
+}
+
 // The bell's new material: hub files posted to your units since you last opened the bell. Asked when Crux opens
 // and when you come back to it, at most every 15 minutes; the answer is kept on the device in between.
 const SEEN = 'crux-inbox-seen', CACHE = 'crux-inbox';
@@ -179,6 +196,12 @@ export default function Nav({ s, unit, setUnit, page, tab }) {
       {wide && <kbd>Esc</kbd>}
     </form>
   );
+  const full = useFullscreen();
+  const fullBtn = full.show && (
+    <button className="navbtn" type="button" aria-label={full.on ? 'Exit full screen' : 'Full screen'} aria-pressed={full.on} onClick={full.toggle} data-tip={full.on ? 'Exit full screen' : 'Full screen'}>
+      <Icon name={full.on ? 'shrink' : 'expand'} />
+    </button>
+  );
   const bellBtn = (
     <button className="navbtn" type="button" aria-label={unread ? 'Notifications, new' : 'Notifications'} aria-expanded={open === 'bell'} onClick={openBell} data-tip="Notifications">
       <Icon name="bell" />{unread && <span className="dotbadge" />}
@@ -201,6 +224,7 @@ export default function Nav({ s, unit, setUnit, page, tab }) {
           <Icon name={open === 'search' ? 'close' : 'search'} />
         </button>
         {bellBtn}
+        {open !== 'search' && fullBtn}
         <a className="navbtn" href={href('settings')} aria-label="Settings"><Icon name="user" /></a>
       </header>
 
@@ -217,6 +241,7 @@ export default function Nav({ s, unit, setUnit, page, tab }) {
         <a className="navbtn" href={href('focus')} aria-label="Focus timer" data-tip="Focus" aria-current={page === 'focus' ? 'page' : undefined}><Icon name="timer" /></a>
         <a className="navbtn" href={href('deeper')} aria-label="Prompt builder" data-tip="Prompt builder" aria-current={page === 'deeper' ? 'page' : undefined}><Icon name="prompt" /></a>
         {bellBtn}
+        {fullBtn}
         <a className="navbtn" href={href('settings')} aria-label="Settings" data-tip="Settings"><Icon name="settings" /></a>
       </nav>
 

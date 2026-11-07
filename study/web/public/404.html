@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Page not found · Crux</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script>
+// Links pasted from WhatsApp and some phones carry invisible characters (word joiners, zero-width spaces, a
+// non-breaking space) or a full stop from the end of a sentence. Strip them and go to the page that was meant.
+(function(){try{
+  var p=decodeURIComponent(location.pathname);
+  var c=p.replace(/[​-‍⁠﻿ \s]/g,'').replace(/[.,;:!?)\]'"]+$/,'');
+  if(c&&c!==p){location.replace(c+location.search+location.hash);}
+}catch(e){}})();
+</script>
+<style>
+@font-face{font-family:"Manrope";src:url("https://www.engineeringhub.site/crux/fonts/manrope-latin-wght-normal.woff2") format("woff2");font-weight:200 800;font-display:swap}
+@font-face{font-family:"Fraunces";src:url("https://www.engineeringhub.site/crux/fonts/fraunces-latin-opsz-normal.woff2") format("woff2");font-weight:100 900;font-display:swap}
+/* Crux's own palette: the default wallpaper's greens, the yellow accent, Fraunces and Manrope. */
+:root{--font:"Manrope",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;--display:"Fraunces",Georgia,"Times New Roman",serif;
+  --bg1:#eef2ee;--bg2:#dfe9e5;--text:#16171b;--text-2:#5b606c;--accent:#f2c200;--on-accent:#1a1a1a;--line:rgba(20,22,30,.1)}
+@media (prefers-color-scheme:dark){:root{--bg1:#0b1112;--bg2:#0f1b1a;--text:#eeeff1;--text-2:#a0a5af;--line:rgba(255,255,255,.1);color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--text);font:400 17px/1.5 var(--font);background:radial-gradient(120% 80% at 50% 0%,var(--bg2),var(--bg1) 70%) fixed,var(--bg1);
+  display:grid;place-items:center;text-align:center;padding-block:32px;
+  padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
+main{display:grid;justify-items:center;gap:8px;animation:in .5s cubic-bezier(.3,1.25,.4,1) both}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+@media (prefers-reduced-motion:reduce){main{animation:none}}
+h1{margin:0;font:600 clamp(96px,26vw,180px)/.9 var(--display);letter-spacing:-.05em}
+h1 span{color:var(--accent)}
+p{margin:0 0 20px;color:var(--text-2);font-size:17px}
+a{display:inline-flex;align-items:center;min-height:48px;padding:0 24px;border-radius:999px;background:var(--accent);color:var(--on-accent);
+  font-weight:700;font-size:15px;text-decoration:none;transition:transform .15s}
+a:hover{transform:translateY(-1px)}
+a:active{transform:scale(.97)}
+a:focus-visible{outline:2px solid var(--text);outline-offset:3px}
+</style>
+</head>
+<body>
+<main>
+  <h1>4<span>0</span>4</h1>
+  <p>This page doesn't exist.</p>
+  <a href="/app">Back to Crux</a>
+</main>
+</body>
+</html>

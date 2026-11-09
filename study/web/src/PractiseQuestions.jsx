@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
 import { photoData } from './media.js';
 import AskTutor from './AskTutor.jsx';
-import FreeBody from './FreeBody.jsx';
+import Solution from './Solution.jsx';
 import { Icon } from './icons.jsx';
 import OpenAt from './OpenAt.jsx';
 import { AiWait } from './Busy.jsx';
@@ -265,16 +265,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
           {solBusy && <><AiWait on kind="solution" /><div className="skeleton" style={{ height: 160 }} /></>}
           {sol && !solBusy && (
             <>
-              {(sol.diagram || sol.fbd) && (
-                <div className="stack-s">
-                  <h3 className="sub-title">Free body diagram</h3>
-                  {sol.diagram && <FreeBody d={sol.diagram} />}
-                  {sol.fbd && <Rich text={sol.fbd} className="fbd-words" />}
-                </div>
-              )}
-              <Rich text={sol.breakdown} />
-              {sol.answer && <AnswerBox text={sol.answer} label="Final answer" />}
-              <p className="row-sub">Made by the AI: check it against your notes. <button type="button" className="btn plain" onClick={() => explain(true)}>Make it again</button></p>
+              <Solution sol={sol} />
+              <p className="row-sub">{sol.schemeFile ? `Made by the AI from the marking scheme (${sol.schemeFile}).` : 'Made by the AI: check it against your notes.'} <button type="button" className="btn plain" onClick={() => explain(true)}>Make it again</button></p>
             </>
           )}
         </section>

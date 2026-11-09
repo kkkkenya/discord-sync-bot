@@ -18,7 +18,7 @@ import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { todayBoard } from './board.js';
 import { buildPrompt } from './prompt.js';
 import { nextActions } from './next.js';
-import { insights } from './insights.js';
+import { activity, insights } from './insights.js';
 import { deleteNote, importNotes, listNotes, loadNotes, ownNotes } from './notes-store.js';
 import { bump, usedToday } from './usage.js';
 import { downloadLink } from './downloads.js';
@@ -28,10 +28,10 @@ import { focusCounts, setFocus } from './focus.js';
 import { classHints, classList, confirmHint, listOf, offerList, shareHint } from './shared.js';
 import { newMaterial } from './inbox.js';
 import { makeGuideFor } from './guide.js';
-import { finishUpload, myUploads, startUpload } from './hub-uploads.js';
+import { contributors, finishUpload, myUploads, postedDays, startUpload, unitPapers } from './hub-uploads.js';
 import { rewardInfo } from './rewards.js';
 import { learnFor, topicPlaces } from './learn-store.js';
-import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke, tidyExplain } from './practice.js';
+import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke, savedExplain } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
 
 // The retired flashcards (cards, reviews) stay in study.json but never go to the dashboard; only their count does,
@@ -289,6 +289,7 @@ const routes = {
   // Files a student adds for the hub: a link to upload straight to storage, then "done" queues it for the hub PC.
   'POST /api/uploads/start': async (q, body, ctx) => startUpload(body || {}, ctx.user),
   'POST /api/uploads/done': async (q, body, ctx) => finishUpload(body || {}, ctx.user),
+  'GET /api/uploads/papers': (q) => ({ papers: unitPapers(q.get('unit')) }),
   'GET /api/uploads': async (q, body, ctx) => ({ files: await myUploads(q.get('unit'), ctx.user), credits: await rewardInfo(ctx.user, ctx.today || nairobiDay()) }),
   // A topic's study guide: { unit, topicId, fresh? } → what to learn and where in your books. Shared with the class.
   'POST /api/learn/guide': async (q, body) => makeGuideFor(body || {}),
@@ -300,7 +301,7 @@ const routes = {
   'POST /api/attempts/photo': async (q, body) => checkPhoto(body || {}),
   'POST /api/attempts/checkpoints': async (q, body) => ensureCheckpoints(body || {}),
   // The full worked solution and free body diagram for a question: { unit, questionId, fresh? }.
-  'GET /api/attempts/explain': (q) => tidyExplain(data.paperq.find((x) => x.id === q.get('questionId') && x.unit === q.get('unit'))?.explain) || { none: true },
+  'GET /api/attempts/explain': (q) => savedExplain(data.paperq.find((x) => x.id === q.get('questionId') && x.unit === q.get('unit'))) || { none: true },
   'POST /api/attempts/explain': async (q, body) => explainQuestion(body || {}),
   // Solve several: { unit, questionIds } → the next 2-4 solved in one AI call; { done, left }.
   'POST /api/attempts/explain-batch': async (q, body) => explainBatch(body || {}),
@@ -312,6 +313,12 @@ const routes = {
   // Insights across every unit: weakspots by priority (with the mistakes behind each and when it was last tried),
   // mistakes by type over 14 days, and questions tried per day for 14 days.
   'GET /api/insights': (q, body, ctx) => insights(ctx?.today || nairobiDay()),
+  'GET /api/activity': async (q, body, ctx) => {
+    const today = ctx?.today || nairobiDay();
+    const since = new Date(Date.parse(`${today}T00:00:00+03:00`) - 150 * 864e5).toISOString();
+    return activity(today, ctx?.user ? await postedDays(ctx.user, since).catch(() => []) : []);
+  },
+  'GET /api/contributors': async (q, body, ctx) => contributors(ctx?.user || {}),
   'GET /api/weakspots': (q) => {
     const unit = q.get('unit');
     if (!data.units.some((u) => u.code === unit)) throw Object.assign(new Error('Pick one of your units first.'), { status: 400 });

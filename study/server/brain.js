@@ -205,53 +205,86 @@ export async function solveWithCheckpoints({ unit, topic = '', question, subtopi
   return structured(schema, TUTOR, content, 6000);
 }
 
-// The full worked solution, for reading: a structured breakdown, plus a free body diagram when forces act on a body.
-// The diagram comes back as data (a beam or bar along x, its supports, loads and reactions) and the app draws it.
+// The full worked solution, for reading, laid out like a model answer: given, find, assumptions, the free body
+// diagram, then one equation per step with its reason on the right, the boxed answer and a check. The diagram comes
+// back as data (a beam, bar or shaft along x, with its supports, loads, torques and cuts) and the app draws it.
 const AT = { type: 'number', description: 'Distance from the left end, in metres.' };
 const FBD_SCHEMA = {
   type: 'object',
   properties: {
-    kind: { type: 'string', enum: ['beam', 'bar', 'none'], description: 'beam: a beam or shaft with transverse loads; bar: a member with axial loads; none: no single straight member to draw.' },
+    kind: { type: 'string', enum: ['beam', 'bar', 'shaft', 'none'], description: 'beam: transverse loads; bar: axial loads; shaft: torsion (torques along the axis); none: no single straight member to draw.' },
     length: { type: 'number', description: 'Member length in metres (0 when kind is none).' },
     supports: { type: 'array', items: { type: 'object', properties: { type: { type: 'string', enum: ['pin', 'roller', 'fixed', 'free'] }, at: AT, label: { type: 'string', description: 'Point name, e.g. A.' } }, required: ['type', 'at', 'label'], additionalProperties: false } },
-    loads: { type: 'array', items: { type: 'object', properties: {
+    loads: { type: 'array', description: 'Beam and bar loads. Empty for a shaft: its torques go in torques.', items: { type: 'object', properties: {
       type: { type: 'string', enum: ['point', 'udl', 'moment'] },
       at: AT, to: { type: 'number', description: 'udl only: where it ends, in metres from the left end; else equal to at.' },
       dir: { type: 'string', enum: ['down', 'up', 'left', 'right', 'cw', 'ccw'] },
       label: { type: 'string', description: 'Plain text, e.g. 20 kN, 5 kN/m, 10 kN·m.' },
     }, required: ['type', 'at', 'to', 'dir', 'label'], additionalProperties: false } },
-    reactions: { type: 'array', items: { type: 'object', properties: { at: AT, dir: { type: 'string', enum: ['up', 'down', 'left', 'right', 'cw', 'ccw'] }, label: { type: 'string', description: 'Plain text, e.g. R_A = 12.5 kN, or R_A when unknown.' } }, required: ['at', 'dir', 'label'], additionalProperties: false } },
+    reactions: { type: 'array', description: 'Beam and bar reactions. Empty for a shaft: its reaction torques go in torques.', items: { type: 'object', properties: { at: AT, dir: { type: 'string', enum: ['up', 'down', 'left', 'right', 'cw', 'ccw'] }, label: { type: 'string', description: 'Plain text, e.g. R_A = 12.5 kN, or R_A when unknown.' } }, required: ['at', 'dir', 'label'], additionalProperties: false } },
+    segments: { type: 'array', description: 'Shaft only (else empty): each length of constant section, left to right, covering the whole shaft. A tapered length has d2 different from d.', items: { type: 'object', properties: {
+      from: AT, to: AT,
+      d: { type: 'number', description: 'Outside diameter at the left of the segment, mm.' },
+      d2: { type: 'number', description: 'Outside diameter at the right of the segment, mm (equal to d unless tapered).' },
+      bore: { type: 'number', description: 'Inside diameter, mm; 0 for a solid shaft.' },
+      label: { type: 'string', description: 'Short, e.g. Ø50 or Ø250/Ø175 steel; empty when there is one plain segment.' },
+    }, required: ['from', 'to', 'd', 'd2', 'bore', 'label'], additionalProperties: false } },
+    torques: { type: 'array', description: 'Shaft only (else empty): every applied torque and every reaction torque, each as a double-headed vector along the axis (right-hand rule).', items: { type: 'object', properties: {
+      at: AT,
+      dir: { type: 'string', enum: ['+x', '-x'], description: 'Which way the torque vector points along the shaft axis (right-hand rule).' },
+      label: { type: 'string', description: 'Plain text, e.g. T = 5 kN·m, T_A, or T (reaction).' },
+      reaction: { type: 'boolean', description: 'true for a support reaction torque.' },
+    }, required: ['at', 'dir', 'label', 'reaction'], additionalProperties: false } },
+    cuts: { type: 'array', description: 'Shaft only (else empty): where the shaft is cut to find an internal torque.', items: { type: 'object', properties: { at: AT, label: { type: 'string', description: 'e.g. cut 1, or empty.' } }, required: ['at', 'label'], additionalProperties: false } },
+    section: { type: 'object', description: 'Shaft only: the cross-section with its shear stress, linear in r. show false for a beam, or when stress is not asked.', properties: {
+      show: { type: 'boolean' },
+      outer: { type: 'number', description: 'Outside diameter, mm.' },
+      inner: { type: 'number', description: 'Bore diameter, mm; 0 when solid.' },
+      tauOuter: { type: 'string', description: 'Stress at the outside, e.g. τmax = 75 MPa, or τmax.' },
+      tauInner: { type: 'string', description: 'Stress at the bore, e.g. τi = 52.5 MPa; empty when solid.' },
+    }, required: ['show', 'outer', 'inner', 'tauOuter', 'tauInner'], additionalProperties: false },
   },
-  required: ['kind', 'length', 'supports', 'loads', 'reactions'],
+  required: ['kind', 'length', 'supports', 'loads', 'reactions', 'segments', 'torques', 'cuts', 'section'],
   additionalProperties: false,
 };
 // Worked first, shown second: the AI solves and checks in `work` (never shown, dropped before saving), so the
-// breakdown the student reads is the settled solution, not the AI changing its mind halfway through.
+// solution the student reads is the settled one, not the AI changing its mind halfway through.
 const WORK = { type: 'string', description: 'Private scratch working, never shown to the student. Solve it fully here first, then check it: every step, the units, the order of magnitude, and the final answer by a second route where there is one. Fix any mistake here, before writing the other fields. Keep it brief.' };
 const CLEAN = 'The fields after work are the clean, final, checked solution: write them only once work is settled. Never think aloud in them: no "wait", "actually", "let me recheck", "correction", no second attempt and nothing that contradicts an earlier step.';
 const SOLUTION_FIELDS = {
   work: WORK,
-  breakdown: { type: 'string', description: 'The full worked solution, formatted as the system prompt says.' },
-  fbd: { type: 'string', description: 'The free body diagram in words: the body, every force and moment with its point of action and direction, and the support reactions. An empty string when the question has no forces on a body: never a note saying a diagram is not needed.' },
+  given: { type: 'array', items: { type: 'string' }, description: 'The data, each with its symbol and converted to SI, e.g. $D = 250\\text{ mm} = 0.25\\text{ m}$.' },
+  find: { type: 'string', description: 'What is asked, in one line.' },
+  assumptions: { type: 'array', items: { type: 'string' }, description: 'The assumptions the method rests on, each under 15 words (e.g. linear-elastic material, so τ = Gγ). Empty when there are none worth saying.' },
+  fbd: { type: 'string', description: 'FBD reasoning in one to three sentences: what is drawn and why, the sign convention, and the equilibrium equation that gives the reactions. An empty string when the question has no forces on a body: never a note saying a diagram is not needed.' },
   diagram: FBD_SCHEMA,
-  answer: { type: 'string', description: 'The final answer, number then unit, plain text.' },
+  method: { type: 'string', description: 'The idea in two or three plain sentences: which principle and why it applies here.' },
+  steps: { type: 'array', description: 'The working, one equation per step, in order, carrying 4-5 significant figures.', items: { type: 'object', properties: {
+    math: { type: 'string', description: 'One equation in LaTeX with no $ signs: the formula, then the numbers substituted, then the result with its unit, e.g. J = \\frac{\\pi}{32}(0.25^4 - 0.175^4) = 2.9143 \\times 10^{-4}\\ \\text{m}^4' },
+    reason: { type: 'string', description: 'Why this line, in 2 to 5 words, e.g. twist formula, ΣMx = 0, rad to deg, J for a hollow shaft.' },
+    note: { type: 'string', description: 'One short plain sentence when the step needs explaining (a choice, a trap, a conversion); else empty.' },
+  }, required: ['math', 'reason', 'note'], additionalProperties: false } },
+  answer: { type: 'string', description: 'The final answer, number then unit, plain text, 3 significant figures. Several parts separated by commas.' },
+  check: { type: 'string', description: 'A quick check by a second route, the units, or a limiting case, in one or two sentences, with the numbers.' },
+  trap: { type: 'string', description: 'The mistake students usually make here, one sentence.' },
+  realLife: { type: 'string', description: 'Where this shows up in real engineering, one sentence; empty when nothing apt.' },
 };
-const HOW_TO_SOLVE = `Write the full worked solution a student can learn from, in this order, each part under its own ## heading:
-## Given (the data, symbols and SI units, as - bullets)
-## Free body diagram (only when forces act on a body: say what is drawn and why, the sign convention, then the equilibrium equations. When no forces act on a body, leave this heading out completely: never write that a diagram is not needed)
-## Method (the idea in two or three sentences: which principle and why it applies)
-## Solution (numbered steps; each step says what is done, the equation in $$...$$, then the numbers substituted and the result in bold)
-## Check (a quick sanity check: units, order of magnitude, or a second route)
-Do not repeat the final answer under its own heading: the answer field holds it. Add a Trap: line for the mistake students usually make here.
+const HOW_TO_SOLVE = `Write the full worked solution a student can learn from, in the fields given: given, find, assumptions,
+the free body diagram (fbd and diagram), the method, the steps, the answer, a check, the usual trap.
+Keep the explanations short and plain: a reason on every step, and a note only where a student would get stuck.
+Keep each step to one line a phone can show: when substituting makes it long, give the substitution a step of its own.
 ${CLEAN}
-For the diagram: when the question has a beam, shaft or bar, fill it in with every support, load and reaction placed by distance from the left end; otherwise kind none with empty lists.`;
+For the diagram: a beam or bar gets every support, load and reaction placed by distance from the left end. A shaft in
+torsion is kind shaft: its segments with their diameters, every applied and reaction torque as a vector along the axis,
+a cut where an internal torque is found, and the section with its stress when stress is asked. Otherwise kind none
+with empty lists and section show false.`;
 
 // Several questions solved in one call (2 to 4, sized by the caller): items [{ id, topic, question, expected }],
 // schemes (marking-scheme text shared by the batch). Returns { solutions: [{ id, ...SOLUTION_FIELDS }] }.
 export async function explainSolutions({ unit, items, schemes = [], maxTokens = 16000 }) {
   const schema = {
     type: 'object',
-    properties: { solutions: { type: 'array', description: 'One solution per question, in the order given.', items: { type: 'object', properties: { id: { type: 'string', description: 'The question id exactly as given.' }, ...SOLUTION_FIELDS }, required: ['id', 'work', 'breakdown', 'fbd', 'diagram', 'answer'], additionalProperties: false } } },
+    properties: { solutions: { type: 'array', description: 'One solution per question, in the order given.', items: { type: 'object', properties: { id: { type: 'string', description: 'The question id exactly as given.' }, ...SOLUTION_FIELDS }, required: ['id', ...Object.keys(SOLUTION_FIELDS)], additionalProperties: false } } },
     required: ['solutions'],
     additionalProperties: false,
   };

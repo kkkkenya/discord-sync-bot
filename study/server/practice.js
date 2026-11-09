@@ -9,7 +9,7 @@ import { aiReady, canRead, provider } from './ai.js';
 import { compareWorking, explainSolution, explainSolutions, followUp, readWorking, solveWithCheckpoints } from './brain.js';
 import { ERROR_TYPES } from './defs.js';
 import { contextFor, library } from './ingest.js';
-import { paperInfo } from './predict.js';
+import { paperInfo, sheetNo } from './predict.js';
 import { shareSolution, sharedSolution } from './shared.js';
 import { add, data, patch, save } from './store.js';
 import { checkMedia, saveUpload } from './uploads.js';
@@ -28,7 +28,8 @@ export function schemeFor(row, files = library.files) {
   const own = files[row.fileId];
   if (own?.text && SCHEME_WORDS.test(own.text.slice(0, 400))) return { name: own.name, text: own.text.slice(0, 12000) };
   const hit = entries.find(([id, e]) => id !== row.fileId && SCHEME_WORDS.test(e.name)
-    && (!row.year || paperInfo(e.name).year === row.year) && paperInfo(e.name).type === row.type);
+    && (!row.year || paperInfo(e.name).year === row.year) && paperInfo(e.name).type === row.type
+    && (row.type !== 'Tutorial' || sheetNo(e.name) === sheetNo(row.source)));
   return hit ? { name: hit[1].name, text: hit[1].text.slice(0, 12000) } : null;
 }
 
@@ -61,6 +62,7 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
 
   // 1. the key
   let key = row?.key || null;
+  if (key?.source === 'ai' && freshScheme(row)) key = null; // a marking scheme has come in since the AI solved it
   const typed = String(body.key || '').trim();
   if (typed && typed !== key?.answer) key = { answer: typed, source: 'you', checkpoints: [] };
   let solved = null;
@@ -166,11 +168,12 @@ export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, 
 export async function explainQuestion({ unit, questionId, fresh = false }, { explain = explainSolution, ready = aiReady } = {}) {
   const row = data.paperq.find((x) => x.id === questionId && x.unit === unit);
   if (!row) throw bad('Pick a question first.');
-  if (row.explain && !fresh) return tidyExplain(row.explain);
+  if (!fresh && savedExplain(row)) return savedExplain(row);
   if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
   const topic = data.topics.find((t) => t.id === row.topicId);
-  const out = await explain({ unit, topic: topic?.name || '', question: row.text, expected: row.key?.answer || '', scheme: schemeFor(row)?.text || '' });
-  return keepSolution(row, out);
+  const scheme = schemeFor(row);
+  const out = await explain({ unit, topic: topic?.name || '', question: row.text, expected: row.key?.answer || '', scheme: scheme?.text || '' });
+  return keepSolution(row, out, scheme?.name);
 }
 
 // A question with no forces on a body gets no free body diagram, and no line saying so: an fbd that only says it
@@ -185,10 +188,44 @@ export function tidyExplain(e) {
   return { ...e, breakdown, fbd: fbd.length < 240 && NO_FBD.test(fbd) ? '' : fbd };
 }
 
-const keepSolution = (row, out) => {
+// The marking scheme for a question when it is a file of its own (not the paper itself): its name, else null. A
+// solution or AI key made before it came in is made again from it.
+export function freshScheme(row, files = library.files) {
+  const scheme = row?.bookSolution ? null : schemeFor(row, files);
+  return scheme && scheme.name !== files[row.fileId]?.name ? scheme.name : null;
+}
+// the saved solution, unless a marking scheme has come in since it was made
+export function savedExplain(row, files = library.files) {
+  if (!row?.explain) return null;
+  const scheme = freshScheme(row, files);
+  return scheme && row.explain.schemeFile !== scheme ? null : tidyExplain(row.explain);
+}
+
+// The solution as one markdown text too, for the places that read it as text (Ask about this, shared solutions).
+export function breakdownOf(x) {
+  const out = [];
+  if (x.given?.length) out.push('## Given', ...x.given.map((g) => `- ${g}`));
+  if (x.find) out.push(`Find: ${x.find}`);
+  if (x.assumptions?.length) out.push('## Assumptions', ...x.assumptions.map((a) => `- ${a}`));
+  if (x.fbd) out.push('## Free body diagram', x.fbd);
+  if (x.method) out.push('## Method', x.method);
+  if (x.steps?.length) out.push('## Solution', ...x.steps.map((s, i) => `${i + 1}. $${s.math}$${s.reason ? ` [${s.reason}]` : ''}${s.note ? `\n${s.note}` : ''}`));
+  if (x.check) out.push('## Check', x.check);
+  if (x.trap) out.push(`Trap: ${x.trap}`);
+  if (x.realLife) out.push(`Real life: ${x.realLife}`);
+  return out.join('\n');
+}
+
+const text = (v) => String(v || '').trim();
+const keepSolution = (row, out, schemeFile = null) => {
   const d = out.diagram || {};
   const diagram = d.kind && d.kind !== 'none' && d.length > 0 ? d : null;
-  return patch('paperq', row.id, { explain: tidyExplain({ breakdown: String(out.breakdown || ''), fbd: String(out.fbd || ''), diagram, answer: String(out.answer || '') }) }).explain;
+  const list = (a) => (Array.isArray(a) ? a.map(text).filter(Boolean) : []);
+  const steps = (out.steps || []).map((s) => ({ math: text(s.math).replace(/^\$+|\$+$/g, ''), reason: text(s.reason).replace(/^\[|\]$/g, ''), note: text(s.note) })).filter((s) => s.math);
+  const parts = steps.length ? { given: list(out.given), find: text(out.find), assumptions: list(out.assumptions), method: text(out.method), steps, check: text(out.check), trap: text(out.trap), realLife: text(out.realLife) } : {};
+  const fbd = text(out.fbd);
+  const breakdown = text(out.breakdown) || breakdownOf({ ...parts, fbd });
+  return patch('paperq', row.id, { explain: tidyExplain({ ...parts, breakdown, fbd, diagram, answer: text(out.answer), schemeFile: schemeFile || null }) }).explain;
 };
 
 // How many questions one AI call solves: a full solution runs to about 900 tokens plus 150 a mark, and one call
@@ -212,7 +249,7 @@ export function nextBatch(rows) {
 // keeps each on its question. { done: [ids], left: [ids] }: the app calls again while anything is left.
 export async function explainBatch({ unit, questionIds = [] }, { explain = explainSolutions, ready = aiReady } = {}) {
   const rows = questionIds.map((id) => data.paperq.find((x) => x.id === id && x.unit === unit)).filter(Boolean);
-  const todo = rows.filter((r) => !r.explain);
+  const todo = rows.filter((r) => !savedExplain(r));
   if (!todo.length) return { done: [], left: [] };
   if (!ready()) return { needAi: true, message: 'Solving needs the built-in AI. Take the questions to the Prompt Builder instead.' };
   const { batch, tokens } = nextBatch(todo);
@@ -224,10 +261,10 @@ export async function explainBatch({ unit, questionIds = [] }, { explain = expla
   const done = [];
   for (const sol of out.solutions || []) {
     const row = batch.find((r) => r.id === sol.id);
-    if (row && sol.breakdown) { keepSolution(row, sol); done.push(row.id); }
+    if (row && (sol.breakdown || sol.steps?.length)) { keepSolution(row, sol, schemeFor(row)?.name); done.push(row.id); }
   }
   if (!done.length) throw bad('The AI sent back no usable solutions. Try again, or solve them one at a time.', 502);
-  return { done, left: todo.filter((r) => !r.explain).map((r) => r.id) };
+  return { done, left: todo.filter((r) => !savedExplain(r)).map((r) => r.id) };
 }
 
 // "Ask about this": body { unit, questionId, messages: [{ role, text }] } → { reply }. The chat lives in the app; each

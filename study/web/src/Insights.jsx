@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import { Activity, Contributors } from './Activity.jsx';
 
 const ago = (today, day) => {
   if (!day) return 'Not tried yet';
@@ -7,7 +8,8 @@ const ago = (today, day) => {
   return n <= 0 ? 'Tried today' : n === 1 ? 'Tried yesterday' : `Tried ${n} days ago`;
 };
 
-// Weakspots across every unit, mistakes by type over 14 days, and questions tried per day.
+// Your study days, weakspots across every unit, mistakes by type over 14 days, questions tried per day, and the
+// students who've added the most files to the hub.
 export default function Insights({ s, go, deeper }) {
   const [d, setD] = useState(null);
   const [problem, setProblem] = useState('');
@@ -19,6 +21,7 @@ export default function Insights({ s, go, deeper }) {
   const wrongs = d.errors.reduce((n, e) => n + e.n, 0);
   return (
     <>
+      <Activity s={s} />
       <div>
         <h2 className="list-title">Fix first</h2>
         {!d.weakspots.length ? (
@@ -69,6 +72,7 @@ export default function Insights({ s, go, deeper }) {
         <p className="row-sub">Last 14 days. The darker part is right answers.</p>
         </>}
       </div>
+      <Contributors s={s} />
     </>
   );
 }

@@ -291,6 +291,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .inline-add { display: flex; gap: var(--s2); align-items: end; flex-wrap: wrap; }
 .grow { flex: 1; min-width: 180px; }
 .check { display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
+.scheme-pick .check input { width: 22px; height: 22px; accent-color: var(--accent); flex: none; }
+.scheme-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--s2) var(--s3); }
+.scheme-fields > .field:first-child, .scheme-fields > p { grid-column: 1 / -1; }
 .checks { display: grid; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .chips .chip { border: 0; min-height: 36px; padding: 0 var(--s3); cursor: pointer; font-size: var(--t-s); }
@@ -351,6 +354,22 @@ fieldset.chips legend { margin-bottom: var(--s2); }
 .bar { height: 8px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
 .bar > span { display: block; height: 100%; background: var(--a2); border-radius: inherit; }
 .bar-n { text-align: right; font-variant-numeric: tabular-nums; color: var(--text-2); }
+/* your study days: one square a day, a column a week, Monday at the top */
+.days-wrap { overflow-x: auto; padding-bottom: 2px; }
+.days-months, .days { display: grid; grid-template-columns: repeat(20, 13px); column-gap: 3px; width: max-content; }
+.days-months { font-size: var(--t-xs); color: var(--text-2); margin-bottom: 4px; }
+.days-months span { white-space: nowrap; }
+.days { grid-template-rows: repeat(7, 13px); grid-auto-flow: column; row-gap: 3px; list-style: none; margin: 0; padding: 0; }
+.days li { border-radius: 3px; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.days li.l1 { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+.days li.l2 { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+.days li.l3 { background: color-mix(in srgb, var(--accent) 80%, transparent); }
+.days li.l4 { background: var(--accent); }
+@media (min-width: 560px) { .days-months, .days { grid-template-columns: repeat(20, 16px); column-gap: 4px; } .days { grid-template-rows: repeat(7, 16px); row-gap: 4px; } }
+.leaders { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.leaders li { display: grid; grid-template-columns: 2ch 1fr auto; gap: var(--s3); align-items: center; padding: var(--s2) var(--s2); border-radius: var(--radius); }
+.leaders li.is-you { background: var(--accent-soft); }
+.leader-n { color: var(--text-2); font-weight: 700; text-align: right; }
 .trend { display: grid; grid-template-columns: repeat(14, 1fr); gap: 4px; height: 120px; align-items: end; }
 .trend .col { height: 100%; display: flex; align-items: end; }
 .trend .tried { width: 100%; min-height: 2px; background: var(--accent-soft); border-radius: 4px 4px 0 0; display: flex; align-items: end; overflow: hidden; }
@@ -542,7 +561,35 @@ input.narrow { width: 88px; }
 .fbd-text { font: 600 13px var(--font); fill: var(--text); }
 .fbd-text.react { fill: var(--link); }
 .fbd-text.dim { font-weight: 500; fill: var(--text-2); }
+.fbd-shaft { fill: color-mix(in srgb, var(--text) 10%, var(--surface-solid)); stroke: var(--text); stroke-width: 1.5; }
+.fbd-bore { fill: var(--surface-solid); stroke: var(--text); stroke-width: 1.5; }
+.fbd-dot { fill: var(--text); }
+.fbd-axis { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 10 4 2 4; }
+.fbd-hidden { stroke: var(--text-2); stroke-width: 1.2; stroke-dasharray: 5 4; }
+.fbd-cut { stroke: var(--text-2); stroke-width: 1.2; stroke-dasharray: 4 4; fill: none; }
 .fbd-words { color: var(--text-2); }
+/* a worked solution laid out like a model answer: one equation a line, its reason on the right */
+.sol-gf { display: grid; gap: var(--s2); margin: 0; }
+.sol-gf > div { display: grid; grid-template-columns: 4.5em 1fr; gap: var(--s2); align-items: baseline; }
+.sol-gf dt { font-weight: 700; }
+.sol-gf dd { margin: 0; min-width: 0; }
+.sol-gf ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.sol-assume { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s1); }
+.sol-assume b { color: var(--text-2); font-size: var(--t-xs); margin-right: 4px; }
+.sol-p { margin: 0; }
+.sol-trap b { color: var(--bad-text); }
+.sol-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s2); }
+.sol-steps > li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--s3); padding-block: var(--s1); border-bottom: 1px solid var(--separator); }
+.sol-steps > li:last-child { border-bottom: 0; }
+.sol-eq { min-width: 0; overflow-x: auto; }
+.sol-eq .katex-display { margin: 0; text-align: left; }
+.sol-eq .katex-display > .katex { text-align: left; font-size: 1.05em; }
+.sol-why { color: var(--text-2); font-size: var(--t-s); white-space: nowrap; }
+.sol-note { grid-column: 1 / -1; margin: 2px 0 0; color: var(--text-2); font-size: var(--t-s); }
+@media (max-width: 560px) {
+  .sol-steps > li { grid-template-columns: minmax(0, 1fr); }
+  .sol-why { white-space: normal; }
+}
 @media (max-width: 560px) { .fbd { padding: var(--s2); } .fbd-text { font-size: 18px; } }
 .step-eq { display: block; font-size: var(--t-s); overflow-x: auto; overflow-y: hidden; padding-block: 2px; }
 

@@ -107,6 +107,11 @@ export function bookQuestions(text) {
   return out;
 }
 
+// A marking scheme by its name ("EMM 302 2023 Exam marking scheme.pdf", "... memo"), as Add files names them.
+export const isScheme = (name) => /mark(?:ing)?[\s_-]*schemes?|(?<![a-z])memo(?![a-z])/i.test(String(name || ''));
+// Which tutorial sheet: 'EMM 302 TUT 3.docx' and 'Tutorial Problems 3' are 3; null when it doesn't say.
+export const sheetNo = (name) => Number(String(name || '').match(/tut(?:orial)?s?[\W_]*(?:problems?[\W_]*|sheet[\W_]*|no\.?[\W_]*)?(\d{1,2})(?!\d)/i)?.[1]) || null;
+
 // From a file name or label: { year, type: 'Tutorial'|'CAT1'|'CAT2'|'CAT'|'Exam' }.
 export function paperInfo(name) {
   const s = String(name || '');

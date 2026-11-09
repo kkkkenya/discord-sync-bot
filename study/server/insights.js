@@ -25,3 +25,25 @@ export function insights(today = nairobiDay(), { days = 14, limit = 12 } = {}) {
   });
   return { weakspots, errors, trend };
 }
+
+// Your activity, one square a day like a commit graph: for each Nairobi day of the last `weeks` weeks (whole weeks,
+// Monday first, ending today), the questions checked, study sessions, teach-backs, mocks finished and files the hub
+// posted for you (posted: their days, read from crux_uploads by the caller). { days: [{ day, n, ... }], streak, total }
+export function activity(today = nairobiDay(), posted = [], weeks = 20) {
+  const end = Date.parse(`${today}T12:00:00+03:00`);
+  const monday = (new Date(end).getUTCDay() + 6) % 7; // 0 on a Monday
+  const start = end - ((weeks - 1) * 7 + monday) * DAY;
+  const days = Array.from({ length: (weeks - 1) * 7 + monday + 1 }, (_, i) => ({ day: nairobiDay(new Date(start + i * DAY)), questions: 0, sessions: 0, teach: 0, mocks: 0, files: 0 }));
+  const at = new Map(days.map((d) => [d.day, d]));
+  const add = (iso, key) => { const d = iso && at.get(dayOf(iso)); if (d) d[key] += 1; };
+  for (const a of data.attempts) add(a.at, 'questions');
+  for (const s of data.sessions) add(s.at, 'sessions');
+  for (const t of data.teach || []) add(t.at, 'teach');
+  for (const m of data.mocks) add(m.finishedAt, 'mocks');
+  for (const f of posted) add(f, 'files');
+  for (const d of days) d.n = d.questions + d.sessions + d.teach + d.mocks + d.files;
+  // the streak runs back from today, or from yesterday when today has nothing yet
+  let streak = 0;
+  for (let i = days.length - 1 - (days.at(-1).n ? 0 : 1); i >= 0 && days[i].n; i--) streak++;
+  return { days, streak, total: days.reduce((n, d) => n + d.n, 0) };
+}

@@ -14,8 +14,8 @@ const STATUS = {
 const day = (iso) => new Date(`${iso}T12:00:00+03:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'Africa/Nairobi' });
 const size = (b) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 
-async function sendOne(file, unit, batch, onProgress) {
-  const { id, uploadUrl } = await api('POST', 'uploads/start', { unit, name: file.name, size: file.size, batch });
+async function sendOne(file, unit, batch, scheme, onProgress) {
+  const { id, uploadUrl } = await api('POST', 'uploads/start', { unit, name: file.name, size: file.size, batch, ...(scheme && { scheme }) });
   await new Promise((ok, fail) => { // XHR for upload progress
     const form = new FormData();
     form.append('cacheControl', '3600');
@@ -36,10 +36,18 @@ export default function AddToHub({ unit, notify }) {
   const [credits, setCredits] = useState(null); // { count, goal, until, premium, earned }
   const [over, setOver] = useState(false);
   const input = useRef(null);
+  // a marking scheme is sent for one paper, so Crux can solve that paper's questions the way the scheme does
+  const [isScheme, setIsScheme] = useState(false);
+  const [papers, setPapers] = useState([]);
+  const [paper, setPaper] = useState('');
+  const [other, setOther] = useState({ type: 'Exam', year: '', sheet: '' });
   const load = () => api('GET', `uploads?unit=${encodeURIComponent(unit)}`).then((r) => { setMine(r.files || []); setCredits(r.credits || null); }).catch(() => {});
-  useEffect(() => { load(); }, [unit]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); setPaper(''); }, [unit]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (isScheme) api('GET', `uploads/papers?unit=${encodeURIComponent(unit)}`).then((r) => setPapers(r.papers || [])).catch(() => {}); }, [isScheme, unit]);
+  const scheme = !isScheme ? null : paper === 'other' ? other : paper ? { paper } : undefined;
 
   const send = async (list) => {
+    if (scheme === undefined) { notify('Pick the paper this marking scheme is for first.'); return; }
     const files = [...list];
     const bad = files.filter((f) => !OK.test(f.name) || f.size > MAX);
     const good = files.filter((f) => !bad.includes(f));
@@ -48,19 +56,19 @@ export default function AddToHub({ unit, notify }) {
     let sent = 0;
     for (const [i, f] of good.entries()) {
       try {
-        await sendOne(f, unit, batch, (p) => setSending((s) => s.map((x, j) => (j === i ? { ...x, done: p } : x))));
+        await sendOne(f, unit, batch, scheme, (p) => setSending((s) => s.map((x, j) => (j === i ? { ...x, done: p } : x))));
         setSending((s) => s.map((x, j) => (j === i ? { ...x, done: 1 } : x)));
         sent++;
       } catch (e) {
         setSending((s) => s.map((x, j) => (j === i ? { ...x, error: e.message } : x)));
       }
     }
-    if (sent) { notify(`${sent} file${sent === 1 ? '' : 's'} sent to the hub. Thank you!`); load(); }
+    if (sent) { notify(`${isScheme ? 'Marking scheme' : `${sent} file${sent === 1 ? '' : 's'}`} sent to the hub. Thank you!`); load(); }
   };
 
   return (
     <div className="card stack-s">
-      <div className="card-head"><span className="row-main"><h2>Add files for the hub</h2><span className="row-sub">Past papers, notes, slides or photos of a paper the hub doesn't have yet</span></span></div>
+      <div className="card-head"><span className="row-main"><h2>Add files for the hub</h2><span className="row-sub">Past papers, marking schemes, notes, slides or photos of a paper the hub doesn't have yet</span></span></div>
       {credits && (
         <div className="credits">
           <span className="credits-n num"><b>{credits.count}</b> / {credits.goal}</span>
@@ -71,6 +79,33 @@ export default function AddToHub({ unit, notify }) {
           <span className="meter" aria-hidden="true"><span style={{ width: `${Math.min(100, (100 * credits.count) / credits.goal)}%` }} /></span>
         </div>
       )}
+      <div className="scheme-pick">
+        <label className="check"><input type="checkbox" checked={isScheme} onChange={(e) => setIsScheme(e.target.checked)} /> I'm sending a marking scheme</label>
+        {isScheme && (
+          <div className="scheme-fields">
+            <label className="field">Which paper is it for?
+              <select value={paper} onChange={(e) => setPaper(e.target.value)}>
+                <option value="">Pick the paper</option>
+                {papers.map((p) => <option key={p.label} value={p.label}>{p.label}</option>)}
+                <option value="other">A paper that isn't listed</option>
+              </select>
+            </label>
+            {paper === 'other' && (
+              <>
+                <label className="field">Kind
+                  <select value={other.type} onChange={(e) => setOther({ ...other, type: e.target.value })}>
+                    {['Exam', 'CAT 1', 'CAT 2', 'Tutorial'].map((t) => <option key={t}>{t}</option>)}
+                  </select>
+                </label>
+                {other.type === 'Tutorial'
+                  ? <label className="field">Tutorial number<input inputMode="numeric" value={other.sheet} onChange={(e) => setOther({ ...other, sheet: e.target.value.replace(/\D/g, '').slice(0, 2) })} placeholder="3" /></label>
+                  : <label className="field">Year<input inputMode="numeric" value={other.year} onChange={(e) => setOther({ ...other, year: e.target.value.replace(/\D/g, '').slice(0, 4) })} placeholder="2023" /></label>}
+              </>
+            )}
+            <p className="muted small">Crux uses it to solve this paper's questions the way your lecturer marks them. It earns a credit like any file.</p>
+          </div>
+        )}
+      </div>
       <label className={`dropzone${over ? ' is-over' : ''}`}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); send(e.dataTransfer.files); }}>

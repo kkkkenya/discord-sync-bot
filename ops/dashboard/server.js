@@ -33,7 +33,7 @@ let job = null; // the announcement being sent: { name, done, total, sent, close
 async function overview() {
   const [guild, members, roles] = await Promise.all([
     api('GET', `/guilds/${GUILD_ID}?with_counts=true`),
-    announceMembers(),
+    announce.allMembers({ fresh: true }),
     api('GET', `/guilds/${GUILD_ID}/roles`),
   ]);
   const people = members.filter((m) => !m.user.bot);
@@ -46,15 +46,6 @@ async function overview() {
     plans, noPlan: people.filter((m) => !Object.keys(PLAN_ROLES).some((id) => m.roles.includes(id))).length,
     bots: await botStatus(),
   };
-}
-async function announceMembers() {
-  const out = [];
-  for (let after = '0'; ;) {
-    const page = await api('GET', `/guilds/${GUILD_ID}/members?limit=1000&after=${after}`);
-    out.push(...page);
-    if (page.length < 1000) return out;
-    after = page.at(-1).user.id;
-  }
 }
 
 // The PC bots run under ops/supervise.js. Their processes: node … src/index.js with cwd pc/ or community/.
@@ -108,24 +99,47 @@ async function payments() {
 }
 
 async function rolesAndChannels() {
-  const [roles, channels] = await Promise.all([api('GET', `/guilds/${GUILD_ID}/roles`), api('GET', `/guilds/${GUILD_ID}/channels`)]);
+  const [roles, channels, members] = await Promise.all([api('GET', `/guilds/${GUILD_ID}/roles`), api('GET', `/guilds/${GUILD_ID}/channels`), announce.allMembers()]);
+  const people = members.filter((m) => !m.user.bot);
   return {
-    roles: roles.filter((r) => !r.managed && r.name !== '@everyone').sort((a, b) => b.position - a.position).map((r) => ({ id: r.id, name: r.name, plan: PLAN_ROLES[r.id] ? PLAN_NAMES[PLAN_ROLES[r.id]] : null })),
+    roles: roles.filter((r) => !r.managed && r.name !== '@everyone').sort((a, b) => b.position - a.position)
+      .map((r) => ({ id: r.id, name: r.name, plan: PLAN_ROLES[r.id] ? PLAN_NAMES[PLAN_ROLES[r.id]] : null, members: people.filter((m) => m.roles.includes(r.id)).length })),
     channels: channels.filter((c) => c.type === 0 || c.type === 5 || c.type === 15).sort((a, b) => a.position - b.position).map((c) => ({ id: c.id, name: c.name, type: c.type === 15 ? 'forum' : 'text' })),
   };
+}
+
+const audienceFrom = (q) => { try { return q.get('aud') ? JSON.parse(q.get('aud')) : null; } catch { throw bad('That audience could not be read.'); } };
+const batchesFrom = (v) => (Number(v) === 1 ? 1 : 3);
+
+async function postMany(b) {
+  const content = String(b.content || '').trim();
+  if (!content || content.length > 2000) throw bad('A message of 1 to 2000 characters.');
+  const ids = [...new Set((Array.isArray(b.channelIds) ? b.channelIds : []).map(String))].filter((id) => /^\d{5,25}$/.test(id));
+  if (!ids.length) throw bad('Tick at least one channel.');
+  if (ids.length > 25) throw bad('Up to 25 channels at a time.');
+  const done = [];
+  for (const id of ids) {
+    try {
+      const m = await api('POST', `/channels/${id}/messages`, { content, allowed_mentions: { parse: b.mentions ? ['roles', 'users', 'everyone'] : [] } });
+      done.push({ id, ok: true, link: `https://discord.com/channels/${GUILD_ID}/${id}/${m.id}` });
+    } catch (e) { done.push({ id, ok: false, error: String(e.message).slice(0, 160) }); }
+  }
+  return { posted: done.filter((d) => d.ok).length, results: done };
 }
 
 const routes = {
   'GET /api/overview': () => overview(),
   'GET /api/announcements': () => ({ names: announce.listAnnouncements(), job }),
-  'GET /api/announcement': (q) => announce.plan(q.get('name')).then((p) => p.summary).then(async (s) => ({ ...s, text: announce.readText(q.get('name')) })),
+  'GET /api/announcement': (q) => announce.plan(q.get('name'), { audience: audienceFrom(q), batches: batchesFrom(q.get('batches')) }).then((p) => ({ ...p.summary, text: p.text })),
+  'GET /api/audience': (q) => announce.audienceSize(audienceFrom(q)),
   'PUT /api/announcement': (q, b) => { announce.writeText(q.get('name'), b.text); return { ok: true }; },
-  'POST /api/announcement/send': (q) => {
+  'POST /api/announcement/send': (q, b) => {
     const name = q.get('name');
     if (!announce.validName(name)) throw bad('Pick an announcement.');
     if (job && !job.finished) throw bad(`Already sending "${job.name}" (${job.done}/${job.total}).`, 409);
     job = { name, done: 0, total: 0, sent: 0, closed: 0, finished: false, error: null, started: new Date().toISOString() };
-    announce.sendStage(name, { onProgress: (p) => Object.assign(job, p) })
+    const audience = b.audience ? announce.cleanAudience(b.audience) : null;
+    announce.sendStage(name, { audience, batches: batchesFrom(b.batches), onProgress: (p) => Object.assign(job, p) })
       .then((r) => Object.assign(job, { finished: true, failed: r.failed }))
       .catch((e) => Object.assign(job, { finished: true, error: e.message }));
     return job;
@@ -145,6 +159,7 @@ const routes = {
     await api('PATCH', `/channels/${encodeURIComponent(q.get('id'))}`, { name });
     return { ok: true, name };
   },
+  'POST /api/post-many': (q, b) => postMany(b),
   'POST /api/post': async (q, b) => {
     const content = String(b.content || '').trim();
     if (!content || content.length > 2000) throw bad('A message of 1 to 2000 characters.');

@@ -40,6 +40,11 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 .msg.bad{border-color:var(--bad);color:var(--bad)}.msg.good{border-color:var(--good)}
 .two{display:grid;gap:16px;grid-template-columns:1fr}
 @media (min-width:860px){.two{grid-template-columns:1fr 1fr}}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;cursor:pointer}
+.pill:has(input:checked){border-color:var(--accent)}
+.checks{display:grid;gap:4px 14px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));max-height:300px;overflow:auto;padding:4px}
+.checks label{display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14px}
+.checks .n{color:var(--text2);font-size:12px;margin-left:auto}
 .preview{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:14px;max-height:420px;overflow:auto}
 [hidden]{display:none!important}
 </style>
@@ -50,7 +55,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   <h1>Hub dashboard</h1>
   <nav aria-label="Sections">
     <button data-tab="overview" aria-pressed="true">Overview</button>
-    <button data-tab="announce" aria-pressed="false">Announcements</button>
+    <button data-tab="announce" aria-pressed="false">Messages</button>
     <button data-tab="payments" aria-pressed="false">Payments</button>
     <button data-tab="discord" aria-pressed="false">Roles and channels</button>
     <button data-tab="bot" aria-pressed="false">Bot</button>
@@ -67,17 +72,42 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   </section>
 
   <section data-panel="announce" hidden>
-    <h2>Announcements</h2>
-    <p class="muted small">A personal DM to every member, sent in 3 daily batches. Bots, members with /nudges off and closed DMs are skipped. <code>{name}</code> becomes each member's name.</p>
+    <h2>Messages</h2>
+    <p class="muted small">Send one message to a group as personal DMs, or post it in channels. <code>{name}</code> becomes each person's name in DMs. Bots, members with /nudges off and closed DMs are skipped.</p>
     <div class="row" style="margin:14px 0"><label>Message <select id="annName"></select></label> <button class="btn" id="annNew">New message</button></div>
     <div class="two">
       <div><textarea id="annText" aria-label="Message text"></textarea><div class="row" style="margin-top:8px"><span class="muted small" id="annCount"></span><button class="btn" id="annSave">Save</button></div></div>
-      <div><div class="muted small" style="margin-bottom:6px">How it reads, for the first member today</div><div class="preview" id="annPreview">…</div></div>
+      <div><div class="muted small" style="margin-bottom:6px">How it reads</div><div class="preview" id="annPreview">…</div></div>
     </div>
-    <div class="card" style="margin-top:16px">
-      <div id="annSummary" class="muted">Loading…</div>
-      <div class="row" style="margin-top:12px"><button class="btn primary" id="annSend">Send today's batch</button><button class="btn" id="annRefresh">Refresh</button></div>
+
+    <div class="row" style="margin:18px 0 8px" role="radiogroup" aria-label="Send as">
+      <label class="pill"><input type="radio" name="mode" value="dm" checked> To people, as DMs</label>
+      <label class="pill"><input type="radio" name="mode" value="channels"> In channels</label>
+    </div>
+
+    <div class="card" id="dmBox">
+      <div id="audLock" class="msg" hidden></div>
+      <div id="audPick">
+        <div class="row" style="margin-bottom:10px">
+          <label class="pill"><input type="radio" name="who" value="everyone" checked> Everyone</label>
+          <label class="pill"><input type="radio" name="who" value="roles"> Choose roles</label>
+        </div>
+        <div id="roleList" class="checks" hidden></div>
+        <div class="row" style="margin-top:10px">
+          <label>Send <select id="batches"><option value="3">in 3 daily batches</option><option value="1">all now</option></select></label>
+          <span class="muted small" id="audCount">…</span>
+        </div>
+      </div>
+      <div id="annSummary" class="muted" style="margin-top:12px"></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="annSend">Send</button><button class="btn" id="annRefresh">Refresh</button></div>
       <div id="annJob" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" id="chanBoxSend" hidden>
+      <div class="row" style="margin-bottom:10px"><input id="chanFilter" placeholder="Filter channels" aria-label="Filter channels"><label class="small"><input type="checkbox" id="postMentions"> Let @mentions ping</label></div>
+      <div id="chanList" class="checks"></div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="postSend">Post in the ticked channels</button><span class="muted small" id="chanCount"></span></div>
+      <div id="postOut" style="margin-top:10px"></div>
     </div>
   </section>
 
@@ -93,12 +123,6 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     <div class="two" style="margin-top:14px">
       <div class="card"><h3 style="margin-top:0">Roles</h3><div id="rolesBox">Loading…</div></div>
       <div class="card"><h3 style="margin-top:0">Channels</h3><div id="chanBox">Loading…</div></div>
-    </div>
-    <div class="card" style="margin-top:16px">
-      <h3 style="margin-top:0">Post a message</h3>
-      <div class="row"><label>Channel <select id="postChan"></select></label><label class="small"><input type="checkbox" id="postMentions"> Allow @mentions to ping</label></div>
-      <textarea id="postText" style="min-height:140px;margin-top:10px" aria-label="Message"></textarea>
-      <div class="row" style="margin-top:8px"><button class="btn primary" id="postSend">Post as the bot</button><span class="muted small" id="postCount"></span></div>
     </div>
   </section>
 
@@ -119,7 +143,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
 (() => {
   // The one-time key from the start link (#key=…); kept for this tab only.
   const fromHash = new URLSearchParams(location.hash.slice(1)).get('key');
-  if (fromHash) { sessionStorage.setItem('dashKey', fromHash); history.replaceState(null, '', location.pathname); }
+  if (fromHash) { sessionStorage.setItem('dashKey', fromHash); history.replaceState(null, '', location.pathname + location.search); }
   const KEY = sessionStorage.getItem('dashKey') || '';
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -155,33 +179,76 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     } catch (e) { fail(e); }
   };
 
-  // announcements
+  // messages: one text, sent as DMs to a group or posted in channels
   let annName = '';
-  const countChars = () => { const n = $('annText').value.length; $('annCount').textContent = `${n} / 1900 characters`; };
+  let roles = [], channels = [];
+  const mode = () => document.querySelector('[name=mode]:checked').value;
+  const audience = () => (document.querySelector('[name=who]:checked').value === 'everyone'
+    ? { everyone: true }
+    : { roles: [...document.querySelectorAll('[data-aud-role]:checked')].map((c) => c.value).filter((v) => v !== 'noplan'), noPlan: Boolean(document.querySelector('[data-aud-role][value=noplan]:checked')) });
+  const audQuery = () => `aud=${encodeURIComponent(JSON.stringify(audience()))}&batches=${$('batches').value}`;
+  const countChars = () => { const n = $('annText').value.length; $('annCount').textContent = `${n} / 1900 characters`; $('annPreview').textContent = $('annText').value.replaceAll('{name}', 'Amina'); };
   $('annText').addEventListener('input', countChars);
+
+  const describe = (a) => a.everyone ? 'everyone' : [...(a.roles || []).map((id) => roles.find((r) => r.id === id)?.name || id), ...(a.noPlan ? ['no plan'] : [])].join(', ');
   const loadAnn = async () => {
     if (!annName) return;
-    $('annSummary').textContent = 'Counting members…';
+    $('annSummary').textContent = 'Counting…';
     try {
-      const s = await call('GET', `/api/announcement?name=${encodeURIComponent(annName)}`);
+      const s = await call('GET', `/api/announcement?name=${encodeURIComponent(annName)}&${audQuery()}`);
       $('annText').value = s.text; countChars();
-      $('annPreview').textContent = s.preview;
+      $('audLock').hidden = !s.audienceLocked;
+      $('audPick').hidden = s.audienceLocked;
+      if (s.audienceLocked) $('audLock').textContent = `This message already went out to ${describe(s.audience)}, in ${s.stages === 1 ? 'one go' : `${s.stages} daily batches`}. Later batches go to the same people. For a different group, make a new message.`;
+      const done = s.stagesDone >= s.stages;
       const pct = s.members ? Math.round((100 * (s.sent + s.closed)) / Math.max(1, s.members - s.optedOut)) : 0;
-      $('annSummary').innerHTML = `<p><b>${s.stagesDone >= s.stages ? 'All batches sent' : `Batch ${s.stage} of ${s.stages}`}</b>: ${s.todayCount} DMs today${s.firstFew.length ? ` (${esc(s.firstFew.join(', '))}…)` : ''}.</p>
-        <p class="small muted">${s.members} members · ${s.sent} sent · ${s.closed} DMs closed · ${s.optedOut} opted out · ${s.left} left</p>
+      $('annSummary').innerHTML = `<p><b>${done ? 'All sent' : s.stages === 1 ? 'Ready to send' : `Batch ${s.stage} of ${s.stages}`}</b>${done ? '' : `: ${s.todayCount} DMs${s.firstFew.length ? ` (${esc(s.firstFew.join(', '))}…)` : ''}`}.</p>
+        <p class="small muted">${s.members} in the group · ${s.sent} sent · ${s.closed} DMs closed · ${s.optedOut} opted out · ${s.left} left</p>
         <div class="bar" aria-label="${pct}% done"><span style="width:${pct}%"></span></div>
         ${s.history.length ? `<p class="small muted">${s.history.map((h, i) => `Batch ${i + 1}: ${when(h.at)}, ${h.sent} sent`).join(' · ')}</p>` : ''}`;
       $('annSend').disabled = s.todayCount === 0;
+      $('annSend').textContent = s.stages === 1 || s.stage === s.stages ? `Send to ${s.todayCount}` : `Send today's batch (${s.todayCount})`;
     } catch (e) { $('annSummary').textContent = ''; fail(e); }
   };
+  let countTimer;
+  const recount = () => {
+    clearTimeout(countTimer);
+    countTimer = setTimeout(async () => {
+      try {
+        const a = audience();
+        if (!a.everyone && !a.roles.length && !a.noPlan) { $('audCount').textContent = 'Tick at least one role.'; $('annSend').disabled = true; return; }
+        const c = await call('GET', `/api/audience?${audQuery()}`);
+        $('audCount').textContent = `${c.count} people${c.optedOut ? ` (${c.optedOut} opted out, skipped)` : ''}${c.sample.length ? `: ${c.sample.join(', ')}…` : ''}`;
+        loadAnn();
+      } catch (e) { fail(e); }
+    }, 250);
+  };
+  document.querySelectorAll('[name=who]').forEach((r) => r.addEventListener('change', () => { $('roleList').hidden = r.value === 'everyone' && r.checked; recount(); }));
+  $('batches').addEventListener('change', recount);
+  $('roleList').addEventListener('change', recount);
+  document.querySelectorAll('[name=mode]').forEach((r) => r.addEventListener('change', () => { $('dmBox').hidden = mode() !== 'dm'; $('chanBoxSend').hidden = mode() !== 'channels'; }));
+
+  const drawChannels = () => {
+    const f = $('chanFilter').value.toLowerCase();
+    const ticked = new Set([...document.querySelectorAll('[data-post-chan]:checked')].map((c) => c.value));
+    $('chanList').innerHTML = channels.filter((c) => c.type === 'text' && c.name.includes(f)).map((c) => `<label><input type="checkbox" data-post-chan value="${esc(c.id)}" ${ticked.has(c.id) ? 'checked' : ''}> #${esc(c.name)}</label>`).join('');
+    $('chanCount').textContent = `${ticked.size} ticked`;
+  };
+  $('chanFilter').addEventListener('input', drawChannels);
+  $('chanList').addEventListener('change', () => { $('chanCount').textContent = `${document.querySelectorAll('[data-post-chan]:checked').length} ticked`; });
+
   loaders.announce = async () => {
     try {
-      const { names, job } = await call('GET', '/api/announcements');
+      const [{ names, job }, d] = await Promise.all([call('GET', '/api/announcements'), call('GET', '/api/discord')]);
+      roles = d.roles; channels = d.channels;
+      $('roleList').innerHTML = `<label><input type="checkbox" data-aud-role value="noplan"> No plan <span class="n"></span></label>`
+        + roles.map((r) => `<label><input type="checkbox" data-aud-role value="${esc(r.id)}"> ${esc(r.name)}<span class="n">${r.members}</span></label>`).join('');
+      drawChannels();
       $('annName').innerHTML = names.map((n) => `<option>${esc(n)}</option>`).join('');
       if (!annName || !names.includes(annName)) annName = names[0] || '';
       $('annName').value = annName;
       if (job && !job.finished) pollJob();
-      await loadAnn();
+      recount();
     } catch (e) { fail(e); }
   };
   $('annName').addEventListener('change', (e) => { annName = e.target.value; loadAnn(); });
@@ -213,9 +280,25 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
     loadAnn();
   };
   $('annSend').addEventListener('click', async () => {
-    const n = $('annSummary').querySelector('b')?.textContent || 'this batch';
-    if (!confirm(`Send ${n} of "${annName}" now? Each member gets a personal DM. This can't be undone.`)) return;
-    try { await call('PUT', `/api/announcement?name=${encodeURIComponent(annName)}`, { text: $('annText').value }); await call('POST', `/api/announcement/send?name=${encodeURIComponent(annName)}`); pollJob(); } catch (e) { fail(e); }
+    const what = $('annSend').textContent;
+    const who = $('audPick').hidden ? 'the same group as before' : describe(audience());
+    if (!confirm(`${what}: "${annName}" as personal DMs to ${who}? This can't be undone.`)) return;
+    try {
+      await call('PUT', `/api/announcement?name=${encodeURIComponent(annName)}`, { text: $('annText').value });
+      await call('POST', `/api/announcement/send?name=${encodeURIComponent(annName)}`, { audience: $('audPick').hidden ? null : audience(), batches: Number($('batches').value) });
+      pollJob();
+    } catch (e) { fail(e); }
+  });
+  $('postSend').addEventListener('click', async () => {
+    const ids = [...document.querySelectorAll('[data-post-chan]:checked')].map((c) => c.value);
+    const content = $('annText').value.replaceAll('{name}', 'everyone').trim();
+    if (!ids.length || !content) return flash('Write the message and tick at least one channel.', 'bad');
+    if (!confirm(`Post "${annName}" in ${ids.length} channel${ids.length === 1 ? '' : 's'} as the bot?`)) return;
+    try {
+      const r = await call('POST', '/api/post-many', { channelIds: ids, content, mentions: $('postMentions').checked });
+      $('postOut').innerHTML = r.results.map((x) => `<p class="small">${x.ok ? `Posted in #${esc(channels.find((c) => c.id === x.id)?.name)} · <a href="${esc(x.link)}" target="_blank" rel="noopener">open</a>` : `<span style="color:var(--bad)">#${esc(channels.find((c) => c.id === x.id)?.name)}: ${esc(x.error)}</span>`}</p>`).join('');
+      flash(`Posted in ${r.posted} of ${ids.length} channels.`, r.posted === ids.length ? 'good' : 'bad');
+    } catch (e) { fail(e); }
   });
 
   // payments
@@ -234,7 +317,6 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       const d = await call('GET', '/api/discord');
       $('rolesBox').innerHTML = `<table><tbody>${d.roles.map((r) => `<tr><td><input value="${esc(r.name)}" data-role="${esc(r.id)}" aria-label="Role name" style="width:100%"></td><td class="small muted">${r.plan ? `plan: ${esc(r.plan)}` : ''}</td><td><button class="btn" data-save-role="${esc(r.id)}">Rename</button></td></tr>`).join('')}</tbody></table>`;
       $('chanBox').innerHTML = `<table><tbody>${d.channels.map((c) => `<tr><td><input value="${esc(c.name)}" data-chan="${esc(c.id)}" aria-label="Channel name" style="width:100%"></td><td class="small muted">${esc(c.type)}</td><td><button class="btn" data-save-chan="${esc(c.id)}">Rename</button></td></tr>`).join('')}</tbody></table>`;
-      $('postChan').innerHTML = d.channels.filter((c) => c.type === 'text').map((c) => `<option value="${esc(c.id)}">#${esc(c.name)}</option>`).join('');
     } catch (e) { fail(e); }
   };
   document.addEventListener('click', async (e) => {
@@ -245,14 +327,6 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
       if (chan) { const r = await call('PATCH', `/api/channel?id=${chan}`, { name: document.querySelector(`[data-chan="${chan}"]`).value }); flash(`Channel renamed to #${r.name}.`); loaders.discord(); }
     } catch (err) { fail(err); }
   });
-  $('postText').addEventListener('input', () => { $('postCount').textContent = `${$('postText').value.length} / 2000`; });
-  $('postSend').addEventListener('click', async () => {
-    const opt = $('postChan').selectedOptions[0];
-    if (!opt || !$('postText').value.trim()) return flash('Pick a channel and write the message.', 'bad');
-    if (!confirm(`Post this in ${opt.textContent} as the bot?`)) return;
-    try { const r = await call('POST', '/api/post', { channelId: opt.value, content: $('postText').value, mentions: $('postMentions').checked }); $('postText').value = ''; flash('Posted.'); window.open(r.link, '_blank', 'noopener'); } catch (e) { fail(e); }
-  });
-
   // bot
   loaders.bot = async () => {
     try {
@@ -273,7 +347,7 @@ pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:
   });
 
   if (!KEY) flash('Open the dashboard from the link the start window printed.', 'bad');
-  else show('overview');
+  else show(['overview', 'announce', 'payments', 'discord', 'bot'].includes(new URLSearchParams(location.search).get('tab')) ? new URLSearchParams(location.search).get('tab') : 'overview');
 })();
 </script>
 </body>

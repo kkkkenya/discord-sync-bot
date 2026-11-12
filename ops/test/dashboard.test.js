@@ -51,3 +51,25 @@ test('todaysStage: a third of the members left each day, skipping bots, opted ou
   assert.equal(validName('desktop-2026-11'), true);
   assert.equal(validName('../secrets'), false);
 });
+
+test('audiences: everyone, chosen roles, or members with no plan role; an empty choice is refused', async () => {
+  const { inAudience, cleanAudience } = await import('../../pc/announce/stage.js');
+  const { ROLES } = await import('../../lib/config.js');
+  const m = (roles) => ({ user: { id: '1' }, roles });
+  assert.equal(inAudience(m([]), { everyone: true }), true);
+  assert.equal(inAudience(m([]), null), true, 'no audience saved yet: everyone');
+  assert.equal(inAudience(m(['111']), { roles: ['111'] }), true);
+  assert.equal(inAudience(m(['222']), { roles: ['111'] }), false);
+  assert.equal(inAudience(m(['222']), { roles: [], noPlan: true }), true, 'no plan role at all');
+  assert.equal(inAudience(m([ROLES.paid]), { roles: [], noPlan: true }), false, 'on Gacrux: has a plan');
+  assert.deepEqual(cleanAudience({ roles: ['123456', '123456', 'x'], noPlan: false }), { roles: ['123456'], noPlan: false });
+  assert.throws(() => cleanAudience({ roles: [] }), /Choose who gets it/);
+});
+
+test('todaysStage: a chosen role in one go', async () => {
+  const { todaysStage } = await import('../../pc/announce/stage.js');
+  const m = (id, roles) => ({ user: { id }, roles });
+  const members = [m('1', ['A']), m('2', ['B']), m('3', ['A', 'B']), m('4', [])];
+  const r = todaysStage(members, new Set(), { sent: {}, closed: {}, stages: [] }, 1, { roles: ['A'] });
+  assert.deepEqual(r.today.map((x) => x.user.id), ['1', '3']);
+});

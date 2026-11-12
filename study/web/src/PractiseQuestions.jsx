@@ -105,7 +105,11 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const groups = useMemo(() => grouped(questions, topics, s.data.subtopics), [questions, topics, s.data.subtopics]);
   const order = useMemo(() => groups.flatMap((g) => g.subs.flatMap((x) => x.qs)), [groups]);
   const at = order.findIndex((x) => x.id === qid);
+  // the list fills the page until a question is open, then folds to a rail beside it (hover the rail to pick another
+  // without unfolding it; click it to keep the list open beside the question)
   const pick = (id) => {
+    if (!q) foldList(true);
+    if (document.activeElement?.closest?.('.qnav')) document.activeElement.blur(); // the rail's pop-out closes after a pick
     reset(); setQid(id); setListOpen(false);
     requestAnimationFrame(() => { const top = work.current?.getBoundingClientRect().top; if (top < 0 || top > window.innerHeight * 0.6) work.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }); });
   };
@@ -150,9 +154,9 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const topic = topics.find((t) => t.id === q?.topicId);
   const subs = (q?.subtopicIds || []).map(subName).filter(Boolean);
   return (
-    <div className="practise-layout">
-      <aside className={`qnav card${listOpen ? ' is-open' : ''}${listFolded ? ' is-folded' : ''}`} aria-label="Questions">
-        <button type="button" className="qnav-rail" aria-expanded="false" aria-label={`Show the questions (${order.length})`} title="Show the questions" onClick={() => foldList(false)}>
+    <div className={`practise-layout${q ? '' : ' is-browse'}`}>
+      <aside className={`qnav card${listOpen ? ' is-open' : ''}${q ? '' : ' is-browse'}${q && listFolded ? ' is-folded' : ''}`} aria-label="Questions">
+        <button type="button" className="qnav-rail" aria-expanded="false" aria-label={`Keep the questions open (${order.length})`} title="Keep the questions open" onClick={() => foldList(false)}>
           <Icon name="chevron" /><span className="chip num">{order.length}</span><span className="qnav-rail-word">Questions</span>
         </button>
         <button type="button" className="qnav-toggle" aria-expanded={listOpen} onClick={() => setListOpen((o) => !o)}>
@@ -162,7 +166,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
           <div className="qnav-tools">
             <div className="qnav-search">
               <input type="search" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Search questions" aria-label="Search questions" />
-              <button type="button" className="iconbtn qnav-fold" aria-expanded="true" aria-label="Hide the questions" title="Hide the questions" onClick={() => foldList(true)}><Icon name="chevron" /></button>
+              {q && <button type="button" className="iconbtn qnav-all" aria-label="All questions, full page" title="All questions, full page" onClick={() => { reset(); setQid(''); }}><Icon name="expand" /></button>}
+              {q && <button type="button" className="iconbtn qnav-fold" aria-expanded={!listFolded} aria-label={listFolded ? 'Keep the questions open' : 'Fold the questions away'} title={listFolded ? 'Keep the questions open' : 'Fold the questions away'} onClick={() => foldList(!listFolded)}><Icon name="chevron" /></button>}
             </div>
             <div className="segmented small" role="group" aria-label="Show">
               {[['all', 'All'], ['new', 'Not tried'], ['saved', 'Solved']].map(([id, name]) => <button key={id} type="button" aria-pressed={show === id} onClick={() => setShow(id)}>{name}</button>)}
@@ -173,7 +178,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
               const list = g.subs.map((x) => ({ ...x, qs: x.qs.filter(shownQ) })).filter((x) => x.qs.length);
               if (!list.length) return null;
               return (
-                <details key={g.id || 'none'} className="qgroup" open={!q || q.topicId === g.id || filter.trim() !== '' || undefined}>
+                <details key={g.id || 'none'} className="qgroup" open={!q || (q.topicId || null) === (g.id || null) || filter.trim() !== '' || undefined}>
                   <summary><span className="qgroup-name">{g.name}</span><span className="num muted small">{list.reduce((n, x) => n + x.qs.length, 0)}</span></summary>
                   {list.map((x) => (
                     <div key={x.id || 'none'} className="qsub">
@@ -213,7 +218,6 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       </aside>
 
       <div className="qwork stack" ref={work}>
-      {!q && <div className="empty"><h2>Pick a question</h2><p>They're listed by topic and sub-topic. A tick means you've tried it.</p></div>}
       {q && (
         <div className="qbar">
           <button type="button" className="iconbtn qbar-prev" aria-label="Previous question" disabled={at <= 0} onClick={() => pick(order[at - 1].id)}><Icon name="chevron" /></button>

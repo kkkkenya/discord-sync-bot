@@ -1020,7 +1020,7 @@ button.chip:active, a.chip:active { transform: scale(.95); }
 /* Folding columns on laptops: the notes column folds into a slim rail on the right and the Practise question list into
    one on the left, so the page and the solution get the width. Each choice is remembered. Phones keep the strip and
    the drawer. */
-.notes-rail, .notes-fold, .qnav-rail, .qnav-fold { display: none; }
+.notes-rail, .notes-fold, .qnav-rail, .qnav-fold, .qnav-all { display: none; }
 .qnav-search { display: flex; gap: var(--s1); align-items: center; }
 .qnav-search input { flex: 1; min-width: 0; }
 .notes-rail, .qnav-rail { flex-direction: column; align-items: center; gap: var(--s2); width: 100%; height: 100%; padding: var(--s3) 0;
@@ -1043,13 +1043,30 @@ button.chip:active, a.chip:active { transform: scale(.95); }
   body:has(.notesbar.is-folded) .pdf-dock { max-width: calc(100vw - 92px - 56px - 4 * var(--s4)); }
 }
 @media (min-width: 1024px) {
-  .qnav-fold { display: inline-grid; width: 36px; height: 36px; flex: none; color: var(--text-2); }
+  .qnav-fold, .qnav-all { display: inline-grid; width: 36px; height: 36px; flex: none; color: var(--text-2); }
+  .qnav-all .icon { width: 16px; height: 16px; }
   .qnav-fold .icon { width: 18px; height: 18px; transform: rotate(180deg); }
   .practise-layout:has(.qnav.is-folded) { grid-template-columns: 56px minmax(0, 1fr); }
   .qnav.is-folded { grid-template-rows: 1fr; }
   .qnav.is-folded .qnav-body { display: none; }
   .qnav.is-folded .qnav-rail { display: flex; }
+  /* folded: hover or tab into the rail and the list pops out over the question, to pick another without unfolding */
+  .qnav.is-folded { overflow: visible; z-index: 6; } /* above the question bar */
+  .qnav.is-folded:hover .qnav-body, .qnav.is-folded:focus-within .qnav-body {
+    display: grid; position: absolute; z-index: 20; top: 0; left: calc(100% - 6px); width: 340px; height: min(78vh, calc(100vh - var(--s4) * 2));
+    background: var(--surface-solid); border: 1px solid var(--separator); border-radius: var(--radius-l); box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.55); }
+  .qnav.is-folded .qnav-fold .icon { transform: none; }
 }
+/* no question open: the list is the page, its topics side by side */
+.practise-layout.is-browse { grid-template-columns: minmax(0, 1fr); }
+.practise-layout.is-browse .qwork { display: none; }
+.qnav.is-browse { position: static; max-height: none; }
+.qnav.is-browse .qnav-toggle { display: none; }
+.qnav.is-browse .qnav-body { display: grid; padding: var(--s3); }
+.qnav.is-browse .qnav-tools { grid-template-columns: minmax(0, 420px) auto; justify-content: space-between; align-items: center; }
+.qnav.is-browse .qnav-list { max-height: none; overflow: visible; display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: var(--s3); align-items: start; }
+.qnav.is-browse .qgroup { margin: 0; padding: var(--s2); border: 1px solid var(--separator); border-radius: var(--radius); background: var(--surface-2); }
+@media (max-width: 560px) { .qnav.is-browse .qnav-tools { grid-template-columns: minmax(0, 1fr); } }
 @media (prefers-reduced-motion: no-preference) {
   .notes-rail, .qnav-rail { animation: fade 0.2s ease; }
 }

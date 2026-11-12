@@ -76,7 +76,7 @@ export default function AddToHub({ unit, notify }) {
         <div className="credits">
           <span className="credits-n num"><b>{credits.count}</b> / {credits.goal}</span>
           <span className="row-main">
-            <span>{credits.earned ? <b>You've earned Premium until {day(credits.until)}. Thank you!</b> : credits.premium ? 'Your files help the whole class.' : <>Add <b className="num">{Math.max(0, credits.goal - credits.count)}</b> more file{credits.goal - credits.count === 1 ? '' : 's'} the hub doesn't have and get <b>Premium until {day(credits.until)}</b> and a contributor medal.</>}</span>
+            <span>{credits.earned ? <b>You've earned Mimosa until {day(credits.until)} and a contributor medal. Thank you!</b> : credits.premium ? 'Your files help the whole class.' : <>Add <b className="num">{Math.max(0, credits.goal - credits.count)}</b> more file{credits.goal - credits.count === 1 ? '' : 's'} the hub doesn't have and get <b>Mimosa until {day(credits.until)}</b> and a contributor medal.</>}</span>
             <span className="row-sub">Each file the hub posts is one credit this semester. Files it already has don't count.</span>
           </span>
           <span className="meter" aria-hidden="true"><span style={{ width: `${Math.min(100, (100 * credits.count) / credits.goal)}%` }} /></span>

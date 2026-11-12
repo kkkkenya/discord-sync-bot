@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from './api.js';
+import Medal from './Medal.jsx';
 
 const date = (day, opts) => new Date(`${day}T12:00:00+03:00`).toLocaleDateString('en-GB', { timeZone: 'Africa/Nairobi', ...opts });
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -53,11 +54,11 @@ export function Contributors({ s }) {
         {c.top.map((x, i) => (
           <li key={`${x.name}${i}`} className={x.you ? 'is-you' : ''} title={`${i + 1}. ${x.name}${x.you ? ' (you)' : ''}: ${plural(x.files, 'file')}${x.medal ? ' · contributor medal' : ''}`}>
             <span className="face">{x.avatar ? <img src={x.avatar} alt={x.name} referrerPolicy="no-referrer" /> : <span aria-label={x.name}>{x.name.slice(0, 1).toUpperCase()}</span>}</span>
-            {x.medal && <span className="medal" role="img" aria-label="Contributor medal">🏅</span>}
+            {x.medal && <Medal className="medal" />}
           </li>
         ))}
       </ol>
-      {c.goal && <p className="row-sub">A medal and Premium for {plural(c.goal, 'file')} the hub didn't have, this semester.</p>}
+      {c.goal && <p className="row-sub">A medal and Mimosa for {plural(c.goal, 'file')} the hub didn't have, this semester.</p>}
       {c.you && !c.top.some((x) => x.you) && <p className="row-sub">You're number {c.you.rank} with {plural(c.you.files, 'file')}.</p>}
       {!c.you && <p className="row-sub">Add a past paper or marking scheme on a unit's Notes tab to join the list.</p>}
     </div>

@@ -5,8 +5,8 @@ import ImportNotes from './ImportNotes.jsx';
 import { InstallCard } from './Install.jsx';
 import { KEEP_CHOICES, keptPages, memoryUse, setKeptPages } from './keep.js';
 import { getLook, setLook } from './look.js';
+import PlanStars, { planName } from './PlanStars.jsx';
 
-const TIER = { owner: 'Owner', premium: 'Premium', basic: 'Basic', trial: 'Free trial' };
 
 // Settings: a full-screen sheet on phones, a side panel from 768px. Esc or the scrim closes it.
 export default function Settings({ s, user, unit, refresh, notify, onClose, onProblem }) {
@@ -107,7 +107,12 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
         <InstallCard notify={notify} />
         {s.data.units.length > 0 && <ImportNotes s={s} unit={unit} refresh={refresh} notify={notify} onProblem={onProblem} />}
         <div className="card">
-          {user && <><p><b>{user.name}</b></p><p className="row-sub">{TIER[user.tier] || user.tier}</p></>}
+          {user && (
+            <div className="plan-line">
+              <PlanStars tier={user.tier} />
+              <span><b>{user.name}</b><span className="row-sub">{planName(user.tier)} plan{user.tier === 'trial' ? ' · free trial' : ''}</span></span>
+            </div>
+          )}
           <div className="actions start">
             <button className="btn" onClick={exportData}>Export my data</button>
             <label className="btn">Bring data back<input type="file" accept=".json,application/json" className="visually-hidden" onChange={(e) => { importData(e.target.files[0]); e.target.value = ''; }} /></label>

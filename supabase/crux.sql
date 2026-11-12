@@ -163,3 +163,14 @@ create index if not exists crux_uploads_user_idx on crux_uploads (user_id, creat
 alter table crux_uploads enable row level security;
 insert into storage.buckets (id, name, public, file_size_limit) values ('crux-uploads', 'crux-uploads', false, 52428800)
   on conflict (id) do nothing;
+
+-- Hosted models for the desktop app (study/server/ai-relay.js, 2026-11-12): answers per student per Nairobi day,
+-- and when Gemini last failed for them (DeepSeek is offered on Imai and Gacrux for 30 minutes after that).
+create table if not exists crux_ai_usage (
+  user_id          text not null references crux_users (id) on delete cascade,
+  day              date not null,
+  answers          integer not null default 0,
+  gemini_failed_at timestamptz,
+  primary key (user_id, day)
+);
+alter table crux_ai_usage enable row level security;

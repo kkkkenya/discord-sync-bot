@@ -93,6 +93,10 @@ const checks = {
     const b = r.body.balance_infos?.[0];
     return green(`✓ DeepSeek key works. Balance: ${b ? `${b.total_balance} ${b.currency}` : 'unknown'}.`);
   },
+  glm: async (key) => {
+    const r = await call('https://api.z.ai/api/paas/v4/models', { headers: { Authorization: `Bearer ${key}` } });
+    return r.ok ? green('✓ GLM key works.') : red(`✗ z.ai didn't accept the GLM key (${r.status}). z.ai → API keys.`);
+  },
 };
 
 // --- main ---------------------------------------------------------------------------------------------------
@@ -146,8 +150,10 @@ env.GEMINI_API_KEY = await ask('Gemini API key', { secret: true, current: env.GE
 if (env.GEMINI_API_KEY) console.log(await checks.gemini(env.GEMINI_API_KEY));
 env.DEEPSEEK_API_KEY = await ask('DeepSeek API key (optional)', { secret: true, current: env.DEEPSEEK_API_KEY });
 if (env.DEEPSEEK_API_KEY) console.log(await checks.deepseek(env.DEEPSEEK_API_KEY));
+env.GLM_API_KEY = await ask('GLM API key from z.ai (optional, hosted models for Mimosa and Acrux)', { secret: true, current: env.GLM_API_KEY });
+if (env.GLM_API_KEY) console.log(await checks.glm(env.GLM_API_KEY));
 
-const KEYS = ['OWNER_ID', 'DISCORD_TOKEN', 'CRUX_DISCORD_CLIENT_ID', 'CRUX_DISCORD_CLIENT_SECRET', 'CRUX_SESSION_SECRET', 'CRON_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'];
+const KEYS = ['OWNER_ID', 'DISCORD_TOKEN', 'CRUX_DISCORD_CLIENT_ID', 'CRUX_DISCORD_CLIENT_SECRET', 'CRUX_SESSION_SECRET', 'CRON_SECRET', 'SUPABASE_URL', 'SUPABASE_SERVICE_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY', 'GLM_API_KEY'];
 writeFileSync(ENV, ['# Crux settings. Made by setup-web.js; run it again to change anything. Git-ignored: never commit or share it.',
   ...KEYS.map((k) => `${k}=${env[k] || ''}`), `PORT=${env.PORT || 5190}`, ''].join('\n'));
 console.log(green('\n✓ Saved study/.env'));

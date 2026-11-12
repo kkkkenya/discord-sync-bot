@@ -6,6 +6,7 @@ import { runBackup, supabaseStorage } from '../server/backup.js';
 import { docStore, withSavedDoc } from '../server/doc-store.js';
 import { fileBytes } from '../server/file-bytes.js';
 import { withReward } from '../server/rewards.js';
+import { aiToken, relay } from '../server/ai-relay.js';
 import { nairobiDay } from '../server/plan.js';
 import { dispatch } from '../server/routes.js';
 import { VERSION } from '../server/store.js';
@@ -31,6 +32,8 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
     if (auth) return authRoute(auth, request, deps);
     const path = `/api/${url.searchParams.get('path') || ''}`;
     if (path === '/api/health') return json({ ok: true, version: VERSION });
+    // hosted models for the desktop app: a relay key, not the session cookie (server/ai-relay.js)
+    if (path.startsWith('/api/ai/v1/') || path === '/api/ai/usage') return relay(request, path);
     if (path === '/api/cron/backup') { // Vercel's daily cron (vercel.json) sends the CRON_SECRET
       if (!process.env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return json({ error: 'Not allowed.' }, 401);
       return json(await runBackup({ db: deps.db, storage: deps.storage || supabaseStorage }));
@@ -43,6 +46,7 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       const reply = (body, status) => { const r = json(body, status); if (cookie) r.headers.append('Set-Cookie', cookie); return r; };
       if (user.tier === 'none') return reply({ error: 'no-access' }, 403);
       if (path === '/api/me') return reply({ ...user, avatar: u.avatar || null }); // the desktop app shows it on its rail
+      if (path === '/api/ai/token') return reply(aiToken(user)); // the desktop app's key for hosted models (12 hours)
       // the PDF viewer's byte ranges: no document to load, and the bytes go back as they are
       if (path === '/api/files/bytes') { const r = await fileBytes(new URLSearchParams(url.searchParams)); if (cookie) r.headers.append('Set-Cookie', cookie); return r; }
       let body = null;

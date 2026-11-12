@@ -31,6 +31,7 @@ export const PLANS = {
   vvip: { models: Object.keys(MODELS), effort: null, perDay: 80 },
   owner: { models: Object.keys(MODELS), effort: null, perDay: 100000 },
 };
+const GEMINI_LIGHT = 'gemini-3.5-flash-lite'; // tried when the main Gemini model is busy
 const TOKEN_HOURS = 12;
 const FALLBACK_MINUTES = 30;
 export const BUSY_MARK = '[crux:gemini-busy]';
@@ -97,12 +98,12 @@ export async function relay(request, path, { store = db, fetchImpl = fetch, now 
   if (effort && spec.provider !== 'deepseek') out.reasoning_effort = effort === 'max' ? 'high' : effort === 'minimal' ? 'low' : effort; else delete out.reasoning_effort;
   if (!spec.image) out.messages = (out.messages || []).map((m) => (Array.isArray(m.content) ? { ...m, content: m.content.filter((p) => p.type !== 'image_url') } : m));
 
-  // Gemini on the entry plans: two tries, then DeepSeek is offered.
-  const tries = spec.provider === 'gemini' ? 2 : 1;
+  // Gemini: the asked model, then the lighter one (its own quota). On the entry plans DeepSeek is offered after that.
+  const tries = spec.provider === 'gemini' ? [model, GEMINI_LIGHT] : [model];
   let r;
-  for (let i = 0; i < tries; i++) {
+  for (const id of tries) {
     try {
-      r = await fetchImpl(up.url, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(out) });
+      r = await fetchImpl(up.url, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...out, model: id }) });
     } catch { r = null; }
     if (r && r.ok) break;
     if (r && ![429, 500, 502, 503, 504].includes(r.status)) break; // a real refusal: no point retrying

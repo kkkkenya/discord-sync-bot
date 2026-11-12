@@ -227,7 +227,9 @@ export async function ingestFile(f, unitCode) {
         const out = await ocrPdf(buf);
         if (out.text.length > text.length) { text = out.text; pageStarts = undefined; method = 'ocr'; }
       } catch (e) {
-        error = `OCR failed: ${e.message}`;
+        // Busy or nothing to read it with right now: keep the text layer and try the scan again on the next pass.
+        if (e.retryable) status = 'queued';
+        else error = `OCR failed: ${e.message}`;
       }
     }
   }

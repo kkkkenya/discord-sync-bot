@@ -4,7 +4,9 @@
 // On the owner's own computer (never on Vercel), CRUX_AI=claude-code sends every call to Claude Code instead: the
 // owner's Claude plan, no API key (claudeCodeCall).
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { renderPdfPages } from './pdf-pages.js';
 import { tmpdir } from 'node:os';
 import { deepseekCost } from './defs.js';
 import { data, requestScope } from './store.js';
@@ -62,7 +64,10 @@ function toGeminiSchema(s) {
   return s;
 }
 
-async function geminiCall(schema, system, content, maxTokens, media = []) {
+// Scanned PDFs try a third Gemini model too: each model has its own quota, so one busy model rarely means all are.
+const GEMINI_OCR_CHAIN = ['gemini-3.8-flash', GEMINI_FALLBACK, 'gemini-2.5-flash'];
+
+async function geminiCall(schema, system, content, maxTokens, media = [], chain = null) {
   const key = process.env.GEMINI_API_KEY;
   const body = (m) => JSON.stringify({
     systemInstruction: { parts: [{ text: system }] },
@@ -84,7 +89,7 @@ async function geminiCall(schema, system, content, maxTokens, media = []) {
   // Busy/hung servers are common and short-lived: one go on the primary, then straight to the lighter model, so a
   // failure shows in about a minute rather than two.
   let last;
-  for (const [n, m] of [provider() === 'gemini' ? model() : MODELS.gemini, GEMINI_FALLBACK].entries()) { // OCR uses Gemini whatever the provider
+  for (const [n, m] of (chain || [provider() === 'gemini' ? model() : MODELS.gemini, GEMINI_FALLBACK]).entries()) { // OCR uses Gemini whatever the provider
     if (n) await sleep(4000 * n);
     try { return await run(m); } catch (e) { last = e; if (!e.retryable) throw e; }
   }
@@ -182,12 +187,55 @@ async function deepseekCall(schema, system, content, maxTokens) {
   throw new Error(`DeepSeek returned invalid JSON after retries: ${last}`);
 }
 
-// A scanned PDF read by Gemini, whichever provider the student picked: the shared library is read once for everyone.
-export async function ocrPdf(buf) {
-  const system = 'You transcribe scanned university exam papers, tutorials and notes. Copy every word, number and equation exactly as printed, in reading order. Write maths in plain text (x^2, sqrt(), integral from a to b). Keep question numbers, part letters and marks like (5 marks). Do not solve, summarise or add anything.';
-  const out = await geminiCall({ type: 'object', properties: { text: { type: 'string' } }, required: ['text'] }, system,
-    'Transcribe this document.', 16000, [{ mime: 'application/pdf', data: buf.toString('base64') }]);
-  return { text: String(out.text || '').replace(/\s+/g, ' ').trim() };
+// A scanned PDF read whichever provider the student picked: the shared library is read once for everyone.
+// Gemini first (three models, each with its own quota). If none can, and Crux runs on the owner's laptop, Claude Code
+// reads the file itself. If nothing can now, the error is retryable: ingest.js queues the file for the next pass.
+const OCR_SYSTEM = 'You transcribe scanned university exam papers, tutorials and notes. Copy every word, number and equation exactly as printed, in reading order. Write maths in plain text (x^2, sqrt(), integral from a to b). Keep question numbers, part letters and marks like (5 marks). Do not solve, summarise or add anything.';
+const OCR_SCHEMA = { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] };
+const tidy = (out) => ({ text: String(out?.text || '').replace(/\s+/g, ' ').trim() });
+
+export async function ocrPdf(buf, { gemini = geminiCall, claude = claudeReadPdf } = {}) {
+  let last = null;
+  if (process.env.GEMINI_API_KEY) {
+    try { return tidy(await gemini(OCR_SCHEMA, OCR_SYSTEM, 'Transcribe this document.', 16000, [{ mime: 'application/pdf', data: buf.toString('base64') }], GEMINI_OCR_CHAIN)); }
+    catch (e) { last = e; }
+  }
+  if (claudeHere()) {
+    try { return tidy(await claude(buf)); } catch (e) { last = e; }
+  }
+  throw Object.assign(new Error(last ? `couldn't read the scan now (${last.message})` : 'no AI that can read scans is set up'), { retryable: true });
+}
+
+// Claude Code on this computer (never on Vercel). Crux draws the pages as pictures itself (pdf-pages.js), so nothing
+// else needs installing; Claude reads them with its Read tool, nothing else allowed, and says whether it could.
+const CLAUDE_OCR_SCHEMA = { type: 'object', properties: { readable: { type: 'boolean' }, text: { type: 'string' } }, required: ['readable', 'text'] };
+export const claudeHere = () => !process.env.VERCEL && (Boolean(process.env.CLAUDE_BIN) || (process.platform === 'win32' && existsSync(WIN_CLAUDE)));
+export async function claudeReadPdf(buf, run = spawn, render = renderPdfPages) {
+  const dir = mkdtempSync(join(tmpdir(), 'crux-ocr-'));
+  const { pages, total } = await render(buf);
+  const names = pages.map(({ page, png }) => { const name = `page-${String(page).padStart(3, '0')}.png`; writeFileSync(join(dir, name), png); return name; });
+  const system = `${OCR_SYSTEM} The pages are pictures; some are photos turned sideways or upside down: read them the right way round. Set readable to false, with empty text, if you could not see the pages.`;
+  const args = ['-p', '--output-format', 'json', '--json-schema', JSON.stringify(CLAUDE_OCR_SCHEMA), '--system-prompt', system, '--tools', 'Read', '--allowedTools', 'Read',
+    '--no-session-persistence', '--setting-sources', '', '--strict-mcp-config', '--model', process.env.CRUX_CLAUDE_MODEL || 'sonnet'];
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = run(claudeBin(), args, { cwd: dir, windowsHide: true });
+      let out = '', err = '';
+      const timer = setTimeout(() => { child.kill(); reject(Object.assign(new Error('Claude Code took too long to read the scan'), { retryable: true })); }, 10 * 60e3);
+      child.stdout.on('data', (d) => { out += d; });
+      child.stderr.on('data', (d) => { err += d; });
+      child.on('error', (e) => { clearTimeout(timer); reject(new Error(`Couldn't start Claude Code (${e.message})`)); });
+      child.on('close', () => {
+        clearTimeout(timer);
+        let d;
+        try { d = JSON.parse(out); } catch { return reject(new Error(`Claude Code gave no answer: ${(err || out).trim().slice(0, 200) || 'empty'}`)); }
+        if (d.is_error || !d.structured_output) return reject(new Error(`Claude Code: ${String(d.result || d.subtype || 'no answer').slice(0, 200)}`));
+        if (!d.structured_output.readable || !String(d.structured_output.text || '').trim()) return reject(Object.assign(new Error('Claude Code could not read the pages'), { retryable: true }));
+        return resolve(d.structured_output);
+      });
+      child.stdin.end(`Transcribe this document. Its ${names.length} page pictures, in order, are in ${dir}: ${names.join(', ')}.${total > names.length ? ` (The first ${names.length} of ${total} pages.)` : ''}`);
+    });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
 // media: [{ mime, data (base64) }], images or audio, for the providers that can read them (CAN).

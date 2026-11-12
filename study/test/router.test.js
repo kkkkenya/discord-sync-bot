@@ -84,14 +84,17 @@ test('no membership is a 403 no-access; /api/me tells the app who is signed in',
   const none = await call(router, 'GET', 'state', { user: 'zed', session: { tier: 'none' } });
   assert.deepEqual([none.status, none.body.error], [403, 'no-access']);
   const me = await call(router, 'GET', 'me', { user: 'amina' });
-  assert.deepEqual(me.body, { id: 'amina', name: 'amina', tier: 'basic' });
+  assert.deepEqual(me.body, { id: 'amina', name: 'amina', tier: 'basic', avatar: null });
+  const pic = 'https://cdn.discordapp.com/avatars/amina/abc.png?size=96';
+  const withPic = await makeRouter(memoryDocs(), noNetwork)(new Request('https://crux.test/api/router?path=me', { headers: { cookie: cookie('amina', { avatar: pic }) } }));
+  assert.equal((await withPic.json()).avatar, pic);
 });
 
 test('a day-old session reads the roles again and gets a fresh cookie', async () => {
   const seen = [];
   const deps = { db: { upsert: async (t, rows) => { seen.push(rows[0].tier); return rows; } }, member: async () => ({ roles: [ROLES.premium], nick: 'Amina W' }) };
   const r = await makeRouter(memoryDocs(), deps)(new Request('https://crux.test/api/router?path=me', { headers: { cookie: cookie('amina', { checked: Date.now() - 25 * 3600e3 }) } }));
-  assert.deepEqual(await r.json(), { id: 'amina', name: 'Amina W', tier: 'premium' });
+  assert.deepEqual(await r.json(), { id: 'amina', name: 'Amina W', tier: 'premium', avatar: null });
   assert.match(r.headers.get('set-cookie'), /crux_session=/);
   assert.deepEqual(seen, ['premium']);
 });

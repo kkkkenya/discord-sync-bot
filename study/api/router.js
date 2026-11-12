@@ -42,7 +42,7 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       const user = await withReward({ id: u.id, name: u.name, tier: u.tier }, nairobiDay()); // Premium earned by adding files to the hub
       const reply = (body, status) => { const r = json(body, status); if (cookie) r.headers.append('Set-Cookie', cookie); return r; };
       if (user.tier === 'none') return reply({ error: 'no-access' }, 403);
-      if (path === '/api/me') return reply(user);
+      if (path === '/api/me') return reply({ ...user, avatar: u.avatar || null }); // the desktop app shows it on its rail
       // the PDF viewer's byte ranges: no document to load, and the bytes go back as they are
       if (path === '/api/files/bytes') { const r = await fileBytes(new URLSearchParams(url.searchParams)); if (cookie) r.headers.append('Set-Cookie', cookie); return r; }
       let body = null;

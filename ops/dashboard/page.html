@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hub dashboard</title>
+<style>
+:root{--bg:#120e0c;--bg2:#1b1512;--card:#211a16;--line:#3a2e27;--text:#f3ece6;--text2:#b9aba0;--accent:#f2c200;--on-accent:#1a1300;--good:#5cc98a;--bad:#ff6b6b;--r:12px;color-scheme:dark}
+@media (prefers-color-scheme: light){:root{--bg:#f6f2ee;--bg2:#ece5de;--card:#fff;--line:#dccfc4;--text:#1d1713;--text2:#6b5d52;--good:#16834a;--bad:#c62828;color-scheme:light}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line);background:var(--bg2);position:sticky;top:0;z-index:2}
+header h1{font-size:17px;margin:0;font-weight:800}
+.mark{width:26px;height:28px}
+nav{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+nav button{background:none;border:0;color:var(--text2);font:inherit;font-weight:600;padding:7px 12px;border-radius:999px;cursor:pointer}
+nav button[aria-pressed=true]{background:var(--accent);color:var(--on-accent)}
+nav button:hover:not([aria-pressed=true]){color:var(--text);background:var(--card)}
+main{max-width:1060px;margin:0 auto;padding:22px 20px 60px}
+h2{font-size:22px;margin:0 0 4px}
+.muted{color:var(--text2)}.small{font-size:13px}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin:16px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.big{font-size:28px;font-weight:800}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--text);font:inherit;font-weight:700;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--text2)}
+.btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent)}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+input,select,textarea{font:inherit;color:var(--text);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+textarea{width:100%;min-height:300px;resize:vertical;font-family:ui-monospace,Consolas,monospace;font-size:13px}
+table{width:100%;border-collapse:collapse}
+td,th{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--bad);margin-right:6px}.dot.on{background:var(--good)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:420px;font-size:12px;white-space:pre-wrap}
+.bar{height:8px;border-radius:999px;background:var(--bg);overflow:hidden;border:1px solid var(--line)}.bar span{display:block;height:100%;background:var(--accent)}
+.msg{margin:10px 0;padding:10px 12px;border-radius:8px;background:var(--card);border:1px solid var(--line)}
+.msg.bad{border-color:var(--bad);color:var(--bad)}.msg.good{border-color:var(--good)}
+.two{display:grid;gap:16px;grid-template-columns:1fr}
+@media (min-width:860px){.two{grid-template-columns:1fr 1fr}}
+.preview{white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:12px;font-size:14px;max-height:420px;overflow:auto}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <svg class="mark" viewBox="150 110 730 800" aria-hidden="true"><g stroke="#f2c200" stroke-opacity=".5" stroke-width="14" stroke-linecap="round"><line x1="494" y1="212" x2="567" y2="811"/><line x1="251" y1="512" x2="802" y2="399"/></g><g fill="#f2c200"><circle cx="494" cy="212" r="44"/><circle cx="251" cy="512" r="54"/><circle cx="802" cy="399" r="42"/><circle cx="567" cy="811" r="70"/><circle cx="668" cy="575" r="20"/></g></svg>
+  <h1>Hub dashboard</h1>
+  <nav aria-label="Sections">
+    <button data-tab="overview" aria-pressed="true">Overview</button>
+    <button data-tab="announce" aria-pressed="false">Announcements</button>
+    <button data-tab="payments" aria-pressed="false">Payments</button>
+    <button data-tab="discord" aria-pressed="false">Roles and channels</button>
+    <button data-tab="bot" aria-pressed="false">Bot</button>
+  </nav>
+</header>
+<main>
+  <div id="flash"></div>
+
+  <section data-panel="overview">
+    <h2 id="server">Server</h2>
+    <p class="muted small" id="serverNote"></p>
+    <div class="grid" id="plans"></div>
+    <div class="card"><h3 style="margin-top:0">PC bots</h3><div id="botsBox" class="muted">Loading…</div></div>
+  </section>
+
+  <section data-panel="announce" hidden>
+    <h2>Announcements</h2>
+    <p class="muted small">A personal DM to every member, sent in 3 daily batches. Bots, members with /nudges off and closed DMs are skipped. <code>{name}</code> becomes each member's name.</p>
+    <div class="row" style="margin:14px 0"><label>Message <select id="annName"></select></label> <button class="btn" id="annNew">New message</button></div>
+    <div class="two">
+      <div><textarea id="annText" aria-label="Message text"></textarea><div class="row" style="margin-top:8px"><span class="muted small" id="annCount"></span><button class="btn" id="annSave">Save</button></div></div>
+      <div><div class="muted small" style="margin-bottom:6px">How it reads, for the first member today</div><div class="preview" id="annPreview">…</div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div id="annSummary" class="muted">Loading…</div>
+      <div class="row" style="margin-top:12px"><button class="btn primary" id="annSend">Send today's batch</button><button class="btn" id="annRefresh">Refresh</button></div>
+      <div id="annJob" style="margin-top:12px"></div>
+    </div>
+  </section>
+
+  <section data-panel="payments" hidden>
+    <h2>Payments waiting</h2>
+    <p class="muted small">Claims in #payments that nobody has approved or rejected. Approve or reject in Discord: it gives the role and DMs the receipt.</p>
+    <div class="row" style="margin:12px 0"><button class="btn" id="payRefresh">Refresh</button></div>
+    <div id="payBox">Loading…</div>
+  </section>
+
+  <section data-panel="discord" hidden>
+    <h2>Roles and channels</h2>
+    <div class="two" style="margin-top:14px">
+      <div class="card"><h3 style="margin-top:0">Roles</h3><div id="rolesBox">Loading…</div></div>
+      <div class="card"><h3 style="margin-top:0">Channels</h3><div id="chanBox">Loading…</div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">Post a message</h3>
+      <div class="row"><label>Channel <select id="postChan"></select></label><label class="small"><input type="checkbox" id="postMentions"> Allow @mentions to ping</label></div>
+      <textarea id="postText" style="min-height:140px;margin-top:10px" aria-label="Message"></textarea>
+      <div class="row" style="margin-top:8px"><button class="btn primary" id="postSend">Post as the bot</button><span class="muted small" id="postCount"></span></div>
+    </div>
+  </section>
+
+  <section data-panel="bot" hidden>
+    <h2>Bot</h2>
+    <div class="row" style="margin:14px 0">
+      <button class="btn" id="regBtn">Register slash commands</button>
+      <button class="btn danger" id="restartBtn">Restart PC bots</button>
+      <label>Logs <select id="logBot"><option value="pc">Drive dumper</option><option value="community">Hub buddy</option></select></label>
+      <button class="btn" id="logRefresh">Refresh logs</button>
+    </div>
+    <div id="botOut"></div>
+    <h3>Restarts</h3><pre id="restartsLog">…</pre>
+    <h3>Today's log</h3><pre id="todayLog">…</pre>
+  </section>
+</main>
+<script>
+(() => {
+  // The one-time key from the start link (#key=…); kept for this tab only.
+  const fromHash = new URLSearchParams(location.hash.slice(1)).get('key');
+  if (fromHash) { sessionStorage.setItem('dashKey', fromHash); history.replaceState(null, '', location.pathname); }
+  const KEY = sessionStorage.getItem('dashKey') || '';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const call = async (method, path, body) => {
+    const r = await fetch(path, { method, headers: { 'x-dash-key': KEY, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error(data?.error || `Failed (${r.status})`);
+    return data;
+  };
+  const flash = (text, kind = 'good') => { $('flash').innerHTML = `<div class="msg ${kind}" role="status">${esc(text)}</div>`; if (kind === 'good') setTimeout(() => { $('flash').innerHTML = ''; }, 5000); };
+  const fail = (e) => flash(e.message, 'bad');
+  const when = (iso) => iso ? new Date(iso).toLocaleString('en-GB', { timeZone: 'Africa/Nairobi', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+
+  // tabs
+  const loaders = {};
+  const show = (tab) => {
+    document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.tab === tab)));
+    document.querySelectorAll('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+    loaders[tab]?.();
+  };
+  document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => show(b.dataset.tab)));
+
+  // overview
+  loaders.overview = async () => {
+    try {
+      const o = await call('GET', '/api/overview');
+      $('server').textContent = o.server;
+      $('serverNote').textContent = `${o.members} members${o.online != null ? `, ${o.online} online` : ''} · boost level ${o.boost}${o.boost < 2 ? ' (role icons need level 2)' : ''}`;
+      $('plans').innerHTML = o.plans.map((p) => `<div class="card"><div class="muted small">${esc(p.star)}${p.plan === 'trial' ? ' · free trial' : ''}</div><div class="big">${p.count}</div><div class="muted small">role: ${esc(p.role)}</div></div>`).join('')
+        + `<div class="card"><div class="muted small">No plan</div><div class="big">${o.noPlan}</div><div class="muted small">no plan role: trial over, or staff</div></div>`;
+      $('botsBox').innerHTML = `<p><span class="dot ${o.bots.supervisor ? 'on' : ''}"></span>Supervisor ${o.bots.supervisor ? 'running' : 'not running'} · ${o.bots.running} of 2 bots running</p>`
+        + o.bots.logs.map((l) => `<p class="small muted">${esc(l.bot)}: last log line ${when(l.lastLog)}</p>`).join('');
+    } catch (e) { fail(e); }
+  };
+
+  // announcements
+  let annName = '';
+  const countChars = () => { const n = $('annText').value.length; $('annCount').textContent = `${n} / 1900 characters`; };
+  $('annText').addEventListener('input', countChars);
+  const loadAnn = async () => {
+    if (!annName) return;
+    $('annSummary').textContent = 'Counting members…';
+    try {
+      const s = await call('GET', `/api/announcement?name=${encodeURIComponent(annName)}`);
+      $('annText').value = s.text; countChars();
+      $('annPreview').textContent = s.preview;
+      const pct = s.members ? Math.round((100 * (s.sent + s.closed)) / Math.max(1, s.members - s.optedOut)) : 0;
+      $('annSummary').innerHTML = `<p><b>${s.stagesDone >= s.stages ? 'All batches sent' : `Batch ${s.stage} of ${s.stages}`}</b>: ${s.todayCount} DMs today${s.firstFew.length ? ` (${esc(s.firstFew.join(', '))}…)` : ''}.</p>
+        <p class="small muted">${s.members} members · ${s.sent} sent · ${s.closed} DMs closed · ${s.optedOut} opted out · ${s.left} left</p>
+        <div class="bar" aria-label="${pct}% done"><span style="width:${pct}%"></span></div>
+        ${s.history.length ? `<p class="small muted">${s.history.map((h, i) => `Batch ${i + 1}: ${when(h.at)}, ${h.sent} sent`).join(' · ')}</p>` : ''}`;
+      $('annSend').disabled = s.todayCount === 0;
+    } catch (e) { $('annSummary').textContent = ''; fail(e); }
+  };
+  loaders.announce = async () => {
+    try {
+      const { names, job } = await call('GET', '/api/announcements');
+      $('annName').innerHTML = names.map((n) => `<option>${esc(n)}</option>`).join('');
+      if (!annName || !names.includes(annName)) annName = names[0] || '';
+      $('annName').value = annName;
+      if (job && !job.finished) pollJob();
+      await loadAnn();
+    } catch (e) { fail(e); }
+  };
+  $('annName').addEventListener('change', (e) => { annName = e.target.value; loadAnn(); });
+  $('annRefresh').addEventListener('click', loadAnn);
+  $('annNew').addEventListener('click', async () => {
+    const name = prompt('Name for the new message (letters, numbers and dashes), e.g. exams-2026-12');
+    if (!name) return;
+    try { await call('PUT', `/api/announcement?name=${encodeURIComponent(name)}`, { text: 'Hi {name}, ' }); annName = name; await loaders.announce(); flash('Created. Write it, then Save.'); } catch (e) { fail(e); }
+  });
+  $('annSave').addEventListener('click', async () => {
+    try { await call('PUT', `/api/announcement?name=${encodeURIComponent(annName)}`, { text: $('annText').value }); flash('Saved.'); await loadAnn(); } catch (e) { fail(e); }
+  });
+  let polling = false;
+  const pollJob = async () => {
+    if (polling) return; polling = true;
+    $('annSend').disabled = true;
+    try {
+      for (;;) {
+        const j = await call('GET', '/api/job');
+        if (!j) break;
+        const pct = j.total ? Math.round((100 * j.done) / j.total) : 0;
+        $('annJob').innerHTML = `<p>Sending "${esc(j.name)}": ${j.done} of ${j.total} · ${j.sent} sent · ${j.closed} DMs closed</p><div class="bar"><span style="width:${pct}%"></span></div>`
+          + (j.finished ? `<p class="${j.error ? 'msg bad' : 'small muted'}">${j.error ? esc(j.error) : `Finished.${j.failed?.length ? ` ${j.failed.length} failed: ${esc(j.failed.join('; '))}` : ''}`}</p>` : '');
+        if (j.finished) break;
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    } catch (e) { fail(e); }
+    polling = false;
+    loadAnn();
+  };
+  $('annSend').addEventListener('click', async () => {
+    const n = $('annSummary').querySelector('b')?.textContent || 'this batch';
+    if (!confirm(`Send ${n} of "${annName}" now? Each member gets a personal DM. This can't be undone.`)) return;
+    try { await call('PUT', `/api/announcement?name=${encodeURIComponent(annName)}`, { text: $('annText').value }); await call('POST', `/api/announcement/send?name=${encodeURIComponent(annName)}`); pollJob(); } catch (e) { fail(e); }
+  });
+
+  // payments
+  loaders.payments = async () => {
+    $('payBox').textContent = 'Loading…';
+    try {
+      const list = await call('GET', '/api/payments');
+      $('payBox').innerHTML = list.length ? `<table><thead><tr><th>When</th><th>Who</th><th>Plan</th><th>KES</th><th>M-Pesa code</th><th></th></tr></thead><tbody>${list.map((p) => `<tr><td>${when(p.at)}</td><td>${esc(p.who)}</td><td>${esc(p.plan)}</td><td>${esc(p.amount ?? '')}</td><td><code>${esc(p.code ?? '')}</code>${p.reused ? ' <b style="color:var(--bad)">claimed before</b>' : ''}</td><td><a class="btn" href="${esc(p.link)}" target="_blank" rel="noopener">Open in Discord</a></td></tr>`).join('')}</tbody></table>` : '<p class="muted">Nothing waiting.</p>';
+    } catch (e) { $('payBox').textContent = ''; fail(e); }
+  };
+  $('payRefresh').addEventListener('click', loaders.payments);
+
+  // roles and channels
+  loaders.discord = async () => {
+    try {
+      const d = await call('GET', '/api/discord');
+      $('rolesBox').innerHTML = `<table><tbody>${d.roles.map((r) => `<tr><td><input value="${esc(r.name)}" data-role="${esc(r.id)}" aria-label="Role name" style="width:100%"></td><td class="small muted">${r.plan ? `plan: ${esc(r.plan)}` : ''}</td><td><button class="btn" data-save-role="${esc(r.id)}">Rename</button></td></tr>`).join('')}</tbody></table>`;
+      $('chanBox').innerHTML = `<table><tbody>${d.channels.map((c) => `<tr><td><input value="${esc(c.name)}" data-chan="${esc(c.id)}" aria-label="Channel name" style="width:100%"></td><td class="small muted">${esc(c.type)}</td><td><button class="btn" data-save-chan="${esc(c.id)}">Rename</button></td></tr>`).join('')}</tbody></table>`;
+      $('postChan').innerHTML = d.channels.filter((c) => c.type === 'text').map((c) => `<option value="${esc(c.id)}">#${esc(c.name)}</option>`).join('');
+    } catch (e) { fail(e); }
+  };
+  document.addEventListener('click', async (e) => {
+    const role = e.target.closest('[data-save-role]')?.dataset.saveRole;
+    const chan = e.target.closest('[data-save-chan]')?.dataset.saveChan;
+    try {
+      if (role) { await call('PATCH', `/api/role?id=${role}`, { name: document.querySelector(`[data-role="${role}"]`).value }); flash('Role renamed.'); }
+      if (chan) { const r = await call('PATCH', `/api/channel?id=${chan}`, { name: document.querySelector(`[data-chan="${chan}"]`).value }); flash(`Channel renamed to #${r.name}.`); loaders.discord(); }
+    } catch (err) { fail(err); }
+  });
+  $('postText').addEventListener('input', () => { $('postCount').textContent = `${$('postText').value.length} / 2000`; });
+  $('postSend').addEventListener('click', async () => {
+    const opt = $('postChan').selectedOptions[0];
+    if (!opt || !$('postText').value.trim()) return flash('Pick a channel and write the message.', 'bad');
+    if (!confirm(`Post this in ${opt.textContent} as the bot?`)) return;
+    try { const r = await call('POST', '/api/post', { channelId: opt.value, content: $('postText').value, mentions: $('postMentions').checked }); $('postText').value = ''; flash('Posted.'); window.open(r.link, '_blank', 'noopener'); } catch (e) { fail(e); }
+  });
+
+  // bot
+  loaders.bot = async () => {
+    try {
+      const l = await call('GET', `/api/logs?bot=${$('logBot').value}`);
+      $('restartsLog').textContent = l.restarts.join('\n') || 'Nothing yet.';
+      $('todayLog').textContent = l.today.join('\n') || 'Nothing logged today.';
+    } catch (e) { fail(e); }
+  };
+  $('logBot').addEventListener('change', loaders.bot);
+  $('logRefresh').addEventListener('click', loaders.bot);
+  $('regBtn').addEventListener('click', async () => {
+    $('botOut').innerHTML = '<p class="muted">Registering…</p>';
+    try { const r = await call('POST', '/api/register'); $('botOut').innerHTML = `<pre>${esc(r.output)}</pre>`; } catch (e) { $('botOut').innerHTML = ''; fail(e); }
+  });
+  $('restartBtn').addEventListener('click', async () => {
+    if (!confirm('Restart both PC bots? The supervisor starts them again within seconds.')) return;
+    try { const r = await call('POST', '/api/restart'); flash(`Restarted ${r.restarted} bot${r.restarted === 1 ? '' : 's'}.`); setTimeout(loaders.bot, 4000); } catch (e) { fail(e); }
+  });
+
+  if (!KEY) flash('Open the dashboard from the link the start window printed.', 'bad');
+  else show('overview');
+})();
+</script>
+</body>
+</html>

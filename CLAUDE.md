@@ -8,6 +8,8 @@ Plan and status: fixplan.md (local only, not in git). Read §0–6 and the phase
 - Drive dumper: cd pc && npm run dry-run | npm start      Community: cd community && npm start | npm run try
 - Community posts (GitHub Actions): node community/scheduler.js
 - Supervisor: node ops/supervise.js | node --test ops/test/      Task: powershell -File ops/install-task.ps1
+- Dashboard (local, Discord management): double-click ops/dashboard/start-dashboard.bat | node ops/dashboard/server.js
+- Announcement DMs (3 daily batches): node pc/announce/send.js <name> [--dry-run], or the dashboard
 - Community tests: cd community && npm test
 - Logs: pc/data/logs/, community/data/logs/ (restarts.log for restarts)
 

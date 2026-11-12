@@ -1,7 +1,7 @@
 {
   "name": "Crux",
   "short_name": "Crux",
-  "description": "Study plans for KU engineering units, built from past papers.",
+  "description": "Study plans built from your past papers and notes.",
   "start_url": "/app#/today",
   "scope": "/",
   "display": "standalone",

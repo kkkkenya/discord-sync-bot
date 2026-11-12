@@ -1,5 +1,5 @@
 // The honest warning before heavy built-in AI work: its context and effort limits, and the way round them.
-export default function LimitNote({ s, unit, topic, go, what = 'long engineering working' }) {
+export default function LimitNote({ s, unit, topic, go, what = 'long working' }) {
   if (!s.ai) return null;
   const synced = Object.values(s.library || {}).filter((e) => e.unit === unit).reduce((n, e) => n + (e.chars || 0), 0);
   return (

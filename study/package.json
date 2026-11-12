@@ -2,7 +2,7 @@
   "name": "crux",
   "private": true,
   "type": "module",
-  "description": "Crux: a study app for KU engineering students, on the web at crux.engineeringhub.site. Discord sign-in, plans from past papers, weakspots, checkpoints.",
+  "description": "Crux: a study app for university students, on the web at crux.engineeringhub.site. Discord sign-in, plans from past papers, weakspots, checkpoints.",
   "engines": {
     "node": ">=22"
   },

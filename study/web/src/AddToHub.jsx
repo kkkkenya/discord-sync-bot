@@ -35,6 +35,8 @@ export default function AddToHub({ unit, notify }) {
   const [mine, setMine] = useState([]);
   const [credits, setCredits] = useState(null); // { count, goal, until, premium, earned }
   const [over, setOver] = useState(false);
+  // consent first: the file goes on the Study Hub Discord with the student's name
+  const [consent, setConsent] = useState(false);
   const input = useRef(null);
   // a marking scheme is sent for one paper, so Crux can solve that paper's questions the way the scheme does
   const [isScheme, setIsScheme] = useState(false);
@@ -47,6 +49,7 @@ export default function AddToHub({ unit, notify }) {
   const scheme = !isScheme ? null : paper === 'other' ? other : paper ? { paper } : undefined;
 
   const send = async (list) => {
+    if (!consent) { notify('Tick the box to agree to share the files first.'); return; }
     if (scheme === undefined) { notify('Pick the paper this marking scheme is for first.'); return; }
     const files = [...list];
     const bad = files.filter((f) => !OK.test(f.name) || f.size > MAX);
@@ -73,7 +76,7 @@ export default function AddToHub({ unit, notify }) {
         <div className="credits">
           <span className="credits-n num"><b>{credits.count}</b> / {credits.goal}</span>
           <span className="row-main">
-            <span>{credits.earned ? <b>You've earned Premium until {day(credits.until)}. Thank you!</b> : credits.premium ? 'Your files help the whole class.' : <>Add <b className="num">{Math.max(0, credits.goal - credits.count)}</b> more file{credits.goal - credits.count === 1 ? '' : 's'} the hub doesn't have and get <b>Premium until {day(credits.until)}</b>.</>}</span>
+            <span>{credits.earned ? <b>You've earned Premium until {day(credits.until)}. Thank you!</b> : credits.premium ? 'Your files help the whole class.' : <>Add <b className="num">{Math.max(0, credits.goal - credits.count)}</b> more file{credits.goal - credits.count === 1 ? '' : 's'} the hub doesn't have and get <b>Premium until {day(credits.until)}</b> and a contributor medal.</>}</span>
             <span className="row-sub">Each file the hub posts is one credit this semester. Files it already has don't count.</span>
           </span>
           <span className="meter" aria-hidden="true"><span style={{ width: `${Math.min(100, (100 * credits.count) / credits.goal)}%` }} /></span>
@@ -106,13 +109,17 @@ export default function AddToHub({ unit, notify }) {
           </div>
         )}
       </div>
-      <label className={`dropzone${over ? ' is-over' : ''}`}
+      <label className="check consent">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <span>I agree to share these files on the Study Hub Discord for {unit}, credited to me. They are mine to share (my notes, or papers given to the class).</span>
+      </label>
+      <label className={`dropzone${over ? ' is-over' : ''}${consent ? '' : ' is-off'}`}
         onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
         onDrop={(e) => { e.preventDefault(); setOver(false); send(e.dataTransfer.files); }}>
         <Icon name="file" />
         <span><b>Drop files here</b> or tap to choose</span>
         <span className="muted small">PDF, JPG, PNG, PowerPoint or Word, up to 50 MB each. Photos sent together become one PDF.</span>
-        <input ref={input} type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.ppt,.pptx,.doc,.docx,image/*" className="visually-hidden" onChange={(e) => { send(e.target.files); e.target.value = ''; }} />
+        <input ref={input} type="file" multiple disabled={!consent} accept=".pdf,.jpg,.jpeg,.png,.ppt,.pptx,.doc,.docx,image/*" className="visually-hidden" onChange={(e) => { send(e.target.files); e.target.value = ''; }} />
       </label>
       {sending.length > 0 && (
         <ul className="hub-sending">
@@ -132,7 +139,7 @@ export default function AddToHub({ unit, notify }) {
           </ul>
         </details>
       )}
-      <p className="muted small">The hub posts them to this unit with your name, for your whole class. Only send files you're happy to share.</p>
+      <p className="muted small">The hub posts them to this unit with your name, for your whole class.</p>
     </div>
   );
 }

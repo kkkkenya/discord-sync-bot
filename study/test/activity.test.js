@@ -28,10 +28,32 @@ test('20 whole weeks, Monday first, ending today; each thing done counts on its 
 test('top contributors count posted files this semester, and say where you stand', async () => {
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   const rows = [...Array(3).fill({ user_id: 'a', user_name: 'Amina' }), ...Array(5).fill({ user_id: 'b', user_name: 'Brian' }), { user_id: 'c', user_name: 'Chebet' }];
-  const select = async (table, query) => { assert.match(query, /status=eq\.posted&created_at=gte\./); return rows; };
+  const select = async (table, query) => { if (table === 'crux_users') return []; assert.match(query, /status=eq\.posted&created_at=gte\./); return rows; };
   const c = await contributors({ id: 'c' }, { limit: 2, select });
-  assert.deepEqual(c.top, [{ name: 'Brian', files: 5, you: false }, { name: 'Amina', files: 3, you: false }]);
+  assert.deepEqual(c.top, [{ name: 'Brian', files: 5, you: false, medal: false, avatar: null }, { name: 'Amina', files: 3, you: false, medal: false, avatar: null }]);
   assert.deepEqual(c.you, { rank: 3, files: 1 });
   assert.equal((await contributors({ id: 'z' }, { select })).you, null);
+  delete process.env.SUPABASE_URL;
+});
+
+test('top contributors: a medal at the reward goal, and the Discord picture when crux_users has it', async () => {
+  process.env.SUPABASE_URL = 'https://example.supabase.co';
+  const rows = [...Array(10).fill({ user_id: 'a', user_name: 'Amina' }), ...Array(2).fill({ user_id: 'b', user_name: 'Brian' })];
+  const select = async (table, query) => {
+    if (table === 'crux_users') {
+      assert.match(decodeURIComponent(query), /id=in\.\("a","b"\)/);
+      return [{ id: 'a', avatar: 'https://cdn.discordapp.com/avatars/a/x.png' }, { id: 'b', avatar: 'https://evil.example/x.png' }];
+    }
+    return rows;
+  };
+  const c = await contributors({ id: 'b' }, { select });
+  assert.deepEqual(c.top, [
+    { name: 'Amina', files: 10, you: false, medal: true, avatar: 'https://cdn.discordapp.com/avatars/a/x.png' },
+    { name: 'Brian', files: 2, you: true, medal: false, avatar: null },
+  ]);
+  assert.equal(c.goal, 10);
+  // the pictures are a nicety: a failing read still returns the board
+  const broken = await contributors({ id: 'b' }, { select: async (t) => { if (t === 'crux_users') throw new Error('column avatar does not exist'); return rows; } });
+  assert.equal(broken.top[0].avatar, null);
   delete process.env.SUPABASE_URL;
 });

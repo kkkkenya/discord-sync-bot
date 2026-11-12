@@ -35,9 +35,14 @@ export async function memberOf(userId, botToken = process.env.DISCORD_TOKEN) {
 }
 
 // Upserts the student's row: crux_docs needs it, and it records the tier and the last visit.
-export const rememberUser = (db, user) => db.upsert('crux_users', [{
-  id: user.id, name: user.name, tier: user.tier, tier_checked_at: new Date().toISOString(), last_seen: new Date().toISOString(),
-}], 'id');
+export const rememberUser = async (db, user) => {
+  const row = await db.upsert('crux_users', [{
+    id: user.id, name: user.name, tier: user.tier, tier_checked_at: new Date().toISOString(), last_seen: new Date().toISOString(),
+  }], 'id');
+  // The picture for the top-contributors row. Its own write: before crux_users.avatar exists this fails quietly.
+  if (user.avatar && db.update) await db.update('crux_users', `id=eq.${encodeURIComponent(user.id)}`, { avatar: user.avatar }).catch(() => {});
+  return row;
+};
 
 // The sign-in's state is signed and lasts 15 minutes, so Discord's reply is accepted in whichever browser it opens:
 // on phones the Discord app and its 2FA step often hand back to a different tab or browser than the one that started.

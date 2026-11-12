@@ -49,15 +49,15 @@ export function Contributors({ s }) {
   return (
     <div className="card stack-s">
       <div className="card-head"><span className="row-main"><h2>Top contributors</h2><span className="row-sub">Files added to the hub since {date(c.since, { day: 'numeric', month: 'long' })}</span></span></div>
-      <ol className="leaders">
+      <ol className="faces" aria-label="Top contributors">
         {c.top.map((x, i) => (
-          <li key={`${x.name}${i}`} className={x.you ? 'is-you' : ''}>
-            <span className="leader-n num">{i + 1}</span>
-            <span className="row-main">{x.name}{x.you && <span className="muted"> (you)</span>}</span>
-            <span className="num">{plural(x.files, 'file')}</span>
+          <li key={`${x.name}${i}`} className={x.you ? 'is-you' : ''} title={`${i + 1}. ${x.name}${x.you ? ' (you)' : ''}: ${plural(x.files, 'file')}${x.medal ? ' · contributor medal' : ''}`}>
+            <span className="face">{x.avatar ? <img src={x.avatar} alt={x.name} referrerPolicy="no-referrer" /> : <span aria-label={x.name}>{x.name.slice(0, 1).toUpperCase()}</span>}</span>
+            {x.medal && <span className="medal" role="img" aria-label="Contributor medal">🏅</span>}
           </li>
         ))}
       </ol>
+      {c.goal && <p className="row-sub">A medal and Premium for {plural(c.goal, 'file')} the hub didn't have, this semester.</p>}
       {c.you && !c.top.some((x) => x.you) && <p className="row-sub">You're number {c.you.rank} with {plural(c.you.files, 'file')}.</p>}
       {!c.you && <p className="row-sub">Add a past paper or marking scheme on a unit's Notes tab to join the list.</p>}
     </div>

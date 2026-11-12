@@ -94,7 +94,7 @@ export async function postedDays(user, since) {
 // Who has added the most files the hub posted this semester (duplicates don't count): the top `limit`, and where you
 // stand. { top: [{ name, files, you }], you: { rank, files } | null, since }
 export async function contributors(user, { limit = 10, select = db.select } = {}) {
-  if (!process.env.SUPABASE_URL) return { top: [], you: null, since: REWARD.start };
+  if (!process.env.SUPABASE_URL) return { top: [], you: null, since: REWARD.start, goal: REWARD.goal };
   const rows = await select('crux_uploads', `status=eq.posted&created_at=gte.${REWARD.start}&select=user_id,user_name`);
   const by = new Map();
   for (const r of rows) {
@@ -104,10 +104,20 @@ export async function contributors(user, { limit = 10, select = db.select } = {}
   }
   const ranked = [...by.values()].sort((a, b) => b.files - a.files || a.name.localeCompare(b.name));
   const i = ranked.findIndex((c) => c.id === user.id);
+  const top = ranked.slice(0, limit);
+  // Their Discord pictures (crux_users.avatar). Before that column exists, or if the read fails, initials show instead.
+  const pics = new Map();
+  if (top.length) {
+    const ids = top.map((c) => `"${String(c.id).replace(/"/g, '')}"`).join(',');
+    const users = await select('crux_users', `id=in.(${encodeURIComponent(ids)})&select=id,avatar`).catch(() => []);
+    for (const u of users || []) if (typeof u?.avatar === 'string' && u.avatar.startsWith('https://cdn.discordapp.com/')) pics.set(u.id, u.avatar);
+  }
   return {
-    top: ranked.slice(0, limit).map((c) => ({ name: c.name, files: c.files, you: c.id === user.id })),
+    // medal: reached the semester's goal (the same count that earns Premium)
+    top: top.map((c) => ({ name: c.name, files: c.files, you: c.id === user.id, medal: c.files >= REWARD.goal, avatar: pics.get(c.id) || null })),
     you: i < 0 ? null : { rank: i + 1, files: ranked[i].files },
     since: REWARD.start,
+    goal: REWARD.goal,
   };
 }
 

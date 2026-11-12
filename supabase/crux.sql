@@ -8,6 +8,8 @@ create table if not exists crux_users (
   created_at      timestamptz not null default now(),
   last_seen       timestamptz
 );
+-- The Discord picture, for the top-contributors row (added 2026-11-12).
+alter table crux_users add column if not exists avatar text;
 create table if not exists crux_docs (
   user_id    text primary key references crux_users (id) on delete cascade,
   doc        jsonb not null,

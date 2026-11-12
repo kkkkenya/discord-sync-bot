@@ -21,14 +21,14 @@ const paymentForm = {
     components: [
       { type: 1, components: [{ type: 4, custom_id: 'code', label: 'M-Pesa code (start of the SMS)', style: 1, min_length: 8, max_length: 12, placeholder: 'e.g. TJK4ABC12D', required: true }] },
       { type: 1, components: [{ type: 4, custom_id: 'sender', label: 'Name the money was sent from', style: 1, max_length: 60, placeholder: 'As it appears on M-Pesa', required: true }] },
-      { type: 1, components: [{ type: 4, custom_id: 'plan', label: `Plan: Basic ${PRICES.basic}, Upgrade ${PRICES.upgrade} or Premium ${PRICES.premium}`, style: 1, value: 'Basic', max_length: 10, required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: 'plan', label: `Plan: Gacrux ${PRICES.basic}, Upgrade ${PRICES.upgrade} or Mimosa ${PRICES.premium}`, style: 1, value: 'Gacrux', max_length: 10, required: true }] },
     ],
   },
 };
 
 const premiumGuide = [
   '',
-  '**How to find things in Premium:**',
+  '**How to find things in Mimosa:**',
   '• **Unit forums:** open the forum for your course and year (e.g. `mech-year-3`, `civil-year-2`, `ecu-year-1`). Each unit has its own post with its notes, past papers and slides. Search the unit code (e.g. EMM 305) to jump to it.',
   '• **Common units:** first-year ECU and university-wide UCU units are in `ecu-year-1`, `ecu-year-2`, `ecu-upper-years` and `ucu-university-common`.',
   '• **Book shelves:** textbooks are grouped by topic (Thermodynamics, Fluid Mechanics, Engineering Mathematics and more). Browse a shelf when you want a book, not a single unit.',
@@ -39,8 +39,8 @@ const premiumGuide = [
 
 const receipt = (plan) => [
   `✅ **Payment confirmed: ${planName(plan)}** (KES ${PRICES[plan]})`,
-  plan === 'premium' ? 'You now have Premium and all the unit libraries for this semester (120 days).'
-    : plan === 'upgrade' ? 'You now have Premium until your Basic semester ends.'
+  plan === 'premium' ? 'You now have Mimosa and all the unit libraries for this semester (120 days).'
+    : plan === 'upgrade' ? 'You now have Mimosa until your Gacrux semester ends.'
       : 'You now have full access to the unit libraries for this semester.',
   ...(plan !== 'basic' ? premiumGuide : []),
   'Thanks for supporting Engineering Study Hub. Good luck with your CATs!',
@@ -141,7 +141,7 @@ export async function POST(request) {
       if (!/^[A-Z0-9]{8,12}$/.test(code)) {
         return ephemeral('That doesn\'t look like an M-Pesa code. It\'s the letters and numbers at the very start of the M-Pesa SMS, like `TJK4ABC12D`. Press **I\'ve paid** and try again.');
       }
-      const plan = /upg/i.test(v.plan) ? 'upgrade' : /prem/i.test(v.plan) ? 'premium' : 'basic';
+      const plan = /upg/i.test(v.plan) ? 'upgrade' : /prem|mimo/i.test(v.plan) ? 'premium' : 'basic';
       const hasBasic = (i.member?.roles || []).includes(ROLES.paid);
       // flag a code that was already claimed (same SMS used twice)
       const recent = await api('GET', `/channels/${CHANNELS.payments}/messages?limit=100`);
@@ -150,7 +150,7 @@ export async function POST(request) {
         content: [
           `💰 **Payment claim** from <@${user.id}> (${user.username})`,
           `Plan: **${planName(plan)}** (KES ${PRICES[plan]})`,
-          ...(plan === 'upgrade' ? [hasBasic ? 'Has Basic now: yes' : '⚠️ Has Basic now: **no**. The upgrade price is for Basic members; ask for the rest of the Premium price.'] : []),
+          ...(plan === 'upgrade' ? [hasBasic ? 'Has Gacrux now: yes' : '⚠️ Has Gacrux now: **no**. The upgrade price is for Gacrux members; ask for the rest of the Mimosa price.'] : []),
           `M-Pesa code: \`${code}\``,
           `Sent from: ${v.sender}`,
           reused ? `⚠️ This code was already claimed: ${reused.content.split('\n')[0]}` : `Check M-Pesa (${MPESA.number}) for this code and amount, then approve.`,

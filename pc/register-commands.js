@@ -30,7 +30,7 @@ const COMMANDS = [
     name: 'group', description: 'Study groups and build squads',
     options: [
       { type: SUB, name: 'create', description: 'Start a study group or a build squad', options: [
-        { type: STRING, name: 'type', description: 'Study group (free) or build squad (Premium)', required: true, choices: [{ name: 'study group', value: 'study' }, { name: 'build squad', value: 'squad' }] },
+        { type: STRING, name: 'type', description: 'Study group (free) or build squad (Mimosa)', required: true, choices: [{ name: 'study group', value: 'study' }, { name: 'build squad', value: 'squad' }] },
         { type: STRING, name: 'name', description: 'e.g. "Thermo CAT 2 revision"', required: true, max_length: 60 },
         { type: STRING, name: 'unit', description: 'Unit code, e.g. EMM 305', max_length: 9 },
         { type: INTEGER, name: 'size', description: 'Most members allowed (2 to 20, default 8)', min_value: 2, max_value: 20 },
@@ -148,7 +148,7 @@ const STUDY = {
     { type: SUB, name: 'predict', description: 'The topics most likely to come', options: [UNIT] },
     { type: SUB, name: 'weakspots', description: 'Your highest-risk sub-topics', options: [UNIT] },
     { type: SUB, name: 'connect', description: 'Connect this Discord account to your Study Desk', options: [{ type: STRING, name: 'code', description: 'The 6-digit code from Study Desk (Settings → Connect Discord)', required: true, min_length: 6, max_length: 6 }] },
-    { type: SUB, name: 'link', description: 'Premium: get a code to set up Study Desk on your laptop' },
+    { type: SUB, name: 'link', description: 'Mimosa: get a code to set up Study Desk on your laptop' },
   ],
 };
 const globals = await api('GET', `/applications/${APP_ID}/commands`);

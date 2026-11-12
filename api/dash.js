@@ -112,7 +112,7 @@ async function stats() {
 
   const payments = payMsgs.filter((m) => m.content.startsWith('💰')).map((m) => {
     const ok = m.content.match(/✅ \*\*Approved (basic|premium|upgrade)\*\* by <@\d+> on (\d{4}-\d{2}-\d{2})/);
-    const plan = ok ? ok[1] : /Plan: \*\*Upgrade/.test(m.content) ? 'upgrade' : /Plan: \*\*Premium/.test(m.content) ? 'premium' : 'basic';
+    const plan = ok ? ok[1] : /Plan: \*\*Upgrade/.test(m.content) ? 'upgrade' : /Plan: \*\*(Premium|Mimosa)/.test(m.content) ? 'premium' : 'basic';
     return {
       who: (m.content.match(/from <@\d+> \(([^)]+)\)/) || [])[1] || '?',
       plan,

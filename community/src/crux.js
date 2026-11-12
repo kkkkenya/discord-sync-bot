@@ -20,7 +20,7 @@ export const TIPS = [
   { title: 'Your Hub notes, no download', body: 'Every file posted on the Hub opens inside Crux, at the right page, without using a download. Find in the file, highlight a line, pin it to your notes bar.', ask: 'Do you revise from your phone or a laptop?' },
   { title: 'A formula sheet for your unit', body: 'Crux\'s Sheet tab makes a one-page formula sheet from your unit\'s notes and questions, with the formulas tied to specific questions marked, and the traps you keep falling into.', ask: 'Which formula do you always forget in the exam?' },
   { title: 'Ask why', body: 'Under any worked solution in Crux there\'s "Ask about this question". Why this formula and not another? Where did that 4 come from? It answers about that question, not in general.', ask: 'What\'s a "why" you never got an answer to in a lecture?' },
-  { title: 'Earn Premium by sharing', body: 'Add 10 files to the Hub from Crux in a semester (past papers, CATs, notes you have) and you get Premium free for the rest of the semester. Everyone in your unit gets the files too.', ask: 'Which unit is missing papers on the Hub?' },
+  { title: 'Earn Mimosa by sharing', body: 'Add 10 files to the Hub from Crux in a semester (past papers, CATs, notes you have) and you get Mimosa free for the rest of the semester, with a contributor medal. Everyone in your unit gets the files too.', ask: 'Which unit is missing papers on the Hub?' },
 ];
 
 const DAY_MS = 864e5;

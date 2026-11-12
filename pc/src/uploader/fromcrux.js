@@ -80,7 +80,7 @@ export async function markPosted(path, outcome, log = console.log, { update = db
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
   if (count === REWARD.goal && earned(count, today)) {
     const until = new Date(`${REWARD.end}T12:00:00+03:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'Africa/Nairobi' });
-    await tell(batch.user_id, `🎉 **${REWARD.goal} files added to the hub!** Thank you, ${batch.user_name || 'you'}. You now have **Premium in Crux until ${until}**: 40 AI actions a day and unlimited downloads. It's already on: open Crux.`);
-    log(`🏆 **${batch.user_name}** has added ${REWARD.goal} files from Crux this semester and earned Premium in Crux until ${until}.`);
+    await tell(batch.user_id, `🎉 **${REWARD.goal} files added to the hub!** Thank you, ${batch.user_name || 'you'}. You now have **Mimosa in Crux until ${until}** and a contributor medal: 40 AI actions a day and unlimited downloads. It's already on: open Crux.`);
+    log(`🏆 **${batch.user_name}** has added ${REWARD.goal} files from Crux this semester and earned Mimosa in Crux until ${until}.`);
   }
 }

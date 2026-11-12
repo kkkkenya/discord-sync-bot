@@ -42,5 +42,7 @@ test('prices: old Premium payments stay KES 800, new ones are KES 500, the upgra
   assert.equal(priceOf('premium', d('2026-11-06'), S), 500);
   assert.equal(priceOf('upgrade', d('2026-11-06'), S), 350);
   assert.equal(priceOf('basic', d('2026-11-06'), S), 50);
-  assert.equal(planName('upgrade'), 'Upgrade to Premium');
+  assert.equal(planName('upgrade'), 'Upgrade to Mimosa');
+  assert.equal(planName('premium'), 'Mimosa');
+  assert.equal(planName('basic'), 'Gacrux');
 });

@@ -13,7 +13,7 @@ export const STAGES = 3;
 const GAP_MS = 3000; // one DM every 3 s, well inside Discord's limits
 const DIR = new URL('./', import.meta.url);
 const DATA = new URL('../data/', import.meta.url);
-const PLAN_ROLE_IDS = [ROLES.trial, ROLES.paid, ROLES.premium];
+const PLAN_ROLE_IDS = [ROLES.trial, ROLES.paid, ROLES.premium, ROLES.vvip];
 
 export const validName = (name) => typeof name === 'string' && /^[\w-]{1,60}$/.test(name);
 const bad = (m) => Object.assign(new Error(m), { status: 400 });

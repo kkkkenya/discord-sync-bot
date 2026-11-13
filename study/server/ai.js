@@ -15,7 +15,7 @@ import { addDeepseekSpend, deepseekOpen } from './usage.js';
 export const PROVIDERS = ['gemini', 'deepseek'];
 // DeepSeek is Premium's (and the owner's), and only while the month's budget lasts; everyone else uses Gemini.
 // Locally (no request) the setting is used as it is.
-const deepseekFor = () => { const u = requestScope()?.user; return (!u || ['premium', 'owner'].includes(u.tier)) && deepseekOpen(); };
+const deepseekFor = () => { const u = requestScope()?.user; return (!u || ['premium', 'vvip', 'owner'].includes(u.tier)) && deepseekOpen(); };
 export const localClaude = () => !process.env.VERCEL && process.env.CRUX_AI === 'claude-code';
 export const provider = () => {
   if (localClaude()) return 'claude-code';

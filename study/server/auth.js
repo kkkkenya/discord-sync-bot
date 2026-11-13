@@ -14,6 +14,7 @@ export function tierFor(member, userId, ownerId = process.env.OWNER_ID) {
   if (ownerId && userId === ownerId) return 'owner';
   if (!member) return 'none';
   const roles = new Set(member.roles || []);
+  if (roles.has(ROLES.vvip)) return 'vvip';
   if (roles.has(ROLES.premium)) return 'premium';
   if (roles.has(ROLES.paid)) return 'basic';
   if (roles.has(ROLES.trial)) return 'trial';
@@ -36,9 +37,12 @@ export async function memberOf(userId, botToken = process.env.DISCORD_TOKEN) {
 
 // Upserts the student's row: crux_docs needs it, and it records the tier and the last visit.
 export const rememberUser = async (db, user) => {
-  const row = await db.upsert('crux_users', [{
-    id: user.id, name: user.name, tier: user.tier, tier_checked_at: new Date().toISOString(), last_seen: new Date().toISOString(),
+  const save = (tier) => db.upsert('crux_users', [{
+    id: user.id, name: user.name, tier, tier_checked_at: new Date().toISOString(), last_seen: new Date().toISOString(),
   }], 'id');
+  // A database whose tier check predates Acrux (supabase/crux.sql) refuses 'vvip': keep the row as Mimosa then.
+  // The row's tier is only a record; the session carries the real one.
+  const row = await save(user.tier).catch((e) => (user.tier === 'vvip' ? save('premium') : Promise.reject(e)));
   // The picture for the top-contributors row. Its own write: before crux_users.avatar exists this fails quietly.
   if (user.avatar && db.update) await db.update('crux_users', `id=eq.${encodeURIComponent(user.id)}`, { avatar: user.avatar }).catch(() => {});
   return row;

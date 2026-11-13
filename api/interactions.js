@@ -6,7 +6,7 @@ import { CHANNELS, GUILD_ID, MPESA, PRICES, ROLES, WHATSAPP } from '../lib/confi
 import { canSort, forwardTo, partsOf, postsFor } from '../lib/sorting.js';
 import { handleCommand, handleComponent } from '../lib/commands.js';
 import { handleLogAutocomplete } from '../lib/logbook.js';
-import { planName } from '../lib/plans.js';
+import { planFromForm, planName, rolesFor } from '../lib/plans.js';
 
 const ADMINISTRATOR = 1n << 3n;
 const MANAGE_ROLES = 1n << 28n;
@@ -21,7 +21,7 @@ const paymentForm = {
     components: [
       { type: 1, components: [{ type: 4, custom_id: 'code', label: 'M-Pesa code (start of the SMS)', style: 1, min_length: 8, max_length: 12, placeholder: 'e.g. TJK4ABC12D', required: true }] },
       { type: 1, components: [{ type: 4, custom_id: 'sender', label: 'Name the money was sent from', style: 1, max_length: 60, placeholder: 'As it appears on M-Pesa', required: true }] },
-      { type: 1, components: [{ type: 4, custom_id: 'plan', label: `Plan: Gacrux ${PRICES.basic}, Upgrade ${PRICES.upgrade} or Mimosa ${PRICES.premium}`, style: 1, value: 'Gacrux', max_length: 10, required: true }] },
+      { type: 1, components: [{ type: 4, custom_id: 'plan', label: 'Plan: Gacrux, Mimosa, Acrux or Upgrade', style: 1, value: 'Gacrux', max_length: 20, required: true }] },
     ],
   },
 };
@@ -39,9 +39,12 @@ const premiumGuide = [
 
 const receipt = (plan) => [
   `✅ **Payment confirmed: ${planName(plan)}** (KES ${PRICES[plan]})`,
-  plan === 'premium' ? 'You now have Mimosa and all the unit libraries for this semester (120 days).'
-    : plan === 'upgrade' ? 'You now have Mimosa until your Gacrux semester ends.'
-      : 'You now have full access to the unit libraries for this semester.',
+  plan === 'vvip' ? 'You now have Acrux, with everything in Mimosa and all the unit libraries, for this semester (120 days).'
+    : plan === 'vvipup' ? 'You now have Acrux until your Mimosa semester ends (a full semester if your Mimosa is for life).'
+      : plan === 'premium' ? 'You now have Mimosa and all the unit libraries for this semester (120 days).'
+        : plan === 'upgrade' ? 'You now have Mimosa until your Gacrux semester ends.'
+          : 'You now have full access to the unit libraries for this semester.',
+  ...(plan === 'vvip' || plan === 'vvipup' ? ['In Crux: 80 AI actions a day, and every model in the desktop app at any effort.'] : []),
   ...(plan !== 'basic' ? premiumGuide : []),
   'Thanks for supporting Engineering Study Hub. Good luck with your CATs!',
 ].join('\n');
@@ -115,8 +118,7 @@ export async function POST(request) {
       const original = i.message.content;
 
       if (action === 'approve') {
-        const roles = plan === 'basic' ? [ROLES.paid] : [ROLES.premium, ROLES.paid];
-        for (const r of roles) await api('PUT', `/guilds/${GUILD_ID}/members/${uid}/roles/${r}`);
+        for (const r of rolesFor(plan, ROLES)) await api('PUT', `/guilds/${GUILD_ID}/members/${uid}/roles/${r}`);
         await api('DELETE', `/guilds/${GUILD_ID}/members/${uid}/roles/${ROLES.trial}`).catch(() => {});
         const sent = await dm(uid, receipt(plan));
         return json({ type: 7, data: {
@@ -141,8 +143,10 @@ export async function POST(request) {
       if (!/^[A-Z0-9]{8,12}$/.test(code)) {
         return ephemeral('That doesn\'t look like an M-Pesa code. It\'s the letters and numbers at the very start of the M-Pesa SMS, like `TJK4ABC12D`. Press **I\'ve paid** and try again.');
       }
-      const plan = /upg/i.test(v.plan) ? 'upgrade' : /prem|mimo/i.test(v.plan) ? 'premium' : 'basic';
-      const hasBasic = (i.member?.roles || []).includes(ROLES.paid);
+      const held = i.member?.roles || [];
+      const plan = planFromForm(v.plan, held, { premiumRole: ROLES.premium, vvipRole: ROLES.vvip });
+      const hasBasic = held.includes(ROLES.paid);
+      const hasPremium = held.includes(ROLES.premium);
       // flag a code that was already claimed (same SMS used twice)
       const recent = await api('GET', `/channels/${CHANNELS.payments}/messages?limit=100`);
       const reused = recent.find((m) => m.content.includes(`\`${code}\``));
@@ -151,6 +155,9 @@ export async function POST(request) {
           `💰 **Payment claim** from <@${user.id}> (${user.username})`,
           `Plan: **${planName(plan)}** (KES ${PRICES[plan]})`,
           ...(plan === 'upgrade' ? [hasBasic ? 'Has Gacrux now: yes' : '⚠️ Has Gacrux now: **no**. The upgrade price is for Gacrux members; ask for the rest of the Mimosa price.'] : []),
+          ...(plan === 'vvipup' ? [hasPremium ? 'Has Mimosa now: yes' : '⚠️ Has Mimosa now: **no**. The Acrux upgrade price is for Mimosa members; ask for the rest of the Acrux price.'] : []),
+          ...(plan === 'vvip' && hasPremium ? ['Has Mimosa now: yes'] : []),
+          ...((plan === 'vvip' || plan === 'vvipup') && held.includes(ROLES.vvip) ? ['Has Acrux now: yes, so this renews it. Check the amount (KES 999 for a new semester).'] : []),
           `M-Pesa code: \`${code}\``,
           `Sent from: ${v.sender}`,
           reused ? `⚠️ This code was already claimed: ${reused.content.split('\n')[0]}` : `Check M-Pesa (${MPESA.number}) for this code and amount, then approve.`,

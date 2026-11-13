@@ -5,11 +5,12 @@ Crux now has a desktop app. It teaches a unit one step at a time from your notes
 Download: https://www.engineeringhub.site/crux/#download
 Sign in with this Discord account.
 
-**New plan names, same prices**
+**New plan names, and a new top plan**
 Plans are now named after stars of the Southern Cross. The brighter the star, the more you get.
 • **Imai**: the 7-day free trial
 • **Gacrux**, KES 50 a semester: every unit library, and Crux with 15 AI actions a day
 • **Mimosa**, KES 500 a semester: Crux with 40 AI actions a day and unlimited downloads, build guides and the career channels. From Gacrux, the upgrade is KES 350.
+• **Acrux**, KES 999 a semester: everything in Mimosa, and Crux with 80 AI actions a day and every model in the desktop app. From Mimosa, the upgrade is KES 499 for the rest of your Mimosa semester.
 Pay by M-Pesa to 0745947704 (Peter Mwangi), then press **I've paid** in #plans.
 
 **Share a file, earn Mimosa**

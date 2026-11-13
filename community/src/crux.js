@@ -10,7 +10,7 @@ export const CRUX_FACTS = `About Crux, the Hub's study app (${CRUX_URL}, sign in
 - Paste the class message with the CAT date and Today builds a plan up to it.
 - It has already read the Hub's files. They open in Crux's own PDF viewer with no download, and you can search them and pin lines to your notes.
 - A formula sheet per unit, built from its notes and questions. There is also a focus timer and a study room.
-- Comes with Basic (KES 50 a semester: 15 AI actions and 2 downloads a day) and Premium (KES 500 a semester, or KES 350 to upgrade from Basic). Add 10 files from Crux in a semester and you get Premium for the rest of it.
+- Comes with the plans, named after stars of the Southern Cross: Gacrux (KES 50 a semester: 15 AI actions and 2 downloads a day), Mimosa (KES 500 a semester, or KES 350 to upgrade from Gacrux: 40 AI actions a day, unlimited downloads) and Acrux (KES 999 a semester, or KES 499 to upgrade from Mimosa: 80 AI actions a day and every model in the desktop app). Add 10 files from Crux in a semester and you get Mimosa for the rest of it.
 When someone asks about revising, past papers, CAT topics, a worked solution, formula sheets or where notes are, answer them properly first, then you may add ONE short line pointing to the part of Crux that fits, with the link. At most once in a conversation (check your earlier messages), never as the whole answer, never in jokes, banter or off-topic chat, and never invent features.`;
 
 export const TIPS = [

@@ -25,7 +25,7 @@ const { pendingPayments, tail, isLocalHost } = await import('./util.js');
 const PORT = Number(process.env.DASH_PORT) || 4180;
 const KEY = randomBytes(24).toString('base64url');
 const PAGE = fs.readFileSync(new URL('./page.html', import.meta.url), 'utf8');
-const PLAN_ROLES = { [ROLES.trial]: 'trial', [ROLES.paid]: 'basic', [ROLES.premium]: 'premium' };
+const PLAN_ROLES = { [ROLES.trial]: 'trial', [ROLES.paid]: 'basic', [ROLES.premium]: 'premium', [ROLES.vvip]: 'vvip' };
 const bad = (m, status = 400) => Object.assign(new Error(m), { status });
 
 let job = null; // the announcement being sent: { name, done, total, sent, closed, finished, error }

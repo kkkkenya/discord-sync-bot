@@ -3,11 +3,14 @@
 create table if not exists crux_users (
   id              text primary key,                 -- Discord user id
   name            text not null default '',
-  tier            text not null default 'none' check (tier in ('none', 'trial', 'basic', 'premium', 'owner')),
+  tier            text not null default 'none' check (tier in ('none', 'trial', 'basic', 'premium', 'vvip', 'owner')),
   tier_checked_at timestamptz,
   created_at      timestamptz not null default now(),
   last_seen       timestamptz
 );
+-- Acrux (vvip) joined the tiers on 2026-11-13; this widens the check on tables made before that.
+alter table crux_users drop constraint if exists crux_users_tier_check;
+alter table crux_users add constraint crux_users_tier_check check (tier in ('none', 'trial', 'basic', 'premium', 'vvip', 'owner'));
 -- The Discord picture, for the top-contributors row (added 2026-11-12).
 alter table crux_users add column if not exists avatar text;
 create table if not exists crux_docs (

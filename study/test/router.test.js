@@ -72,6 +72,7 @@ test('bad JSON is a 400', async () => {
 
 test('tier from server roles: premium beats basic beats trial; the owner is owner; no roles or no member is none', () => {
   assert.equal(tierFor({ roles: [ROLES.trial, ROLES.premium] }, '1', 'x'), 'premium');
+  assert.equal(tierFor({ roles: [ROLES.paid, ROLES.premium, ROLES.vvip] }, '1', 'x'), 'vvip');
   assert.equal(tierFor({ roles: [ROLES.paid] }, '1', 'x'), 'basic');
   assert.equal(tierFor({ roles: [ROLES.trial] }, '1', 'x'), 'trial');
   assert.equal(tierFor({ roles: [] }, '1', 'x'), 'none');
@@ -125,4 +126,13 @@ test('an AI request that loses a save race is redone on the newer document witho
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal(calls, 1);
   } finally { globalThis.fetch = realFetch; delete process.env.GEMINI_API_KEY; }
+});
+
+test('an Acrux sign-in still saves its row on a database that predates the Acrux tier', async () => {
+  const { rememberUser } = await import('../server/auth.js');
+  const saved = [];
+  const db = { upsert: async (t, rows) => { if (rows[0].tier === 'vvip') throw new Error('23514 tier check'); saved.push(rows[0].tier); return rows; } };
+  await rememberUser(db, { id: '9', name: 'a', tier: 'vvip' });
+  assert.deepEqual(saved, ['premium']);
+  await assert.rejects(rememberUser({ upsert: async () => { throw new Error('down'); } }, { id: '9', name: 'a', tier: 'basic' }));
 });

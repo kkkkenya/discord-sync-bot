@@ -21,5 +21,5 @@ export async function withReward(user, today, deps) {
 
 export const rewardInfo = async (user, today) => {
   const count = process.env.SUPABASE_URL ? await credits(user.id) : 0;
-  return { count, goal: REWARD.goal, until: REWARD.end, premium: earned(count, today) || ['premium', 'owner'].includes(user.tier), earned: earned(count, today) };
+  return { count, goal: REWARD.goal, until: REWARD.end, premium: earned(count, today) || ['premium', 'vvip', 'owner'].includes(user.tier), earned: earned(count, today) };
 };

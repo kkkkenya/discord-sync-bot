@@ -39,8 +39,8 @@ export const TBA = 'TBA';
 
 // What each membership tier gets a day (Nairobi days). Owner: no limits.
 export const LIMITS = {
-  ai: { trial: 15, basic: 15, premium: 40, owner: Infinity },
-  download: { trial: 2, basic: 2, premium: Infinity, owner: Infinity },
+  ai: { trial: 15, basic: 15, premium: 40, vvip: 80, owner: Infinity },
+  download: { trial: 2, basic: 2, premium: Infinity, vvip: Infinity, owner: Infinity },
 };
 // DeepSeek (Premium's deeper text tasks). Priced at the peak rate so the estimate errs high: deepseek-flash,
 // USD per million tokens, from api-docs.deepseek.com on 2026-11-01. Above the monthly cap Crux uses Gemini instead.

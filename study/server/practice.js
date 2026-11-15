@@ -82,7 +82,7 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
   let gold = null;
   if (!typed && (!key || ['ai', 'strong', 'agreed'].includes(key.source)) && shareable(row)) {
     gold = await shared.get(unit.code, question).catch(() => null);
-    key = classKey(gold, subs, fallbackSub) || (key?.fromClass ? null : key);
+    key = classKey(gold, subs, fallbackSub) || key; // nothing shared: keep what this student has (a gold --local key too)
   }
   if (typed && typed !== key?.answer) key = { answer: typed, source: 'you', checkpoints: [] };
   let solved = null;
@@ -261,6 +261,7 @@ export async function explainCode(row, { program = explainProgram, files = libra
   const base = { unit: row.unit, topic: topic?.name || '', question: row.text, taught: [...taught].sort(), notes: notes(row.unit, topic?.name || row.text.slice(0, 120), 6000) || '' };
   const read = (out) => { const c = stripComments(out.code, out.language); return { out, clean: c, extra: untaught(c.code, taught) }; };
   let best = read(await program(base));
+  if (!taught.size) best.extra = []; // notes with no text teach nothing to check against
   if (best.extra.length) {
     const again = read(await program({ ...base, avoid: best.extra }));
     if (again.extra.length <= best.extra.length) best = again;

@@ -43,6 +43,15 @@ export function samePaper(a, b) {
   return x.type === y.type && x.year === y.year && sheetNo(a) === sheetNo(b);
 }
 
+// Course notes headed "Exercise 2.1", "Assignment 6.11" give one question per task; a past paper that only mentions
+// "Lab 2" in passing keeps its own questions. Tasks win only with distinct labels and more of them than questions.
+export function papersOrExercises(text) {
+  const questions = parseQuestions(text);
+  const tasks = exerciseBlocks(text);
+  const distinct = new Set(tasks.map((t) => t.label)).size === tasks.length;
+  return tasks.length && distinct && tasks.length > questions.length ? tasks : questions;
+}
+
 export function parsePapers(unit) {
   const topics = data.topics.filter((t) => t.unit === unit);
   const subs = data.subtopics.filter((s) => s.unit === unit);
@@ -51,7 +60,7 @@ export function parsePapers(unit) {
   const papers = all.filter(([, e]) => e.paper && !isScheme(e.name)).map(([, e]) => e.name);
   const files = all.filter(([, e]) => !(e.paper && isScheme(e.name) && papers.some((n) => samePaper(n, e.name))));
   const ids = new Set(all.map(([id]) => id));
-  const read = (e) => (e.paper ? (exerciseBlocks(e.text).length ? exerciseBlocks(e.text) : parseQuestions(e.text)) : bookQuestions(e.text).map((b, i) => ({ number: i + 1, label: b.label, marks: null, text: b.text, offset: b.offset, ...(b.solution && { bookSolution: b.solution }) })))
+  const read = (e) => (e.paper ? papersOrExercises(e.text) : bookQuestions(e.text).map((b, i) => ({ number: i + 1, label: b.label, marks: null, text: b.text, offset: b.offset, ...(b.solution && { bookSolution: b.solution }) })))
     .map(({ offset, ...q }) => ({ ...q, page: pageAt(e, offset) }));
   const old = new Map(data.paperq.filter((q) => ids.has(q.fileId)).map((q) => [`${q.fileId}#${q.number}`, q]));
   data.paperq = data.paperq.filter((q) => !ids.has(q.fileId));

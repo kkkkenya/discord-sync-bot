@@ -96,3 +96,12 @@ test('a flag on a shared solution counts once per student', async () => {
   await disputeSolution({ id: two.attempt.id, step: 2 }, { flag });
   assert.equal(flags.length, 1);
 });
+
+test('a checked key kept on this laptop (gold --local) survives when nothing is shared', async () => {
+  resetSharedForTests();
+  const row = data.paperq.find((q) => q.id === 'g1');
+  row.key = { answer: '1.59 kNm', source: 'agreed', level: 'agreed', local: true, checkpoints: [] };
+  const r = await checkAnswer({ unit: 'EMM 302', questionId: 'g1', answer: '1.59 kNm' }, noAi);
+  assert.equal(r.verdict, 'right');
+  assert.equal(r.key.label, 'two solvers agree');
+});

@@ -55,7 +55,8 @@ const settled = (row) => row && !(row.flagged >= GOLD.flagsToReplace) && (rank(r
 
 const stored = new Map();
 // local: what this laptop already has on the question itself
-const localRow = (q) => (q.explain?.gold ? { level: q.explain.level, model: q.explain.model, solution: q.explain, flagged: 0 } : null);
+const localRow = (q) => (q.explain?.gold ? { level: q.explain.level, model: q.explain.model, solution: q.explain, flagged: 0 }
+  : q.key?.local ? { level: q.key.level, model: GOLD.solver, solution: null, flagged: 0 } : null); // --no-full runs keep only the key
 for (const q of all) stored.set(q.id, opt.local ? localRow(q) : await sharedSolution(unit, q.text));
 const OLD = 'The shared table is missing E1 columns. Run the E1 SQL at the end of supabase/crux.sql in Supabase (SQL Editor; safe to run again), then run this again.';
 if (usesOldTable() && opt.save && !opt.dry) stop(OLD);
@@ -86,7 +87,7 @@ function keepLocal(q, { level, model, answer, solution, checkpoints, printed }) 
   const subs = data.subtopics.filter((x) => x.unit === unit);
   const cps = tidy(checkpoints, subs, row.subtopicIds?.[0]);
   if (solution) row.explain = { ...solution, level, model, gold: true };
-  row.key = printed ? { ...row.key, checkpoints: cps } : { answer, source: SOURCE_OF_LEVEL[level] || 'strong', level, fromClass: true, checkpoints: cps };
+  row.key = printed ? { ...row.key, checkpoints: cps, level, local: true } : { answer, source: SOURCE_OF_LEVEL[level] || 'strong', level, local: true, checkpoints: cps };
   save();
   return true;
 }

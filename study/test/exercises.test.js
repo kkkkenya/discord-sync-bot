@@ -17,3 +17,14 @@ test('each Exercise or Assignment heading starts a question, labelled without st
 test('notes with fewer than three headings are left to the usual parser', () => {
   assert.deepEqual(exerciseBlocks('Exercise 1.1: do this. Exercise 1.2: and this.'), []);
 });
+
+test('a past paper that mentions Lab 2, Lab 3 and Lab 4 keeps its own questions', async () => {
+  const { papersOrExercises } = await import('../server/weakspots.js');
+  const paper = 'QUESTION ONE (20 marks) a) Using the results of Lab 2, find the yield stress of the specimen tested. b) Compare it with Lab 3. '
+    + 'QUESTION TWO (20 marks) The pump tested in Lab 4 delivers 5 L/s at 20 m head. Find the power. '
+    + 'QUESTION THREE (20 marks) A shaft transmits 50 kW at 300 rpm. Find the torque. '
+    + 'QUESTION FOUR (20 marks) A beam of span 6 m carries 12 kN at midspan. Find the maximum moment.';
+  const q = papersOrExercises(paper);
+  assert.ok(q.every((x) => !/^Lab /.test(x.label || '')), JSON.stringify(q.map((x) => x.label)));
+  assert.ok(q.length >= 4);
+});

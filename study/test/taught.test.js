@@ -43,3 +43,15 @@ test('comments come out of C-style code', () => {
   assert.equal(out.code, 'int x = 5;\nConsole.WriteLine("a // b");');
   assert.deepEqual(out.comments, ['five', 'block\nnote']);
 });
+
+test('words inside strings are not calls; no notes means nothing is flagged', () => {
+  const taught = taughtNames([NOTES]);
+  assert.deepEqual(untaught('mass = float(input("Enter the mass (kg): "))\nprint("Force (N) =", mass * 9.81)', new Set([...taught, 'float', 'input'])), []);
+  assert.deepEqual(untaught('print(x)', new Set()), []);
+});
+
+test('C keeps #include; JavaScript template strings are strings', () => {
+  assert.match(stripComments('#include <stdio.h>\nint main() { return 0; } // done', 'c').code, /^#include <stdio\.h>/);
+  assert.match(stripComments('#define N 5\nint x = N;', 'arduino').code, /^#define N 5/);
+  assert.equal(stripComments('const u = `http://x.com`; // link', 'javascript').code, 'const u = `http://x.com`;');
+});

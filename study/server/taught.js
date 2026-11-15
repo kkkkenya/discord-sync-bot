@@ -50,7 +50,12 @@ export function taughtNames(texts) {
 }
 
 // Calls and imports in the answer that the notes never use, minus what the answer defines. Sorted.
+// String contents emptied: "Enter the mass (kg): " is text, not a call to mass().
+export const blankStrings = (code) => String(code || '').replace(/("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)/g, (s) => s.slice(0, s.startsWith('"""') || s.startsWith("'''") ? 3 : 1).repeat(2));
+
 export function untaught(code, taught) {
+  if (!taught.size) return [];
+  code = blankStrings(code);
   const own = definedIn(code);
   const used = new Set([...callsIn(code), ...importsIn(code)]);
   return [...used].filter((n) => !taught.has(n) && !own.has(n)).sort();
@@ -60,7 +65,8 @@ export function untaught(code, taught) {
 // A comment on its own line goes with its line; a trailing one is cut from the end of the line.
 export function stripComments(code, language = 'python') {
   const src = String(code || '');
-  const hash = !/^(c|c#|csharp|c\+\+|cpp|java|javascript|js)$/i.test(language);
+  // # comments only in languages that use them (Python is the default); in C, #include and #define are code
+  const hash = /^(|python\d?|py|r|sh|bash|shell|ruby|perl)$/i.test(String(language || '').trim());
   const comments = [];
   let out = '';
   let i = 0;
@@ -93,7 +99,7 @@ export function stripComments(code, language = 'python') {
       }
       quote = triple[1]; out += quote; i += 3; continue;
     }
-    if (src[i] === '"' || src[i] === "'") { quote = src[i]; out += src[i++]; continue; }
+    if (src[i] === '"' || src[i] === "'" || (!hash && src[i] === '`')) { quote = src[i]; out += src[i++]; continue; }
     if ((hash && src[i] === '#') || (!hash && rest.startsWith('//'))) {
       const end = src.indexOf('\n', i);
       const text = src.slice(i + (hash ? 1 : 2), end < 0 ? undefined : end).trim();

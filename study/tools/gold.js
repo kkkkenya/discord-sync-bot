@@ -19,24 +19,26 @@ const unit = argv.find((a) => !a.startsWith('--'));
 const flag = (name) => argv.includes(`--${name}`);
 const limitAt = argv.indexOf('--limit');
 const limit = limitAt >= 0 ? Number(argv[limitAt + 1]) : Infinity;
-const opt = { dry: flag('dry'), onlyKeyed: flag('only-keyed'), books: flag('books'), full: !flag('no-full'), save: !flag('no-save'), redo: flag('redo') };
+const opt = { dry: flag('dry'), onlyKeyed: flag('only-keyed'), books: flag('books'), full: !flag('no-full'), save: !flag('no-save'), redo: flag('redo'), local: flag('local') };
+// --local: this laptop's own questions and study.json (files added from here, like tutorial sheets), not the class's
+// shared library. For the owner's own study; nothing is shared. Stop the dev server first: it rewrites study.json.
 
 const stop = (msg) => { console.log(msg); process.exit(1); };
-if (!unit) stop('Usage: node tools/gold.js "EMM 302" [--dry] [--limit N] [--only-keyed] [--books] [--no-full] [--no-save] [--redo]');
+if (!unit) stop('Usage: node tools/gold.js "EMM 302" [--dry] [--limit N] [--only-keyed] [--books] [--no-full] [--no-save] [--redo] [--local]');
 if (process.env.VERCEL) stop('This runs on the owner\'s laptop only.');
 if (!Number.isFinite(limit) && limitAt >= 0) stop('--limit needs a number, for example --limit 10.');
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) stop('SUPABASE_URL and SUPABASE_SERVICE_KEY are missing from study/.env (run setup-web.bat). The shared library lives there.');
+if (!opt.local && (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY)) stop('SUPABASE_URL and SUPABASE_SERVICE_KEY are missing from study/.env (run setup-web.bat). The shared library lives there.');
 if (!opt.dry && !process.env.DEEPSEEK_API_KEY) stop('DEEPSEEK_API_KEY is missing from study/.env (run setup-web.bat). It is the second solver.');
-process.env.CRUX_REMOTE_LIBRARY = '1'; // the class's file text and shared solutions, not this laptop's copies
+if (!opt.local) process.env.CRUX_REMOTE_LIBRARY = '1'; // the class's file text and shared solutions, not this laptop's copies
 
 const { withModel } = await import('../server/ai.js');
 const { explainSolution, solveWithCheckpoints } = await import('../server/brain.js');
 const { GOLD } = await import('../server/defs.js');
 const { rank, report, sameAnswer, settle, strong } = await import('../server/gold.js');
 const { ensureLibrary } = await import('../server/ingest.js');
-const { schemeFor, shapeSolution } = await import('../server/practice.js');
+const { schemeFor, shapeSolution, tidy } = await import('../server/practice.js');
 const { questionKey, shareSolution, sharedSolution, usesOldTable } = await import('../server/shared.js');
-const { data } = await import('../server/store.js');
+const { data, save } = await import('../server/store.js');
 const { isBook, parsePapers } = await import('../server/weakspots.js');
 const { nairobiDay } = await import('../server/plan.js');
 const { db, enc } = await import('../../lib/db.js');
@@ -52,7 +54,9 @@ const all = data.paperq.filter((q) => q.unit === unit && (opt.books || !isBook(q
 const settled = (row) => row && !(row.flagged >= GOLD.flagsToReplace) && (rank(row.level) > 0 || strong(row.model)) && (!opt.full || row.solution);
 
 const stored = new Map();
-for (const q of all) stored.set(q.id, await sharedSolution(unit, q.text));
+// local: what this laptop already has on the question itself
+const localRow = (q) => (q.explain?.gold ? { level: q.explain.level, model: q.explain.model, solution: q.explain, flagged: 0 } : null);
+for (const q of all) stored.set(q.id, opt.local ? localRow(q) : await sharedSolution(unit, q.text));
 const OLD = 'The shared table is missing E1 columns. Run the E1 SQL at the end of supabase/crux.sql in Supabase (SQL Editor; safe to run again), then run this again.';
 if (usesOldTable() && opt.save && !opt.dry) stop(OLD);
 if (usesOldTable()) console.log(`${OLD} Counting and scoring still work.`);
@@ -63,6 +67,7 @@ const todo = all.filter((q) => (opt.redo || !settled(stored.get(q.id))) && (!opt
 const levels = Object.fromEntries(GOLD.levels.map((l) => [l, done.filter((q) => stored.get(q.id).level === l).length]));
 console.log(`${all.length} questions${opt.books ? '' : ' (books left out: --books)'}, ${keyed.length} with a printed answer. Settled: ${done.length} (key ${levels.key}, agreed ${levels.agreed}, single by a strong model ${levels.single}). To do: ${todo.length}${opt.onlyKeyed ? ' with a printed answer' : ''}.`);
 
+if (opt.dry && opt.local) process.exit(0);
 if (opt.dry) {
   const keys = new Set(all.map((q) => questionKey(unit, q.text)));
   const gold = await db.select('crux_question_kb', `unit_code=eq.${enc(unit)}&model=in.(${GOLD.strongModels.join(',')})&select=qkey`).catch(() => []);
@@ -73,12 +78,27 @@ if (opt.dry) {
 }
 if (!opt.save) console.log('--no-save: nothing is written to the shared library.');
 
+// --local: the solution goes on this laptop's own question, as if it came from the class (level shown, no AI later).
+const SOURCE_OF_LEVEL = { agreed: 'agreed', single: 'strong' };
+function keepLocal(q, { level, model, answer, solution, checkpoints, printed }) {
+  const row = data.paperq.find((x) => x.id === q.id);
+  if (!row) return false;
+  const subs = data.subtopics.filter((x) => x.unit === unit);
+  const cps = tidy(checkpoints, subs, row.subtopicIds?.[0]);
+  if (solution) row.explain = { ...solution, level, model, gold: true };
+  row.key = printed ? { ...row.key, checkpoints: cps } : { answer, source: SOURCE_OF_LEVEL[level] || 'strong', level, fromClass: true, checkpoints: cps };
+  save();
+  return true;
+}
+
 const LIMIT_HIT = /usage limit|rate.?limit|limit (reached|exceeded)|out of (extra )?usage|429|quota|overloaded/i;
 const results = [];
 let failsInARow = 0;
 let stoppedFor = null;
 const batch = todo.slice(0, limit);
-for (const [i, q] of batch.entries()) {
+const POOL = 3; // three questions at a time
+async function one(q, i) {
+  if (stoppedFor) return;
   const label = labelOf(q);
   const printed = printedOf(q);
   const topic = data.topics.find((t) => t.id === q.topicId);
@@ -102,19 +122,22 @@ for (const [i, q] of batch.entries()) {
     let saved = false;
     if (keep && opt.save) {
       const solution = opt.full ? shapeSolution(await withModel('claude-code', GOLD.solver, () => explainSolution({ unit, topic: topic?.name || '', question: q.text, expected: answer, scheme: scheme?.text || '' })), scheme?.name) : null;
-      saved = await shareSolution(unit, q.text, winner.checkpoints, { level: s.level, model, answer, solution });
+      if (opt.local) saved = keepLocal(q, { level: s.level, model, answer, solution, checkpoints: winner.checkpoints, printed });
+      else saved = await shareSolution(unit, q.text, winner.checkpoints, { level: s.level, model, answer, solution });
     }
     results.push(r);
     failsInARow = 0;
     const tail = printed ? ` | printed ${printed.join('; ')}${second ? ` | DeepSeek ${second.answer}` : ''}` : second ? ` | DeepSeek ${second.answer}` : '';
     console.log(`${i + 1}/${batch.length} ${s.review ? '!' : '✓'} ${s.level.padEnd(6)} ${label}: Opus ${first.answer}${tail}${told ? ` | told: ${told.answer}` : ''} (${s.reason}${opt.save ? (saved ? ', saved' : keep ? ', kept the stored one' : ', not saved') : ''})`);
   } catch (e) {
-    if (LIMIT_HIT.test(e.message)) { stoppedFor = e.message; break; }
+    if (LIMIT_HIT.test(e.message)) { stoppedFor = e.message; return; }
     results.push({ label, error: e.message.slice(0, 160) });
     console.log(`${i + 1}/${batch.length} ✗ ${label}: ${e.message.slice(0, 160)}`);
-    if (++failsInARow >= 3) { stoppedFor = `three failures in a row (${e.message.slice(0, 120)})`; break; }
+    if (++failsInARow >= 3) stoppedFor = `three failures in a row (${e.message.slice(0, 120)})`;
   }
 }
+let next = 0;
+await Promise.all(Array.from({ length: Math.min(POOL, batch.length) }, async () => { while (next < batch.length && !stoppedFor) { const i = next++; await one(batch[i], i); } }));
 
 const rep = report(results);
 const pct = (a) => (a.of ? `${a.right} of ${a.of} (${Math.round((100 * a.right) / a.of)}%)` : 'none checked');

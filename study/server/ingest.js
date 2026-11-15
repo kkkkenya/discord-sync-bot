@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { pathToFileURL } from 'node:url';
 import { db, enc } from '../../lib/db.js';
 import { ocrPdf } from './ai.js';
-import { extract } from './extract.js';
+import { MAX_LOCAL_TEXT, extract } from './extract.js';
 import { ownNotes } from './notes-store.js';
 
 // Same folder as study.json (STUDY_DATA_DIR overrides both).
@@ -139,7 +139,7 @@ export async function addLocalFile(unit, name, buf) {
   const id = `local-${createHash('sha1').update(buf).digest('hex').slice(0, 12)}`;
   const had = library.files[id];
   if (had) return { id, name: had.name, chars: had.chars, paper: had.paper, duplicate: true };
-  const { pages, text, pageStarts, sections } = await extract(buf, name);
+  const { pages, text, pageStarts, sections } = await extract(buf, name, { max: MAX_LOCAL_TEXT });
   const paper = PAPER_NAME.test(name) && !OUTLINE.test(name);
   library.files[id] = { unit, name, kind: 'local', paper, pages, at: new Date().toISOString(), chars: text.length, text, local: true, ...(pageStarts && { pageStarts }), ...(sections && { sections }) };
   saveLibrary();

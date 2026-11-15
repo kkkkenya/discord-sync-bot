@@ -10,6 +10,12 @@ import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 import TopicNotes from './TopicNotes.jsx';
 
 const qname = (x) => `${x.source} · ${x.label || `Q${x.number}`}`;
+// How far a shared solution was checked (server/gold.js levels).
+const LEVEL_LINE = {
+  key: 'Checked against the printed answer.',
+  agreed: 'Two solvers agree on the answer.',
+  single: 'Not double-checked. Check it against your notes.',
+};
 
 // The unit's questions by topic, then sub-topic (outline order), the untagged last: [{ id, name, subs: [{ id, name, qs }] }]
 function grouped(questions, topics, subtopics) {
@@ -270,7 +276,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
           {sol && !solBusy && (
             <>
               <Solution sol={sol} />
-              <p className="row-sub">{sol.schemeFile ? `Made by the AI from the marking scheme (${sol.schemeFile}).` : 'Made by the AI: check it against your notes.'} <button type="button" className="btn plain" onClick={() => explain(true)}>Make it again</button></p>
+              <p className="row-sub">{LEVEL_LINE[sol.level] || (sol.schemeFile ? `Made by the AI from the marking scheme (${sol.schemeFile}).` : 'Made by the AI: check it against your notes.')} <button type="button" className="btn plain" onClick={() => explain(true)}>Make it again (1 AI action)</button></p>
             </>
           )}
         </section>

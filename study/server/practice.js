@@ -47,7 +47,7 @@ export function schemeFor(row, files = library.files) {
 }
 
 // The AI's checkpoints, cleaned: at most 6, sub-topic names turned into ids, unknown error types dropped.
-function tidy(checkpoints, subs, fallbackSub) {
+export function tidy(checkpoints, subs, fallbackSub) {
   return (checkpoints || []).slice(0, 6).map((c, i) => {
     const sub = subs.find((s) => s.name.trim().toLowerCase() === String(c.subtopic || '').trim().toLowerCase());
     return {

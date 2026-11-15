@@ -7,6 +7,7 @@ import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { sectionsOf } from './sections.js';
 
 const MAX_TEXT = 50000; // ~12k tokens per file is plenty for grounding; keeps the cache small
+export const MAX_LOCAL_TEXT = 300000; // a file added from this laptop (a lecturer's full notes) is kept whole; it is never synced
 const MAX_PAGES = 100;
 const HEADINGS_PAGES = 1500; // past the text kept, every page is still read for its section headings…
 const HEADINGS_MS = 25e3; // …for this long at most (a request has 60s)
@@ -22,18 +23,18 @@ const squash = (s) => symbolFont(String(s || '')).replace(/\s+/g, ' ').trim();
 const xmlText = (xml) => squash([...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join(' '));
 
 // Pages (or slides) squashed and joined with one space; pageStarts[i] is where page i + 1 starts in the text.
-function joinPages(pages) {
+function joinPages(pages, max = MAX_TEXT) {
   let text = '';
   const pageStarts = [];
   for (const p of pages) {
-    if (text.length >= MAX_TEXT) break;
+    if (text.length >= max) break;
     pageStarts.push(text.length ? text.length + 1 : 0);
     text += (text.length ? ' ' : '') + squash(p);
   }
-  return { text: text.slice(0, MAX_TEXT), pageStarts };
+  return { text: text.slice(0, max), pageStarts };
 }
 
-async function pdfText(buf) {
+async function pdfText(buf, max = MAX_TEXT) {
   // new Uint8Array(buf) copies: pdf.js takes ownership of the bytes it is given
   const doc = await getDocument({ data: new Uint8Array(buf), isEvalSupported: false, disableFontFace: true, useSystemFonts: true, verbosity: 0 }).promise;
   try {
@@ -42,14 +43,14 @@ async function pdfText(buf) {
     let size = 0;
     const started = Date.now();
     for (let n = 1; n <= Math.min(HEADINGS_PAGES, doc.numPages); n++) {
-      if (size >= MAX_TEXT && Date.now() - started > HEADINGS_MS) break;
+      if (size >= max && Date.now() - started > HEADINGS_MS) break;
       const page = await doc.getPage(n);
       const text = squash((await page.getTextContent()).items.map((it) => it.str).join(' '));
       page.cleanup();
       all.push(text);
-      if (n <= MAX_PAGES && size < MAX_TEXT) { pages.push(text); size += text.length; }
+      if ((n <= MAX_PAGES || max > MAX_TEXT) && size < max) { pages.push(text); size += text.length; }
     }
-    return { pages: doc.numPages, ...joinPages(pages), sections: sectionsOf(all) };
+    return { pages: doc.numPages, ...joinPages(pages, max), sections: sectionsOf(all) };
   } finally {
     await doc.destroy();
   }
@@ -57,23 +58,24 @@ async function pdfText(buf) {
 
 // buf: downloaded bytes, name: filename. Returns { pages, text, pageStarts?, sections? } (pageStarts for PDFs and slides,
 // sections for PDFs with numbered headings). Images and scanned PDFs yield empty text.
-export async function extract(buf, name) {
+// max: how much text to keep (MAX_LOCAL_TEXT for files added from this laptop).
+export async function extract(buf, name, { max = MAX_TEXT } = {}) {
   const ext = (name.split('.').pop() || '').toLowerCase();
   try {
-    if (ext === 'pdf') return await pdfText(buf);
+    if (ext === 'pdf') return await pdfText(buf, max);
     if (ext === 'docx') {
       const { value } = await mammoth.extractRawText({ buffer: buf });
-      return { pages: 0, text: squash(value).slice(0, MAX_TEXT) };
+      return { pages: 0, text: squash(value).slice(0, max) };
     }
     if (ext === 'pptx') {
       const zip = await JSZip.loadAsync(buf);
       const slides = Object.keys(zip.files).filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))
         .sort((a, b) => Number(a.match(/\d+/)[0]) - Number(b.match(/\d+/)[0]));
       const pages = [];
-      for (const s of slides) { pages.push(xmlText(await zip.file(s).async('string'))); if (pages.join(' ').length > MAX_TEXT) break; }
-      return { pages: slides.length, ...joinPages(pages) };
+      for (const s of slides) { pages.push(xmlText(await zip.file(s).async('string'))); if (pages.join(' ').length > max) break; }
+      return { pages: slides.length, ...joinPages(pages, max) };
     }
-    if (['txt', 'md', 'csv'].includes(ext)) return { pages: 0, text: squash(buf.toString('utf8').slice(0, MAX_TEXT * 2)).slice(0, MAX_TEXT) };
+    if (['txt', 'md', 'csv'].includes(ext)) return { pages: 0, text: squash(buf.toString('utf8').slice(0, max * 2)).slice(0, max) };
   } catch {
     // scanned, encrypted or broken files fall through to empty text
   }

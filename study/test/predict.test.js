@@ -135,3 +135,14 @@ test('each question remembers where it starts, so its page can be found', async 
   const book = 'Preface. Chapter one. Example 1.1. A square steel rod 20 mm by 20 mm carries an axial load of 100 kN. Find the shortening in 50 mm.';
   assert.equal(book.slice(bookQuestions(book)[0].offset).slice(0, 11), 'Example 1.1');
 });
+
+test('figure captions like "Fig. Q.1" are not question headings (EMM 302 CAT 1 lost its first question to them)', () => {
+  const cat = 'INSTRUCTIONS (i) Attempt all the questions. 1. A rectangular steel block is subjected to three forces as shown in Fig. Q1. (a) Determine the strains (3 marks) [Diagram] Fig. Q.1 '
+    + '2. A tension specimen tapers uniformly from 20mm to 16mm diameter as shown in Fig. Q.1b. (i) Find E. [3 marks] Fig. Q.2 1 '
+    + '3. Find the forces in all the members of the truss shown in Fig. Q. 3 using the method of joints. (10 Marks) Fig. Q. 3 '
+    + '4. A compressed-air tank having an inner diameter of 5.5 m is formed by welding two hemispheres as shown in Fig. Q. 4 (a) Find P (1 mark)';
+  const qs = parseQuestions(cat);
+  assert.deepEqual(qs.map((q) => q.number), [1, 2, 3, 4]);
+  assert.match(qs[0].text, /^A rectangular steel block/);
+  assert.match(qs[2].text, /^Find the forces/);
+});

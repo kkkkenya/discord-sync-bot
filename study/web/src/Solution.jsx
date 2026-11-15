@@ -25,6 +25,12 @@ export default function Solution({ sol }) {
     <div className="stack-s">
       <h3 className="sub-title">Free body diagram</h3>
       {sol.diagram && <FreeBody d={sol.diagram} />}
+      {sol.diagram?.kind === 'truss' && (
+        <p className="sol-p muted">
+          {sol.diagram.checked ? 'Every joint balances with these forces (ΣFx = 0 and ΣFy = 0, checked by Crux). ' : 'Crux could not confirm that every joint balances. Check the forces yourself. '}
+          T is tension, C is compression.
+        </p>
+      )}
       {sol.fbd && (sol.steps?.length
         ? <p className="sol-p"><b>FBD reasoning: </b><Rich as="span" text={sol.fbd} /></p>
         : <Rich text={sol.fbd} className="fbd-words" />)}

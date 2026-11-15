@@ -191,7 +191,88 @@ function Section({ s }) {
   );
 }
 
+// A pin-jointed truss: joints by letter, members with their force (T tension, C compression) once found, supports,
+// the loads and the reactions arriving at their joints. Coordinates in metres, y up (server/diagram-check.js).
+function trussLabel(force) {
+  if (force == null) return '';
+  const v = Math.abs(force);
+  return v < 0.005 ? '0' : `${v >= 10 ? v.toFixed(1) : v.toFixed(2)} ${force > 0 ? 'T' : 'C'}`;
+}
+function Truss({ d }) {
+  const nodes = d.nodes || [];
+  const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
+  const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const pad = 70, top = 96; // room above for the load and reaction labels
+  const s = Math.min((W - 2 * pad) / (maxX - minX || 1), 260 / (maxY - minY || 1));
+  const H = (maxY - minY) * s + top + pad + 20;
+  const P = (n) => [pad + (n.x - minX) * s, top + (maxY - n.y) * s];
+  const at = new Map(nodes.map((n) => [n.id, P(n)]));
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const force = (f, cls, key) => {
+    const [x, y] = at.get(f.node) || [0, 0];
+    const fx = Number(f.fx) || 0, fy = -(Number(f.fy) || 0);
+    const len = Math.hypot(fx, fy);
+    if (!len) return null;
+    const ux = fx / len, uy = fy / len;
+    const tip = [x - ux * 8, y - uy * 8], tail = [x - ux * 56, y - uy * 56];
+    return (
+      <g key={key}>
+        {arrowTo(tail[0], tail[1], tip[0], tip[1], cls)}
+        <Label text={f.label || ''} x={tail[0] + (ux ? -ux * 4 : 6)} y={tail[1] + (uy < 0 ? 16 : uy > 0 ? -6 : 4)} textAnchor={ux > 0 ? 'end' : 'start'} className={cls === 'fbd-react' ? 'react' : ''} />
+      </g>
+    );
+  };
+  const words = [
+    `Truss with joints ${nodes.map((n) => n.id).join(', ')}.`,
+    ...(d.supports || []).map((x) => `${x.type} support at ${x.node}.`),
+    ...(d.loads || []).map((f) => `Load ${f.label} at ${f.node}.`),
+    ...(d.reactions || []).map((f) => `Reaction ${f.label} at ${f.node}.`),
+    ...(d.members || []).filter((m) => m.force != null).map((m) => `${m.a}${m.b} ${trussLabel(m.force)}.`),
+  ].join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Free body diagram. ${words}`}>
+      {markers}
+      {(d.members || []).map((m, i) => {
+        const p = at.get(m.a), q = at.get(m.b);
+        if (!p || !q) return null;
+        const cls = m.force == null || Math.abs(m.force) < 0.005 ? 'fbd-member' : m.force > 0 ? 'fbd-member tension' : 'fbd-member compression';
+        const [mx, my] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+        const [nx, ny] = (() => { const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1; return [-dy / l, dx / l]; })();
+        return (
+          <g key={`m${i}`}>
+            <line x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} className={cls} />
+            {m.force != null && <text x={mx + nx * 12} y={my + ny * 12 + 4} textAnchor="middle" className="fbd-text truss-force">{trussLabel(m.force)}</text>}
+          </g>
+        );
+      })}
+      {(d.supports || []).map((x, i) => {
+        const [px, py] = at.get(x.node) || [0, 0];
+        return (
+          <g key={`s${i}`}>
+            <path d={`M ${px} ${py + 5} L ${px - 12} ${py + 24} L ${px + 12} ${py + 24} Z`} className="fbd-support" />
+            {x.type === 'roller' && [-6, 6].map((k) => <circle key={k} cx={px + k} cy={py + 28} r="4" className="fbd-support" />)}
+            <line x1={px - 18} y1={py + (x.type === 'roller' ? 33 : 24)} x2={px + 18} y2={py + (x.type === 'roller' ? 33 : 24)} className="fbd-thin" />
+          </g>
+        );
+      })}
+      {nodes.map((n) => {
+        const [px, py] = at.get(n.id);
+        const left = n.x < cx, low = n.y < cy;
+        return (
+          <g key={`n${n.id}`}>
+            <circle cx={px} cy={py} r="3.5" className="fbd-dot" />
+            <Label text={n.id} x={px + (left ? -10 : 10)} y={py + (low ? 18 : -10)} textAnchor={left ? 'end' : 'start'} />
+          </g>
+        );
+      })}
+      {(d.loads || []).map((f, i) => force(f, 'fbd-load', `l${i}`))}
+      {(d.reactions || []).map((f, i) => force(f, 'fbd-react', `r${i}`))}
+    </svg>
+  );
+}
+
 export default function FreeBody({ d }) {
+  if (d?.kind === 'truss' && d.nodes?.length > 1) return <figure className="fbd"><Truss d={d} /></figure>;
   const L = Number(d?.length) || 0;
   if (!L) return null;
   if (d.kind === 'shaft') {

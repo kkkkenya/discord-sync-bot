@@ -12,6 +12,7 @@ import { ERROR_TYPES } from './defs.js';
 import { contextFor, library } from './ingest.js';
 import { paperInfo, sheetNo } from './predict.js';
 import { rank, sameAnswer, strong } from './gold.js';
+import { checkTruss } from './diagram-check.js';
 import { flagSolution, shareSolution, sharedSolution } from './shared.js';
 import { add, data, patch, save } from './store.js';
 import { checkMedia, saveUpload } from './uploads.js';
@@ -285,7 +286,9 @@ const text = (v) => String(v || '').trim();
 // A model's solution in the shape that is saved and shown (Solution.jsx). Also used by tools/gold.js.
 export function shapeSolution(out, schemeFile = null) {
   const d = out.diagram || {};
-  const diagram = d.kind && d.kind !== 'none' && d.length > 0 ? d : null;
+  // a truss is drawn from its joints, and marked checked only when every joint balances in code
+  const truss = d.kind === 'truss' && d.nodes?.length > 1 ? { ...d, checked: checkTruss(d).ok } : null;
+  const diagram = truss || (d.kind && d.kind !== 'none' && d.length > 0 ? d : null);
   const list = (a) => (Array.isArray(a) ? a.map(text).filter(Boolean) : []);
   const steps = (out.steps || []).map((s) => ({ math: text(s.math).replace(/^\$+|\$+$/g, ''), reason: text(s.reason).replace(/^\[|\]$/g, ''), note: text(s.note) })).filter((s) => s.math);
   const parts = steps.length ? { given: list(out.given), find: text(out.find), assumptions: list(out.assumptions), method: text(out.method), steps, check: text(out.check), trap: text(out.trap), realLife: text(out.realLife) } : {};

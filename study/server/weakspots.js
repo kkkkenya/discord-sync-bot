@@ -27,7 +27,7 @@ const scannedOf = (unit) => Object.entries(library.files).filter(([, e]) => e.un
 // Bumped when parseQuestions changes, so saved papers are read again (GET /api/predict). 2: looser numbering, no
 // 3000-character cut. 3: worked examples and exercises from the unit's books, word for word. 4: the page each
 // question is on (for "Open at page").
-export const PARSER_VERSION = 5; // 5: notes with Exercise / Assignment headings give one question per task
+export const PARSER_VERSION = 6; // 5: notes with Exercise / Assignment headings give one question per task. 6: "Fig. Q.1" is a figure, not a question heading
 // The PDF page (1-based) a character offset falls on, when the file's page starts are known.
 const pageAt = (e, offset) => (e.pageStarts?.length && offset != null ? Math.max(1, e.pageStarts.findLastIndex((s) => s <= offset) + 1) : null);
 export const isBook = (q) => q.type === 'Book';

@@ -4,7 +4,8 @@ import { HINT } from './defs.js';
 import { words } from './analysis.js';
 
 const NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
-const HEADER = /\b(?:question|qn|q)\s*\.?\s*(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/gi;
+// "Fig. Q.1" and "Figure Q3" name a figure, not a question
+const HEADER = /(?<!\bfig(?:ure)?\.?\s*)\b(?:question|qn|q)\s*\.?\s*(one|two|three|four|five|six|seven|eight|nine|ten|\d{1,2})\b/gi;
 const SUB_MARKS = /[([]\s*(\d{1,2}(?:\.\d)?)\s*(?:marks?|mks?)\s*[)\]]/gi;
 
 // Questions in one paper's text (extracted text is whitespace-squashed, so no line starts to lean on).

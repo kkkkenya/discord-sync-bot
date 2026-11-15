@@ -7,7 +7,7 @@ import { ERROR_TYPES } from './defs.js';
 import { canRead, provider } from './ai.js';
 import { transcribe } from './brain.js';
 import { paperInfo } from './predict.js';
-import { KEY_LABEL, checkAnswer, checkPhoto, flagCheckpoint, markBroke } from './practice.js';
+import { KEY_LABEL, checkAnswer, checkPhoto, disputeSolution, markBroke } from './practice.js';
 import { checkMedia, saveUpload } from './uploads.js';
 import { learnFor, topicNamed } from './learn-store.js';
 import { stageMix } from './stages.js';
@@ -192,7 +192,7 @@ async function markText(t, { photo, attachment }) {
   }
   if (/^dispute\b/i.test(rest)) {
     if (!marking.attempt) return 'Check an answer first: `mark EMM 302`, then `mark <your answer>`.';
-    flagCheckpoint({ id: marking.attempt });
+    await disputeSolution({ id: marking.attempt });
     return 'Saved: the checkpoints look wrong to you, so nothing is held against you. Get a verified solution from the Prompt Builder on the dashboard.';
   }
   if (!rest) return HELP;

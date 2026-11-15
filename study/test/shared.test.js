@@ -29,9 +29,23 @@ test('the first list of 3+ topics is shared; later ones keep it; the owner can r
 test('a solved question is found again by unit and wording, whatever the spacing or case', async () => {
   resetSharedForTests();
   await shareSolution('EMM 302', 'A hollow shaft  has an inside diameter…', [{ step: 'Area ratio' }]);
-  assert.deepEqual(await sharedSolution('EMM 302', 'a hollow shaft has an INSIDE diameter…'), { checkpoints: [{ step: 'Area ratio' }] });
+  assert.deepEqual(await sharedSolution('EMM 302', 'a hollow shaft has an INSIDE diameter…'), { checkpoints: [{ step: 'Area ratio' }], level: 'single', model: null, answer: null, solution: null, flagged: 0 });
   assert.equal(await sharedSolution('EMM 305', 'A hollow shaft has an inside diameter…'), null);
   assert.notEqual(questionKey('EMM 302', 'q'), questionKey('EMM 305', 'q'));
+});
+
+test('a cheap solve never replaces a checked one; a strong one replaces a cheap one; flags are counted', async () => {
+  const { flagSolution } = await import('../server/shared.js');
+  resetSharedForTests();
+  const q = 'A beam of span 6 m carries a point load of 12 kN at midspan. Find the maximum bending moment.';
+  assert.equal(await shareSolution('EMM 302', q, [{ step: 'cheap' }], { level: 'single', model: 'gemini-3.8-flash' }), true);
+  assert.equal(await shareSolution('EMM 302', q, [{ step: 'cheap again' }], { level: 'single', model: 'deepseek-flash' }), false);
+  assert.equal(await shareSolution('EMM 302', q, [{ step: 'opus' }], { level: 'agreed', model: 'opus', answer: '18 kNm', solution: { breakdown: 'M = PL/4' } }), true);
+  assert.equal(await shareSolution('EMM 302', q, [{ step: 'cheap' }], { level: 'single', model: 'gemini-3.8-flash' }), false);
+  const row = await sharedSolution('EMM 302', q);
+  assert.equal(row.level, 'agreed'); assert.equal(row.answer, '18 kNm'); assert.equal(row.checkpoints[0].step, 'opus');
+  assert.equal(await flagSolution('EMM 302', q), 1);
+  assert.equal((await sharedSolution('EMM 302', q)).flagged, 1);
 });
 
 const { classHints, confirmHint, kitKey, resetMoreSharedForTests, shareHint, shareKit, sharedKit, SHARED_KITS } = await import('../server/shared.js');

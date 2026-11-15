@@ -4,6 +4,7 @@
 // shared list copies it into your own document, so your edits stay private.
 import { createHash } from 'node:crypto';
 import { db, enc } from '../../lib/db.js';
+import { shouldReplace } from './gold.js';
 import { remote } from './ingest.js';
 
 const memory = { units: new Map(), questions: new Map() }; // local runs and tests
@@ -38,21 +39,58 @@ export async function offerList(unit, topics, userId, { force = false } = {}) {
 // ---- worked checkpoints: crux_question_kb (one row per question, keyed by unit and wording) ----
 export const questionKey = (unit, text) => createHash('sha1').update(`${unit}|${String(text).toLowerCase().replace(/\s+/g, ' ').trim()}`).digest('hex');
 
+// A row: { checkpoints, level, model, answer, solution, flagged } (fixplan-e E1). level 'key' | 'agreed' | 'single'
+// (server/gold.js); answer and solution (the full worked solution) come from tools/gold.js. A database that hasn't run
+// the E1 SQL yet still shares checkpoints the old way, and says so once in the log.
+let oldTable = false;
+const isColumnError = (e) => /column|42703|PGRST204/i.test(e?.message || '');
+const noteOldTable = (e) => { if (!oldTable) console.error('crux_question_kb has no E1 columns yet (run the E1 SQL in supabase/crux.sql):', e.message); oldTable = true; };
+const rowOf = (r) => (r && (r.checkpoints?.length || r.solution) ? { checkpoints: r.checkpoints || [], level: r.level || 'single', model: r.model || null, answer: r.answer || null, solution: r.solution || null, flagged: r.flagged || 0 } : null);
+
 export async function sharedSolution(unit, text) {
   const key = questionKey(unit, text);
-  if (!remote()) return memory.questions.get(key) || null;
+  if (!remote()) return rowOf(memory.questions.get(key));
+  if (!oldTable) {
+    try {
+      const [row] = await db.select('crux_question_kb', `qkey=eq.${key}&select=checkpoints,level,model,answer,solution,flagged`);
+      return rowOf(row);
+    } catch (e) { if (!isColumnError(e)) { console.error('crux_question_kb read:', e.message); return null; } noteOldTable(e); }
+  }
   const [row] = await db.select('crux_question_kb', `qkey=eq.${key}&select=checkpoints`).catch(() => []);
-  return row?.checkpoints?.length ? { checkpoints: row.checkpoints } : null;
+  return rowOf(row);
 }
 
-export async function shareSolution(unit, text, checkpoints) {
-  if (!checkpoints?.length) return;
+// Writes only when the write rule allows it (gold.js shouldReplace): a cheap solve never replaces a checked one.
+// meta: { level = 'single', model, answer, solution }. Returns true when it wrote.
+export async function shareSolution(unit, text, checkpoints, { level = 'single', model = null, answer = null, solution = null } = {}) {
+  const incoming = { checkpoints: checkpoints || [], level, model, answer, solution };
+  if (!incoming.checkpoints.length && !solution) return false;
   const key = questionKey(unit, text);
-  if (!remote()) { memory.questions.set(key, { checkpoints }); return; }
-  await db.upsert('crux_question_kb', [{ qkey: key, unit_code: unit, checkpoints, updated_at: new Date().toISOString() }], 'qkey').catch(() => {});
+  const stored = await sharedSolution(unit, text);
+  if (!shouldReplace(stored, incoming)) return false;
+  if (!remote()) { memory.questions.set(key, { ...incoming, flagged: 0 }); return true; }
+  const at = new Date().toISOString();
+  if (!oldTable) {
+    try {
+      await db.upsert('crux_question_kb', [{ qkey: key, unit_code: unit, ...incoming, flagged: 0, updated_at: at }], 'qkey');
+      return true;
+    } catch (e) { if (!isColumnError(e)) { console.error('crux_question_kb write:', e.message); return false; } noteOldTable(e); }
+  }
+  if (stored || !incoming.checkpoints.length) return false; // the old table can't tell levels apart: first one stays
+  await db.upsert('crux_question_kb', [{ qkey: key, unit_code: unit, checkpoints: incoming.checkpoints, updated_at: at }], 'qkey').catch((e) => console.error('crux_question_kb write:', e.message));
+  return true;
 }
 
-export const resetSharedForTests = () => { memory.units.clear(); memory.questions.clear(); };
+// A student disputed a shared solution: one more flag (atomic, in SQL). The student's id is never stored here.
+export async function flagSolution(unit, text) {
+  const key = questionKey(unit, text);
+  if (!remote()) { const r = memory.questions.get(key); if (r) r.flagged = (r.flagged || 0) + 1; return r?.flagged ?? null; }
+  return db.rpc('crux_flag_question', { p_qkey: key }).catch((e) => { console.error('crux_flag_question:', e.message); return null; });
+}
+
+export const usesOldTable = () => oldTable;
+
+export const resetSharedForTests = () => { memory.units.clear(); memory.questions.clear(); oldTable = false; };
 
 // ---- sheets: crux_kit_kb (ladders and recipes per unit, kind, stage and topic) ----
 // Trap sheets are never shared: they carry the student's own recurring mistakes.

@@ -31,7 +31,7 @@ import { makeGuideFor } from './guide.js';
 import { contributors, finishUpload, myUploads, postedDays, startUpload, unitPapers } from './hub-uploads.js';
 import { rewardInfo } from './rewards.js';
 import { learnFor, topicPlaces } from './learn-store.js';
-import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, ensureCheckpoints, explainBatch, explainQuestion, flagCheckpoint, markBroke, savedExplain } from './practice.js';
+import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, classExplain, disputeSolution, ensureCheckpoints, explainBatch, explainQuestion, markBroke, savedExplain } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
 
 // The retired flashcards (cards, reviews) stay in study.json but never go to the dashboard; only their count does,
@@ -301,14 +301,17 @@ const routes = {
   'POST /api/attempts/photo': async (q, body) => checkPhoto(body || {}),
   'POST /api/attempts/checkpoints': async (q, body) => ensureCheckpoints(body || {}),
   // The full worked solution and free body diagram for a question: { unit, questionId, fresh? }.
-  'GET /api/attempts/explain': (q) => savedExplain(data.paperq.find((x) => x.id === q.get('questionId') && x.unit === q.get('unit'))) || { none: true },
+  'GET /api/attempts/explain': async (q) => {
+    const row = data.paperq.find((x) => x.id === q.get('questionId') && x.unit === q.get('unit'));
+    return savedExplain(row) || (row && await classExplain(row)) || { none: true }; // a shared solution costs no AI
+  },
   'POST /api/attempts/explain': async (q, body) => explainQuestion(body || {}),
   // Solve several: { unit, questionIds } → the next 2-4 solved in one AI call; { done, left }.
   'POST /api/attempts/explain-batch': async (q, body) => explainBatch(body || {}),
   // "Ask about this": { unit, questionId, messages } → { reply }, a follow-up on the question and its solution
   'POST /api/attempts/ask': async (q, body) => askAbout(body || {}),
   'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
-  'POST /api/attempts/flag': (q, body) => flagCheckpoint(body || {}),
+  'POST /api/attempts/flag': async (q, body) => disputeSolution(body || {}),
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
   // Insights across every unit: weakspots by priority (with the mistakes behind each and when it was last tried),
   // mistakes by type over 14 days, and questions tried per day for 14 days.

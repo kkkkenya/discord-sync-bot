@@ -3,6 +3,7 @@
 // Keys: GEMINI_API_KEY, DEEPSEEK_API_KEY. Model names override via AI_MODEL.
 // On the owner's own computer (never on Vercel), CRUX_AI=claude-code sends every call to Claude Code instead: the
 // owner's Claude plan, no API key (claudeCodeCall).
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -17,7 +18,19 @@ export const PROVIDERS = ['gemini', 'deepseek'];
 // Locally (no request) the setting is used as it is.
 const deepseekFor = () => { const u = requestScope()?.user; return (!u || ['premium', 'vvip', 'owner'].includes(u.tier)) && deepseekOpen(); };
 export const localClaude = () => !process.env.VERCEL && process.env.CRUX_AI === 'claude-code';
+
+// tools/gold.js runs two model families side by side in one process: withModel(provider, model, fn) picks them for
+// every structured() call inside fn, without touching CRUX_AI. Claude Code is never used on Vercel.
+const pinned = new AsyncLocalStorage();
+export function withModel(via, name, fn) {
+  if (via === 'claude-code' && process.env.VERCEL) throw new Error('Claude Code runs only on the owner\'s computer.');
+  if (!['claude-code', ...PROVIDERS].includes(via)) throw new Error(`Unknown provider "${via}"`);
+  return pinned.run({ via, name }, fn);
+}
+const pin = () => pinned.getStore();
+
 export const provider = () => {
+  if (pin()) return pin().via;
   if (localClaude()) return 'claude-code';
   const p = data?.settings?.aiProvider || process.env.AI_PROVIDER || 'gemini';
   return p === 'deepseek' && !deepseekFor() ? 'gemini' : p;
@@ -30,7 +43,9 @@ export const aiReady = () => provider() === 'claude-code' || Boolean(process.env
 // What each provider can read besides text: photos of working, and voice teach-backs.
 export const CAN = { gemini: { image: true, audio: true }, deepseek: { image: false, audio: false }, 'claude-code': { image: false, audio: false } };
 export const canRead = (kind) => aiReady() && Boolean(CAN[provider()]?.[kind]);
-const model = () => process.env.AI_MODEL || MODELS[provider()];
+const model = () => pin()?.name || process.env.AI_MODEL || MODELS[provider()];
+// The model behind the next call, as stored with a shared solution ('opus', 'gemini-3.8-flash').
+export const modelInUse = () => (provider() === 'claude-code' ? (pin()?.name || process.env.CRUX_CLAUDE_MODEL || 'sonnet') : model());
 
 export const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.round(Number(n) || lo)));
 
@@ -132,7 +147,7 @@ const WIN_CLAUDE = `${process.env.APPDATA}\\npm\\node_modules\\@anthropic-ai\\cl
 const claudeBin = () => process.env.CLAUDE_BIN || (process.platform === 'win32' && existsSync(WIN_CLAUDE) ? WIN_CLAUDE : 'claude');
 export function claudeCodeCall(schema, system, content, maxTokens, run = spawn) {
   const args = ['-p', '--output-format', 'json', '--json-schema', JSON.stringify(schema), '--system-prompt', system, '--tools', '',
-    '--no-session-persistence', '--setting-sources', '', '--strict-mcp-config', '--model', process.env.CRUX_CLAUDE_MODEL || 'sonnet'];
+    '--no-session-persistence', '--setting-sources', '', '--strict-mcp-config', '--model', (pin()?.via === 'claude-code' && pin().name) || process.env.CRUX_CLAUDE_MODEL || 'sonnet'];
   return new Promise((resolve, reject) => {
     const child = run(claudeBin(), args, { cwd: tmpdir(), windowsHide: true });
     let out = '';
@@ -175,7 +190,8 @@ async function deepseekCall(schema, system, content, maxTokens) {
       continue;
     }
     if (!r.ok) throw new Error(`DeepSeek ${r.status}: ${text.slice(0, 200)}`);
-    try { addDeepseekSpend(deepseekCost(JSON.parse(text).usage)).catch((e) => console.error('DeepSeek spend:', e.message)); } catch { /* no usage block */ }
+    // the owner's own laptop runs (withModel) are not the students' monthly budget
+    if (!pin()) try { addDeepseekSpend(deepseekCost(JSON.parse(text).usage)).catch((e) => console.error('DeepSeek spend:', e.message)); } catch { /* no usage block */ }
     let raw = '';
     let obj;
     try { raw = JSON.parse(text).choices?.[0]?.message?.content ?? ''; obj = JSON.parse(raw); }

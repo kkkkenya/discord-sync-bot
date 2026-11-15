@@ -20,7 +20,7 @@ function symbol(letters) {
 
 // 'N/mm^2', 'kN.m', 'mm2', 'rad/s' -> { dims, factor } | null when any part isn't a unit we know.
 export function parseUnit(text) {
-  const s = String(text || '').trim().replace(/[·⋅*×]/g, '.').replace(/µ/g, 'u').replace(/²/g, '^2').replace(/³/g, '^3').replace(/\s+/g, '');
+  const s = String(text || '').trim().replace(/°(?![CFK])/g, 'deg').replace(/[·⋅*×]/g, '.').replace(/µ/g, 'u').replace(/²/g, '^2').replace(/³/g, '^3').replace(/\s+/g, '');
   if (!s) return null;
   const dims = {};
   let factor = 1;

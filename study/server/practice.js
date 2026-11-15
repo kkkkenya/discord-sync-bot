@@ -5,19 +5,32 @@
 // 'wrong' (the student marked the checkpoint where their paper diverged: the only thing that counts as a weakspot
 // failure) or 'disputed' (the student says the checkpoints are wrong: nothing is held against them).
 import { compareAnswers } from './answer.js';
-import { aiReady, canRead, provider } from './ai.js';
+import { aiReady, canRead, modelInUse, provider } from './ai.js';
 import { compareWorking, explainSolution, explainSolutions, followUp, readWorking, solveWithCheckpoints } from './brain.js';
 import { ERROR_TYPES } from './defs.js';
 import { contextFor, library } from './ingest.js';
 import { paperInfo, sheetNo } from './predict.js';
-import { shareSolution, sharedSolution } from './shared.js';
+import { rank, sameAnswer, strong } from './gold.js';
+import { flagSolution, shareSolution, sharedSolution } from './shared.js';
 import { add, data, patch, save } from './store.js';
 import { checkMedia, saveUpload } from './uploads.js';
 
 const bad = (message, status = 400) => Object.assign(new Error(message), { status });
 const SCHEME_WORDS = /mark(?:ing)?[\s_-]*scheme|solutions?|memo|answers?/i;
 const ERROR_IDS = ERROR_TYPES.map((e) => e.id);
-export const KEY_LABEL = { you: 'your answer key', sheet: 'given on the tutorial sheet', scheme: 'from the marking scheme', ai: 'AI-solved: verify' };
+export const KEY_LABEL = { you: 'your answer key', sheet: 'given on the tutorial sheet', scheme: 'from the marking scheme', ai: 'AI-solved: verify', agreed: 'two solvers agree', strong: 'solved once, not double-checked' };
+
+// Shared solutions (fixplan-e E1). Only questions from the unit's files are shared: never a pasted paper, never an
+// answer key a student typed.
+const shareable = (row) => Boolean(row?.fileId) && !String(row.fileId).startsWith('paste-');
+const classGet = { get: sharedSolution };
+// A classmate-shared solution as this student's key, when it is worth more than their own AI solve: checked
+// (agreed or key) or made by a strong model. Its source names the level, so every label (app, bot, pack) shows it.
+const SOURCE_OF_LEVEL = { key: 'sheet', agreed: 'agreed', single: 'strong' };
+function classKey(g, subs, fallbackSub) {
+  if (!g?.answer || !(rank(g.level) > 0 || strong(g.model))) return null;
+  return { answer: g.answer, source: SOURCE_OF_LEVEL[g.level] || 'strong', level: g.level, fromClass: true, checkpoints: tidy(g.checkpoints, subs, fallbackSub) };
+}
 
 // Marking-scheme text for a past-paper question: the paper's own file when it says it is a solution, else a library
 // file of the unit whose name says scheme/solution and that matches the paper's year and type. { name, text } | null.
@@ -47,7 +60,7 @@ function tidy(checkpoints, subs, fallbackSub) {
 // body: { unit, questionId? | question?, topicId?, answer, operations?, key? }.
 // Where the key comes from, in order: a key you typed, a saved one, the marking scheme (read by the AI), an AI solve.
 // Returns { needKey, message } when there is no key and the AI can't make one.
-export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = aiReady } = {}) {
+export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = aiReady, shared = classGet } = {}) {
   const unit = data.units.find((u) => u.code === body.unit);
   if (!unit) throw bad('Pick one of your units first.');
   const row = body.questionId ? data.paperq.find((x) => x.id === body.questionId && x.unit === unit.code) : null;
@@ -64,6 +77,12 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
   let key = row?.key || null;
   if (key?.source === 'ai' && freshScheme(row)) key = null; // a marking scheme has come in since the AI solved it
   const typed = String(body.key || '').trim();
+  // a shared checked solution beats this student's own AI solve, and is looked at again in case it has been checked since
+  let gold = null;
+  if (!typed && (!key || ['ai', 'strong', 'agreed'].includes(key.source)) && shareable(row)) {
+    gold = await shared.get(unit.code, question).catch(() => null);
+    key = classKey(gold, subs, fallbackSub) || (key?.fromClass ? null : key);
+  }
   if (typed && typed !== key?.answer) key = { answer: typed, source: 'you', checkpoints: [] };
   let solved = null;
   if (!key) {
@@ -85,6 +104,11 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
 
   // 3. the checkpoints: written now when the answer is wrong (a right one gets them on request, see ensureCheckpoints)
   let checkpointNote = '';
+  if (!key.checkpoints?.length && cmp.verdict === 'wrong' && shareable(row) && key.source !== 'you') {
+    // shared checkpoints that lead to this same answer: free, and no AI needed
+    gold = gold || await shared.get(unit.code, question).catch(() => null);
+    if (gold?.checkpoints?.length && gold.answer && sameAnswer(gold.answer, shown)) Object.assign(key, { checkpoints: tidy(gold.checkpoints, subs, fallbackSub), fromClass: true, level: gold.level });
+  }
   if (!key.checkpoints?.length && cmp.verdict === 'wrong' && ready()) {
     try {
       const out = await ask({ expected: shown });
@@ -98,11 +122,12 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
     unit: unit.code, questionId: row?.id || null, topicId: topic?.id || null, subtopicId: right ? fallbackSub : null,
     answer, operations: String(body.operations || '').trim().slice(0, 500), verdict: right ? 'right' : 'mismatch',
     keySource: key.source, keyAnswer: shown, checkpoints: key.checkpoints || [], brokeAt: null, errorType: null,
+    ...(key.fromClass && { fromClass: true, checkLevel: key.level || 'single' }),
     ...(!row && { question: question.slice(0, 1500) }),
   });
   return {
     attempt, verdict: cmp.verdict, reason: cmp.reason, note: cmp.note || '', assumedUnit: Boolean(cmp.assumed),
-    key: { answer: shown, source: key.source, label: KEY_LABEL[key.source], schemeFile: key.schemeFile || null },
+    key: { answer: shown, source: key.source, label: KEY_LABEL[key.source], schemeFile: key.schemeFile || null, ...(key.fromClass && { level: key.level || 'single' }) },
     checkpoints: key.checkpoints || [], checkpointNote,
     // the best guess to pre-fill "Broke here": the number checks say units/sign, else the checkpoint's own tag
     guess: { errorType: cmp.errorType || null, subtopicId: fallbackSub },
@@ -142,7 +167,7 @@ export async function checkPhoto(body, { read = readWorking, compare = compareWo
 }
 
 // "Show checkpoints" on an attempt that has none (a right answer): writes them for the key, once. { checkpoints, note }.
-export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, ready = aiReady, shared = { get: sharedSolution, put: shareSolution } } = {}) {
+export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, ready = aiReady, shared = { get: sharedSolution, put: shareSolution }, modelName = modelInUse } = {}) {
   const a = data.attempts.find((x) => x.id === id);
   if (!a) throw bad('That attempt was not found.', 404);
   if (a.checkpoints?.length) return { checkpoints: a.checkpoints, note: '' };
@@ -151,24 +176,30 @@ export async function ensureCheckpoints({ id }, { solve = solveWithCheckpoints, 
   const topic = data.topics.find((t) => t.id === a.topicId);
   const subs = data.subtopics.filter((s) => s.unit === a.unit && (!topic || s.topicId === topic.id));
   // a classmate already had this question solved: reuse it (free, instant, works without AI)
-  const known = question ? await shared.get(a.unit, question) : null;
+  // only for questions from the unit's files; a key the student typed is never shared, and reuses a shared one only
+  // when it is the same answer
+  const typedKey = a.keySource === 'you';
+  const found = question && shareable(row) ? await shared.get(a.unit, question) : null;
+  const known = found?.checkpoints?.length && (!typedKey || (found.answer && sameAnswer(found.answer, a.keyAnswer))) ? found : null;
   if (!known && (!ready() || !question)) return { checkpoints: [], note: 'The checkpoints need the built-in AI. Take the question to the Prompt Builder for a full step-by-step solution.' };
   try {
     const out = known || await solve({ unit: a.unit, topic: topic?.name || '', question, subtopics: subs.map((s) => s.name), expected: a.keyAnswer });
-    if (!known) await shared.put(a.unit, question, out.checkpoints);
+    if (!known && shareable(row) && !typedKey) await shared.put(a.unit, question, out.checkpoints, { level: 'single', model: modelName() });
     const checkpoints = tidy(out.checkpoints, subs, row?.subtopicIds?.[0]);
     if (row?.key) row.key.checkpoints = checkpoints;
-    patch('attempts', id, { checkpoints });
+    patch('attempts', id, { checkpoints, ...(known && { fromClass: true, checkLevel: known.level }) });
     return { checkpoints, note: '' };
   } catch (e) { return { checkpoints: [], note: `Couldn't write the checkpoints (${e.message}). Take it to the Prompt Builder for a full solution.` }; }
 }
 
 // "Full worked solution": a readable breakdown and a free body diagram for one past-paper question, made once and
 // kept on the question. body: { unit, questionId, fresh? } → { breakdown, fbd, diagram, answer } or { needAi, message }.
-export async function explainQuestion({ unit, questionId, fresh = false }, { explain = explainSolution, ready = aiReady } = {}) {
+export async function explainQuestion({ unit, questionId, fresh = false }, { explain = explainSolution, ready = aiReady, shared = classGet } = {}) {
   const row = data.paperq.find((x) => x.id === questionId && x.unit === unit);
   if (!row) throw bad('Pick a question first.');
   if (!fresh && savedExplain(row)) return savedExplain(row);
+  const mine = !fresh && await classExplain(row, shared);
+  if (mine) return mine;
   if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
   const topic = data.topics.find((t) => t.id === row.topicId);
   const scheme = schemeFor(row);
@@ -216,8 +247,17 @@ export function breakdownOf(x) {
   return out.join('\n');
 }
 
+// The shared full solution for a question (tools/gold.js), copied onto this student's question with its level: no AI.
+export async function classExplain(row, shared = classGet) {
+  if (!shareable(row)) return null;
+  const g = await shared.get(row.unit, row.text).catch(() => null);
+  if (!g?.solution) return null;
+  return patch('paperq', row.id, { explain: { ...tidyExplain(g.solution), level: g.level, model: g.model, fromClass: true } }).explain;
+}
+
 const text = (v) => String(v || '').trim();
-const keepSolution = (row, out, schemeFile = null) => {
+// A model's solution in the shape that is saved and shown (Solution.jsx). Also used by tools/gold.js.
+export function shapeSolution(out, schemeFile = null) {
   const d = out.diagram || {};
   const diagram = d.kind && d.kind !== 'none' && d.length > 0 ? d : null;
   const list = (a) => (Array.isArray(a) ? a.map(text).filter(Boolean) : []);
@@ -225,8 +265,9 @@ const keepSolution = (row, out, schemeFile = null) => {
   const parts = steps.length ? { given: list(out.given), find: text(out.find), assumptions: list(out.assumptions), method: text(out.method), steps, check: text(out.check), trap: text(out.trap), realLife: text(out.realLife) } : {};
   const fbd = text(out.fbd);
   const breakdown = text(out.breakdown) || breakdownOf({ ...parts, fbd });
-  return patch('paperq', row.id, { explain: tidyExplain({ ...parts, breakdown, fbd, diagram, answer: text(out.answer), schemeFile: schemeFile || null }) }).explain;
-};
+  return tidyExplain({ ...parts, breakdown, fbd, diagram, answer: text(out.answer), schemeFile: schemeFile || null });
+}
+const keepSolution = (row, out, schemeFile = null) => patch('paperq', row.id, { explain: shapeSolution(out, schemeFile) }).explain;
 
 // How many questions one AI call solves: a full solution runs to about 900 tokens plus 150 a mark, and one call
 // writes up to OUT_BUDGET tokens, so short questions go 4 at a time and long ones 2 (1 when only one is left).
@@ -247,10 +288,12 @@ export function nextBatch(rows) {
 
 // "Solve several": body { unit, questionIds } → solves the next 2-4 that have no saved solution, in one AI call, and
 // keeps each on its question. { done: [ids], left: [ids] }: the app calls again while anything is left.
-export async function explainBatch({ unit, questionIds = [] }, { explain = explainSolutions, ready = aiReady } = {}) {
+export async function explainBatch({ unit, questionIds = [] }, { explain = explainSolutions, ready = aiReady, shared = classGet } = {}) {
   const rows = questionIds.map((id) => data.paperq.find((x) => x.id === id && x.unit === unit)).filter(Boolean);
+  const fromClass = [];
+  for (const r of rows) if (!savedExplain(r) && await classExplain(r, shared)) fromClass.push(r.id);
   const todo = rows.filter((r) => !savedExplain(r));
-  if (!todo.length) return { done: [], left: [] };
+  if (!todo.length) return { done: fromClass, left: [] };
   if (!ready()) return { needAi: true, message: 'Solving needs the built-in AI. Take the questions to the Prompt Builder instead.' };
   const { batch, tokens } = nextBatch(todo);
   const schemes = [...new Map(batch.map((r) => [r.fileId, schemeFor(r)]).filter(([, x]) => x)).values()];
@@ -264,6 +307,7 @@ export async function explainBatch({ unit, questionIds = [] }, { explain = expla
     if (row && (sol.breakdown || sol.steps?.length)) { keepSolution(row, sol, schemeFor(row)?.name); done.push(row.id); }
   }
   if (!done.length) throw bad('The AI sent back no usable solutions. Try again, or solve them one at a time.', 502);
+  done.unshift(...fromClass);
   return { done, left: todo.filter((r) => !savedExplain(r)).map((r) => r.id) };
 }
 
@@ -322,5 +366,15 @@ export function flagCheckpoint({ id, step = null, note = '' }) {
   // an AI or scheme key may be the wrong thing: forget it so the next try solves again (a key you typed stays)
   const row = data.paperq.find((q) => q.id === a.questionId);
   if (row?.key && row.key.source !== 'you') { delete row.key; save(); }
-  return patch('attempts', id, { verdict: 'disputed', flag: { step, note: String(note).trim().slice(0, 300), at: new Date().toISOString() } });
+  // a shared solution's flag counts once per student per question (disputeSolution adds it to the shared row)
+  const counted = Boolean(a.fromClass) && shareable(row) && !data.attempts.some((x) => x.id !== id && x.questionId === a.questionId && x.flag?.counted);
+  return patch('attempts', id, { verdict: 'disputed', flag: { step, note: String(note).trim().slice(0, 300), at: new Date().toISOString(), ...(counted && { counted: true }) } });
+}
+
+// The route and the bot: flag, and count it on the shared solution. Only the count is shared, never who.
+export async function disputeSolution(body, { flag = flagSolution } = {}) {
+  const a = flagCheckpoint(body);
+  const row = data.paperq.find((q) => q.id === a.questionId);
+  if (a.flag?.counted && row) await flag(row.unit, row.text);
+  return a;
 }

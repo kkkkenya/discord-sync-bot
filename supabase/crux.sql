@@ -185,3 +185,10 @@ alter table crux_question_kb add column if not exists level   text not null defa
 alter table crux_question_kb add column if not exists model   text;          -- e.g. 'opus', 'gemini-3.8-flash'
 alter table crux_question_kb add column if not exists answer  text;          -- the final answer as text, for the agreement check
 alter table crux_question_kb add column if not exists flagged integer not null default 0;  -- students who disputed the checkpoints
+-- E1, second part: the full worked solution, shared with the level (tools/gold.js), and a student's flag counted in
+-- SQL so two flags at once are both counted. Safe to run again with the lines above.
+alter table crux_question_kb add column if not exists solution jsonb;  -- the full worked solution, made by tools/gold.js
+create or replace function crux_flag_question(p_qkey text)
+returns integer language sql as $$
+  update crux_question_kb set flagged = flagged + 1 where qkey = p_qkey returning flagged;
+$$;

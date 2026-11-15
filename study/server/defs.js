@@ -46,3 +46,9 @@ export const LIMITS = {
 // USD per million tokens, from api-docs.deepseek.com on 2026-11-01. Above the monthly cap Crux uses Gemini instead.
 export const DEEPSEEK = { model: 'deepseek-flash', inputPerM: 0.3, outputPerM: 1.2, priced: '2026-11-01', monthlyCapUsd: 2.9 };
 export const deepseekCost = ({ prompt_tokens: i = 0, completion_tokens: o = 0 } = {}) => (i * DEEPSEEK.inputPerM + o * DEEPSEEK.outputPerM) / 1e6;
+
+// Gold solutions (fixplan-e E1, server/gold.js). Check levels, lowest first: 'single' (one solver), 'agreed' (two model
+// families reach the same answer), 'key' (matches the answer printed on a tutorial sheet). A shared solution is
+// replaced only by a higher level, by a strong model over a cheap one at the same level, or after enough students
+// flagged it. Strong models run only on the owner's laptop (tools/gold.js).
+export const GOLD = { levels: ['single', 'agreed', 'key'], strongModels: ['opus', 'fable'], flagsToReplace: 3, solver: 'opus', second: 'deepseek-flash', referee: 'fable' };

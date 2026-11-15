@@ -1094,3 +1094,7 @@ button.chip:active, a.chip:active { transform: scale(.95); }
 .plan-line { display: flex; align-items: center; gap: var(--s3); }
 .plan-line > span { display: flex; flex-direction: column; }
 .planstars { width: 44px; height: 48px; flex: none; }
+
+/* Programming answers (Solution.jsx): plain monospace, scrolls sideways on a phone instead of wrapping code */
+.code-block { margin: 0; padding: var(--s3); background: var(--surface-2); border-radius: var(--radius); overflow-x: auto; font: 400 var(--t-s)/1.55 var(--mono); color: var(--text); white-space: pre; tab-size: 4; }
+.code-block code { font: inherit; }

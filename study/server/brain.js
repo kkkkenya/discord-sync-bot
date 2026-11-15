@@ -309,6 +309,36 @@ export async function explainSolution({ unit, topic = '', question, expected = '
   return structured(schema, TUTOR, content, 12000);
 }
 
+// A programming question answered the way the course teaches it (owner, 2026-11-15): only the functions, methods,
+// classes and modules in taught (read from the unit's notes by taught.js), written like the notes, and no comments in
+// the code: every explanation goes after it. avoid: what the last answer used that the course never teaches.
+const CODER = `You teach a university engineering programming course in Kenya. You answer exactly the way the course notes
+teach: the same language, the same functions and the same style, even when a shorter or newer way exists. Students are
+marked on what was taught, so anything from outside the notes costs them marks.`;
+export async function explainProgram({ unit, topic = '', question, taught = [], notes = '', avoid = [] }) {
+  const schema = {
+    type: 'object',
+    properties: {
+      work: { ...WORK, description: 'Private scratch working, never shown. Write the program here first, check every line runs and uses only what the notes use, then copy it into code.' },
+      language: { type: 'string', description: 'The language, as the notes use it, for example python.' },
+      code: { type: 'string', description: 'The complete program, ready to run. No comments of any kind: no #, no //, no docstrings.' },
+      explanation: { type: 'array', items: { type: 'string' }, description: 'How the code works, in the order of the code, one short point per part. Every explanation goes here, never in the code.' },
+      output: { type: 'string', description: 'What the program prints or shows for a sample run, or an empty string.' },
+    },
+    required: ['work', 'language', 'code', 'explanation', 'output'],
+    additionalProperties: false,
+  };
+  const content = [
+    `Unit: ${unit}${topic ? `\nTopic: ${topic}` : ''}`,
+    notes ? `From the course notes (write code the way they do):\n${notes}` : '',
+    taught.length ? `Use only these functions, methods, classes and modules, which the course notes use: ${taught.join(', ')}. Nothing else, even if it is shorter or better. Variables, arithmetic, if, for and while are always fine.` : '',
+    avoid.length ? `Your last answer used ${avoid.join(', ')}, which the course never teaches. Write it again without them.` : '',
+    `Question:\n${question}`,
+    'Answer as a well-taught student of this course would in the exam: the code first, written the way the notes write it, then the explanation.',
+  ].filter(Boolean).join('\n\n');
+  return structured(schema, CODER, content, 8000);
+}
+
 // "Ask about this": a follow-up on one question and its worked solution ("why this formula and not that one?",
 // "explain step 3"). history: [{ role: 'student' | 'tutor', text }], the last one the student's new question.
 export async function followUp({ unit, topic = '', question, solution = '', answer = '', notes = '', history = [] }) {

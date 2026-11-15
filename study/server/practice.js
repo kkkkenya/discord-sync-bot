@@ -6,7 +6,8 @@
 // failure) or 'disputed' (the student says the checkpoints are wrong: nothing is held against them).
 import { compareAnswers } from './answer.js';
 import { aiReady, canRead, modelInUse, provider } from './ai.js';
-import { compareWorking, explainSolution, explainSolutions, followUp, readWorking, solveWithCheckpoints } from './brain.js';
+import { compareWorking, explainProgram, explainSolution, explainSolutions, followUp, readWorking, solveWithCheckpoints } from './brain.js';
+import { isProgramming, stripComments, taughtNames, untaught } from './taught.js';
 import { ERROR_TYPES } from './defs.js';
 import { contextFor, library } from './ingest.js';
 import { paperInfo, sheetNo } from './predict.js';
@@ -200,6 +201,7 @@ export async function explainQuestion({ unit, questionId, fresh = false }, { exp
   if (!fresh && savedExplain(row)) return savedExplain(row);
   const mine = !fresh && await classExplain(row, shared);
   if (mine) return mine;
+  if (programmingUnit(unit)) { if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' }; return explainCode(row); }
   if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
   const topic = data.topics.find((t) => t.id === row.topicId);
   const scheme = schemeFor(row);
@@ -245,6 +247,29 @@ export function breakdownOf(x) {
   if (x.trap) out.push(`Trap: ${x.trap}`);
   if (x.realLife) out.push(`Real life: ${x.realLife}`);
   return out.join('\n');
+}
+
+// ---- programming units: answers the way the course teaches them (owner, 2026-11-15) ----
+export const programmingUnit = (code) => isProgramming(data.units.find((u) => u.code === code)?.title);
+const codeBreakdown = (x) => [`\`\`\`${x.language || ''}`, x.code, '\`\`\`', ...(x.explanation.length ? ['', 'How it works:', ...x.explanation.map((e) => `- ${e}`)] : []), ...(x.output ? ['', 'Output:', x.output] : [])].join('\n');
+
+// The program, its explanation after it, and what it uses that the notes don't. The code is checked in code: comments
+// come out (and join the explanation), and a call the notes never use gets one rewrite without it.
+export async function explainCode(row, { program = explainProgram, files = library.files, notes = contextFor } = {}) {
+  const taught = taughtNames(Object.values(files).filter((e) => e.unit === row.unit && e.text).map((e) => e.text));
+  const topic = data.topics.find((t) => t.id === row.topicId);
+  const base = { unit: row.unit, topic: topic?.name || '', question: row.text, taught: [...taught].sort(), notes: notes(row.unit, topic?.name || row.text.slice(0, 120), 6000) || '' };
+  const read = (out) => { const c = stripComments(out.code, out.language); return { out, clean: c, extra: untaught(c.code, taught) }; };
+  let best = read(await program(base));
+  if (best.extra.length) {
+    const again = read(await program({ ...base, avoid: best.extra }));
+    if (again.extra.length <= best.extra.length) best = again;
+  }
+  const x = {
+    language: text(best.out.language).toLowerCase(), code: best.clean.code, output: text(best.out.output), untaught: best.extra,
+    explanation: [...(best.out.explanation || []), ...best.clean.comments].map(text).filter(Boolean),
+  };
+  return patch('paperq', row.id, { explain: { ...x, breakdown: codeBreakdown(x), answer: '', fbd: '', diagram: null, schemeFile: null } }).explain;
 }
 
 // The shared full solution for a question (tools/gold.js), copied onto this student's question with its level: no AI.
@@ -294,6 +319,11 @@ export async function explainBatch({ unit, questionIds = [] }, { explain = expla
   for (const r of rows) if (!savedExplain(r) && await classExplain(r, shared)) fromClass.push(r.id);
   const todo = rows.filter((r) => !savedExplain(r));
   if (!todo.length) return { done: fromClass, left: [] };
+  if (programmingUnit(unit)) { // one at a time: each is checked against the notes
+    if (!ready()) return { needAi: true, message: 'Solving needs the built-in AI. Take the questions to the Prompt Builder instead.' };
+    await explainCode(todo[0]);
+    return { done: [...fromClass, todo[0].id], left: todo.slice(1).map((r) => r.id) };
+  }
   if (!ready()) return { needAi: true, message: 'Solving needs the built-in AI. Take the questions to the Prompt Builder instead.' };
   const { batch, tokens } = nextBatch(todo);
   const schemes = [...new Map(batch.map((r) => [r.fileId, schemeFor(r)]).filter(([, x]) => x)).values()];

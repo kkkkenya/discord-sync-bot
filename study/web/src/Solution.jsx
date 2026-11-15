@@ -5,6 +5,22 @@ import Rich, { AnswerBox } from './Rich.jsx';
 // reasoning behind it, then one equation per line with its reason on the right, the answer in a box and a check.
 // Solutions saved before this layout (one markdown text, no steps) are shown as they were.
 export default function Solution({ sol }) {
+  // a programming answer: the code, then how it works, then a sample run (no comments inside the code)
+  if (sol.code) {
+    return (
+      <div className="sol stack">
+        <pre className="code-block" tabIndex={0} aria-label={`${sol.language || 'Code'} answer`}><code>{sol.code}</code></pre>
+        {sol.explanation?.length > 0 && (
+          <div className="stack-s">
+            <h3 className="sub-title">How it works</h3>
+            <ol className="sol-assume">{sol.explanation.map((e, i) => <li key={i}><Rich as="span" text={e} /></li>)}</ol>
+          </div>
+        )}
+        {sol.output && <div className="stack-s"><h3 className="sub-title">Output</h3><pre className="code-block"><code>{sol.output}</code></pre></div>}
+        {sol.untaught?.length > 0 && <p className="sol-p muted">Uses {sol.untaught.join(', ')}, which your notes don't show. Check with your lecturer's way.</p>}
+      </div>
+    );
+  }
   const fbd = (sol.diagram || sol.fbd) && (
     <div className="stack-s">
       <h3 className="sub-title">Free body diagram</h3>

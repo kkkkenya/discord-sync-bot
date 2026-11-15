@@ -52,3 +52,7 @@ export const deepseekCost = ({ prompt_tokens: i = 0, completion_tokens: o = 0 } 
 // replaced only by a higher level, by a strong model over a cheap one at the same level, or after enough students
 // flagged it. Strong models run only on the owner's laptop (tools/gold.js).
 export const GOLD = { levels: ['single', 'agreed', 'key'], strongModels: ['opus'], flagsToReplace: 3, solver: 'opus', second: 'deepseek-flash', diagrams: 'fable' }; // Fable draws diagrams only, never answers (owner, 2026-11-15; phase E1b)
+
+// Programming units (owner, 2026-11-15): answers use only what the unit's notes teach, with no comments in the code
+// (server/taught.js). Matched on the unit's title.
+export const PROGRAMMING_UNIT = /programming|coding/i;

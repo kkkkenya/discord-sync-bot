@@ -199,7 +199,9 @@ function trussLabel(force) {
   return v < 0.005 ? '0' : `${v >= 10 ? v.toFixed(1) : v.toFixed(2)} ${force > 0 ? 'T' : 'C'}`;
 }
 function Truss({ d }) {
-  const nodes = d.nodes || [];
+  // joints without a position are left out, so a bad diagram draws what it can instead of NaN
+  const nodes = (d.nodes || []).filter((n) => n && Number.isFinite(Number(n.x)) && Number.isFinite(Number(n.y))).map((n) => ({ ...n, x: Number(n.x), y: Number(n.y) }));
+  if (nodes.length < 2) return null;
   const xs = nodes.map((n) => n.x), ys = nodes.map((n) => n.y);
   const [minX, maxX, minY, maxY] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const pad = 70, top = 96; // room above for the load and reaction labels
@@ -209,7 +211,8 @@ function Truss({ d }) {
   const at = new Map(nodes.map((n) => [n.id, P(n)]));
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
   const force = (f, cls, key) => {
-    const [x, y] = at.get(f.node) || [0, 0];
+    if (!f || !at.has(f.node)) return null;
+    const [x, y] = at.get(f.node);
     const fx = Number(f.fx) || 0, fy = -(Number(f.fy) || 0);
     const len = Math.hypot(fx, fy);
     if (!len) return null;
@@ -233,7 +236,7 @@ function Truss({ d }) {
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Free body diagram. ${words}`}>
       {markers}
       {(d.members || []).map((m, i) => {
-        const p = at.get(m.a), q = at.get(m.b);
+        const p = m && at.get(m.a), q = m && at.get(m.b);
         if (!p || !q) return null;
         const cls = m.force == null || Math.abs(m.force) < 0.005 ? 'fbd-member' : m.force > 0 ? 'fbd-member tension' : 'fbd-member compression';
         const [mx, my] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
@@ -246,7 +249,8 @@ function Truss({ d }) {
         );
       })}
       {(d.supports || []).map((x, i) => {
-        const [px, py] = at.get(x.node) || [0, 0];
+        if (!x || !at.has(x.node)) return null;
+        const [px, py] = at.get(x.node);
         return (
           <g key={`s${i}`}>
             <path d={`M ${px} ${py + 5} L ${px - 12} ${py + 24} L ${px + 12} ${py + 24} Z`} className="fbd-support" />
@@ -255,11 +259,11 @@ function Truss({ d }) {
           </g>
         );
       })}
-      {nodes.map((n) => {
+      {nodes.map((n, i) => {
         const [px, py] = at.get(n.id);
         const left = n.x < cx, low = n.y < cy;
         return (
-          <g key={`n${n.id}`}>
+          <g key={`n${i}`}>
             <circle cx={px} cy={py} r="3.5" className="fbd-dot" />
             <Label text={n.id} x={px + (left ? -10 : 10)} y={py + (low ? 18 : -10)} textAnchor={left ? 'end' : 'start'} />
           </g>

@@ -287,7 +287,7 @@ const text = (v) => String(v || '').trim();
 export function shapeSolution(out, schemeFile = null) {
   const d = out.diagram || {};
   // a truss is drawn from its joints, and marked checked only when every joint balances in code
-  const truss = d.kind === 'truss' && d.nodes?.length > 1 ? { ...d, checked: checkTruss(d).ok } : null;
+  const truss = d.kind === 'truss' && d.nodes?.length > 1 ? { ...d, checked: (() => { try { return checkTruss(d).ok; } catch { return false; } })() } : null;
   const diagram = truss || (d.kind && d.kind !== 'none' && d.length > 0 ? d : null);
   const list = (a) => (Array.isArray(a) ? a.map(text).filter(Boolean) : []);
   const steps = (out.steps || []).map((s) => ({ math: text(s.math).replace(/^\$+|\$+$/g, ''), reason: text(s.reason).replace(/^\[|\]$/g, ''), note: text(s.note) })).filter((s) => s.math);

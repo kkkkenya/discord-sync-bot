@@ -53,3 +53,33 @@ test('member labels say tension or compression', () => {
   assert.equal(memberLabel(0), '0');
   assert.equal(memberLabel(-2.5), '2.50 C');
 });
+
+test('a member force 0.4 kN off is caught (a tolerance set by the largest force in the truss let it through)', () => {
+  for (const [a, b, force] of [['A', 'B', 15.4], ['A', 'C', -18.43], ['F', 'G', -12.4]]) {
+    const d = { ...CAT1_TRUSS, members: CAT1_TRUSS.members.map((m) => (m.a === a && m.b === b ? { ...m, force } : m)) };
+    assert.equal(checkTruss(d).ok, false, `${a}${b} = ${force}`);
+  }
+});
+
+test('bad data is never checked: no position, a non-number, an unknown joint, null entries', () => {
+  const noX = { ...CAT1_TRUSS, nodes: CAT1_TRUSS.nodes.map((n) => (n.id === 'B' ? { id: 'B', y: 0 } : n)) };
+  const word = { ...CAT1_TRUSS, loads: [{ node: 'F', fx: 0, fy: 'abc' }, CAT1_TRUSS.loads[1]] };
+  const ghost = { ...CAT1_TRUSS, members: [...CAT1_TRUSS.members, { a: 'A', b: 'Z', force: 9 }] };
+  const nulls = { ...CAT1_TRUSS, nodes: [...CAT1_TRUSS.nodes, null], members: [null, ...CAT1_TRUSS.members], loads: null };
+  for (const d of [noX, word, ghost]) {
+    const r = checkTruss(d);
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.length);
+  }
+  assert.doesNotThrow(() => checkTruss(nulls));
+  assert.doesNotThrow(() => checkTruss(null));
+  assert.equal(checkTruss(null).ok, false);
+});
+
+test('an indeterminate truss is not marked checked even when it balances', () => {
+  const extra = { ...CAT1_TRUSS, members: [...CAT1_TRUSS.members, { a: 'B', b: 'E', force: 0 }] };
+  const r = checkTruss(extra);
+  assert.equal(r.unbalanced.length, 0);
+  assert.equal(r.determinate, false);
+  assert.equal(r.ok, false);
+});

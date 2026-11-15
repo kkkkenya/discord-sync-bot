@@ -2,7 +2,7 @@
 // stays pure in analysis.js.
 import { applyTeachGaps } from './analysis.js';
 import { library } from './ingest.js';
-import { bookQuestions, isScheme, mapQuestion, paperInfo, parseQuestions, readHint, sheetNo } from './predict.js';
+import { bookQuestions, exerciseBlocks, isScheme, mapQuestion, paperInfo, parseQuestions, readHint, sheetNo } from './predict.js';
 import { data, save } from './store.js';
 
 // A tutorial sheet's printed answer as the question's key: "(Ans: 175 kNm; 4.3°)" → any part can be checked, no AI needed.
@@ -27,7 +27,7 @@ const scannedOf = (unit) => Object.entries(library.files).filter(([, e]) => e.un
 // Bumped when parseQuestions changes, so saved papers are read again (GET /api/predict). 2: looser numbering, no
 // 3000-character cut. 3: worked examples and exercises from the unit's books, word for word. 4: the page each
 // question is on (for "Open at page").
-export const PARSER_VERSION = 4;
+export const PARSER_VERSION = 5; // 5: notes with Exercise / Assignment headings give one question per task
 // The PDF page (1-based) a character offset falls on, when the file's page starts are known.
 const pageAt = (e, offset) => (e.pageStarts?.length && offset != null ? Math.max(1, e.pageStarts.findLastIndex((s) => s <= offset) + 1) : null);
 export const isBook = (q) => q.type === 'Book';
@@ -51,7 +51,7 @@ export function parsePapers(unit) {
   const papers = all.filter(([, e]) => e.paper && !isScheme(e.name)).map(([, e]) => e.name);
   const files = all.filter(([, e]) => !(e.paper && isScheme(e.name) && papers.some((n) => samePaper(n, e.name))));
   const ids = new Set(all.map(([id]) => id));
-  const read = (e) => (e.paper ? parseQuestions(e.text) : bookQuestions(e.text).map((b, i) => ({ number: i + 1, label: b.label, marks: null, text: b.text, offset: b.offset, ...(b.solution && { bookSolution: b.solution }) })))
+  const read = (e) => (e.paper ? (exerciseBlocks(e.text).length ? exerciseBlocks(e.text) : parseQuestions(e.text)) : bookQuestions(e.text).map((b, i) => ({ number: i + 1, label: b.label, marks: null, text: b.text, offset: b.offset, ...(b.solution && { bookSolution: b.solution }) })))
     .map(({ offset, ...q }) => ({ ...q, page: pageAt(e, offset) }));
   const old = new Map(data.paperq.filter((q) => ids.has(q.fileId)).map((q) => [`${q.fileId}#${q.number}`, q]));
   data.paperq = data.paperq.filter((q) => !ids.has(q.fileId));

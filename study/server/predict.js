@@ -88,6 +88,20 @@ export function parseQuestions(text) {
 // [{ label, text, solution }]
 const BOOK_LABEL = /\b(Worked [Ee]xample|Illustrative [Ee]xample|Example|EXAMPLE|Exercise|EXERCISE|Problem|PROBLEM)\s*(\d+(?:[.-]\d+)*)\s*[.:]?(?=\s+[A-Z(])/g;
 const SOLUTION = /\b(?:Solution|SOLUTION|Sol\.)(?:\s*\d+(?:[.-]\d+)*)?\s*[.:]?\s/;
+// Course notes whose tasks are headed "Exercise 2.1", "Assignment 6. 11", "Lab 3": each heading starts a question, which
+// runs to the next one (at most 1500 characters). [] when the notes have fewer than three such headings.
+const EXERCISE = /(?<![A-Za-z])(Exercise|Assignment|Lab)\s*:?\s*(\d+(?:\s*\.\s*\d+)?)\s*:?/g;
+export function exerciseBlocks(text) {
+  const t = String(text || '');
+  const heads = [...t.matchAll(EXERCISE)];
+  if (heads.length < 3) return [];
+  return heads.map((m, i) => {
+    const end = i + 1 < heads.length ? heads[i + 1].index : t.length;
+    const label = `${m[1]} ${m[2].replace(/\s+/g, '')}`;
+    return { number: i + 1, label, marks: null, text: t.slice(m.index, Math.min(end, m.index + 1500)).trim(), offset: m.index };
+  }).filter((q) => q.text.length > 40);
+}
+
 export function bookQuestions(text) {
   const src = String(text || '');
   const hits = [...src.matchAll(BOOK_LABEL)];

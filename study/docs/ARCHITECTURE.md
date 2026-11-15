@@ -23,7 +23,7 @@ flowchart LR
   end
   subgraph Owner laptop
     T[tools/*.js run by hand]
-    CC[Claude Code headless: Opus, Fable]
+    CC[Claude Code headless: Opus]
     PC[PC bots: drive dumper, hub buddy]
   end
   W --> R
@@ -131,7 +131,7 @@ Use of each model:
 
 | Model | Work | Where |
 |---|---|---|
-| Fable 5.2 | Plans. End-of-track review. Third opinion when two solvers disagree. Rewrites of the prompts for the cheap models (E6). | Claude Code sessions; `tools/gold.js --referee` |
+| Fable 5.2 | Plans and end-of-track code review only. **Never used for answers or solutions** (owner, 2026-11-15). | Claude Code sessions |
 | Opus 5.5 | Building each phase. First solver for gold solutions. | Claude Code sessions; `tools/gold.js` |
 | GLM 5.3 or DeepSeek V4 Pro | Second solver for gold solutions. A different model family makes agreement mean more. | `tools/gold.js`, with the keys in `study/.env` |
 | Gemini Flash, DeepSeek Flash, GLM Flash | Everything per student. | Vercel |
@@ -150,10 +150,8 @@ flowchart TD
   S2 --> S3[Second solver from another family solves, blind]
   S3 --> C2{Final answers match?}
   C2 -- yes --> AG[level = agreed]
-  C2 -- no --> F[Fable solves, sees both]
-  F --> C3{Matches one of them?}
-  C3 -- yes --> AG
-  C3 -- no --> SI[level = single, listed for the owner]
+  C2 -- no --> SI
+  SI[level = single, listed for the owner]
 ```
 
 - Comparison is code: `compareAnswers` in `server/answer.js` (value, unit, tolerance). Questions with no numeric answer (derivations, definitions) cannot be compared; they are stored as `single` with `model` set, and the app says "not double-checked".

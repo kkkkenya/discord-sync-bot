@@ -63,13 +63,9 @@ test('settle: a printed answer with no number falls back to the two solvers', ()
   assert.equal(settle({ key: 'see notes', first: '12.5 kN', second: '12.5 kN' }).level, 'agreed');
 });
 
-test('settle: disagreement, with and without a referee', () => {
-  const no = settle({ first: '12.5 kN', second: '20 kN' });
-  assert.equal(no.level, 'single'); assert.equal(no.review, true);
-  assert.deepEqual(settle({ first: '12.5 kN', second: '20 kN', referee: '12.5 kN' }).winner, 'first');
-  const second = settle({ first: '12.5 kN', second: '20 kN', referee: '20 kN' });
-  assert.equal(second.level, 'agreed'); assert.equal(second.winner, 'second');
-  assert.equal(settle({ first: '12.5 kN', second: '20 kN', referee: '7 kN' }).reason, 'three different answers');
+test('settle: a disagreement stays single and goes to the owner (no referee model)', () => {
+  const no = settle({ first: '12.5 kN', second: '20 kN', referee: '12.5 kN' });
+  assert.equal(no.level, 'single'); assert.equal(no.review, true); assert.equal(no.reason, 'the solvers disagree');
 });
 
 test('settle: a derivation has nothing to compare and stays single, not listed', () => {

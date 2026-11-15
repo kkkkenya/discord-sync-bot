@@ -41,9 +41,9 @@ export function sameAnswer(x, y) {
 
 // The level of one question, from the final answers as text. key: the printed answer (parts or text) or null.
 // first: the first solver, blind. told: the first solver again, told the printed answer (only after a miss).
-// second: the other model family, blind. referee: a third model, blind, only when first and second disagree.
-// → { level, winner: 'first'|'told'|'second', reason, review } (review: the owner should look at it).
-export function settle({ key = null, first, told = null, second = null, referee = null }) {
+// second: the other model family, blind. When the two disagree there is no referee: the owner looks at it.
+// → { level, winner: 'first'|'told', reason, review } (review: the owner should look at it).
+export function settle({ key = null, first, told = null, second = null }) {
   const printed = key == null ? [] : answerParts(key);
   if (printed.length) {
     const blind = sameAnswer(first, printed);
@@ -55,11 +55,7 @@ export function settle({ key = null, first, told = null, second = null, referee 
   const agree = sameAnswer(first, second);
   if (agree == null) return { level: 'single', winner: 'first', reason: 'nothing to compare', review: false };
   if (agree) return { level: 'agreed', winner: 'first', reason: 'two solvers agree', review: false };
-  if (referee != null) {
-    if (sameAnswer(referee, first)) return { level: 'agreed', winner: 'first', reason: 'the referee agrees with the first solver', review: false };
-    if (sameAnswer(referee, second)) return { level: 'agreed', winner: 'second', reason: 'the referee agrees with the second solver', review: true };
-  }
-  return { level: 'single', winner: 'first', reason: referee != null ? 'three different answers' : 'the solvers disagree', review: true };
+  return { level: 'single', winner: 'first', reason: 'the solvers disagree', review: true };
 }
 
 // The run's report. results: [{ label, level, reason, review, keyed, firstRight?, secondRight?, error? }].

@@ -2,7 +2,7 @@
 //   node tools/gold.js "EMM 302" --dry                 counts only: questions, printed answers, already settled
 //   node tools/gold.js "EMM 302" --limit 10            solve up to 10 questions that are not settled yet
 //   node tools/gold.js "EMM 302" --only-keyed --limit 5 --no-save    score the solvers on printed answers (E6 too)
-// Other flags: --referee (Fable decides when Opus and DeepSeek disagree), --books (book exercises too),
+// Other flags: --books (book exercises too),
 // --no-full (checkpoints only, no full worked solution: half the Opus calls), --redo (solve settled ones again).
 //
 // First solver: Opus through Claude Code (the owner's plan, no API key). Second: DeepSeek Flash (DEEPSEEK_API_KEY).
@@ -19,10 +19,10 @@ const unit = argv.find((a) => !a.startsWith('--'));
 const flag = (name) => argv.includes(`--${name}`);
 const limitAt = argv.indexOf('--limit');
 const limit = limitAt >= 0 ? Number(argv[limitAt + 1]) : Infinity;
-const opt = { dry: flag('dry'), onlyKeyed: flag('only-keyed'), referee: flag('referee'), books: flag('books'), full: !flag('no-full'), save: !flag('no-save'), redo: flag('redo') };
+const opt = { dry: flag('dry'), onlyKeyed: flag('only-keyed'), books: flag('books'), full: !flag('no-full'), save: !flag('no-save'), redo: flag('redo') };
 
 const stop = (msg) => { console.log(msg); process.exit(1); };
-if (!unit) stop('Usage: node tools/gold.js "EMM 302" [--dry] [--limit N] [--only-keyed] [--referee] [--books] [--no-full] [--no-save] [--redo]');
+if (!unit) stop('Usage: node tools/gold.js "EMM 302" [--dry] [--limit N] [--only-keyed] [--books] [--no-full] [--no-save] [--redo]');
 if (process.env.VERCEL) stop('This runs on the owner\'s laptop only.');
 if (!Number.isFinite(limit) && limitAt >= 0) stop('--limit needs a number, for example --limit 10.');
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) stop('SUPABASE_URL and SUPABASE_SERVICE_KEY are missing from study/.env (run setup-web.bat). The shared library lives there.');
@@ -91,11 +91,9 @@ for (const [i, q] of batch.entries()) {
     const wantSecond = !printed || opt.onlyKeyed;
     const [first, second] = await Promise.all([opus(), wantSecond ? withModel('deepseek', GOLD.second, () => solveWithCheckpoints(base)) : null]);
     const told = printed && !sameAnswer(first.answer, printed) ? await opus({ expected: printed.join('; ') }) : null;
-    const disagree = !printed && second && sameAnswer(first.answer, second.answer) === false;
-    const referee = disagree && opt.referee ? await withModel('claude-code', GOLD.referee, () => solveWithCheckpoints(base)) : null;
-    const s = settle({ key: printed, first: first.answer, told: told?.answer ?? null, second: printed ? null : second?.answer ?? null, referee: referee?.answer ?? null });
-    const winner = { first, told, second }[s.winner];
-    const model = s.winner === 'second' ? GOLD.second : GOLD.solver;
+    const s = settle({ key: printed, first: first.answer, told: told?.answer ?? null, second: printed ? null : second?.answer ?? null });
+    const winner = { first, told }[s.winner];
+    const model = GOLD.solver;
     const answer = s.level === 'key' ? printed.join('; ') : String(winner.answer || '').trim();
     const r = { label, level: s.level, reason: s.reason, review: s.review, keyed: Boolean(printed), answer, firstAnswer: first.answer, secondAnswer: second?.answer };
     if (printed) { r.firstRight = sameAnswer(first.answer, printed) === true; if (second) r.secondRight = sameAnswer(second.answer, printed) === true; }

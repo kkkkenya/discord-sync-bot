@@ -177,3 +177,11 @@ create table if not exists crux_ai_usage (
   primary key (user_id, day)
 );
 alter table crux_ai_usage enable row level security;
+
+-- Track E1 (study/docs/ARCHITECTURE.md 3.3, 2026-11-15): check level and origin of a shared solution.
+-- level: key (matches a printed answer) > agreed (two model families agree) > single (not double-checked).
+-- A lower level never replaces a higher one (study/server/gold.js). Additive: existing rows become 'single'.
+alter table crux_question_kb add column if not exists level   text not null default 'single' check (level in ('key', 'agreed', 'single'));
+alter table crux_question_kb add column if not exists model   text;          -- e.g. 'opus', 'gemini-3.8-flash'
+alter table crux_question_kb add column if not exists answer  text;          -- the final answer as text, for the agreement check
+alter table crux_question_kb add column if not exists flagged integer not null default 0;  -- students who disputed the checkpoints

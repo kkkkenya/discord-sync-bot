@@ -51,4 +51,4 @@ export const deepseekCost = ({ prompt_tokens: i = 0, completion_tokens: o = 0 } 
 // families reach the same answer), 'key' (matches the answer printed on a tutorial sheet). A shared solution is
 // replaced only by a higher level, by a strong model over a cheap one at the same level, or after enough students
 // flagged it. Strong models run only on the owner's laptop (tools/gold.js).
-export const GOLD = { levels: ['single', 'agreed', 'key'], strongModels: ['opus'], flagsToReplace: 3, solver: 'opus', second: 'deepseek-flash' }; // no Fable for answers (owner, 2026-11-15)
+export const GOLD = { levels: ['single', 'agreed', 'key'], strongModels: ['opus'], flagsToReplace: 3, solver: 'opus', second: 'deepseek-flash', diagrams: 'fable' }; // Fable draws diagrams only, never answers (owner, 2026-11-15; phase E1b)

@@ -1,6 +1,6 @@
 {
-  "version": "0.6.1",
+  "version": "0.6.3",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "Crux hosted models with your plan: no key needed. Best models first in the list.",
-  "released": "2026-11-13"
+  "notes": "Now called Crux Harness. Later versions install from inside the app with Update now. Add several Hub files at once.",
+  "released": "2026-11-15"
 }

@@ -41,6 +41,8 @@ export const TBA = 'TBA';
 export const LIMITS = {
   ai: { trial: 15, basic: 15, premium: 40, vvip: 80, owner: Infinity },
   download: { trial: 2, basic: 2, premium: Infinity, vvip: Infinity, owner: Infinity },
+  // "Ask for the scheme" (server/schemes.js): each ask is a DM to the owner
+  ask: { trial: 5, basic: 5, premium: 5, vvip: 5, owner: Infinity },
 };
 // DeepSeek (Premium's deeper text tasks). Priced at the peak rate so the estimate errs high: deepseek-flash,
 // USD per million tokens, from api-docs.deepseek.com on 2026-11-01. Above the monthly cap Crux uses Gemini instead.

@@ -22,10 +22,11 @@ import Today from './Today.jsx';
 import Units from './Units.jsx';
 import UnitNotes from './UnitNotes.jsx';
 import UnitPapers from './UnitPapers.jsx';
+import UnitSchemes from './UnitSchemes.jsx';
 import UnitTopics from './UnitTopics.jsx';
 
 const MODES = [{ id: 'questions', label: 'Questions' }, { id: 'explain', label: 'Explain it' }, { id: 'timed', label: 'Timed paper' }];
-const UNIT_TABS = [{ id: 'topics', label: 'Topics' }, { id: 'papers', label: 'Papers' }, { id: 'notes', label: 'Notes' }, { id: 'sheet', label: 'Sheet' }];
+const UNIT_TABS = [{ id: 'topics', label: 'Topics' }, { id: 'papers', label: 'Papers' }, { id: 'schemes', label: 'Schemes' }, { id: 'notes', label: 'Notes' }, { id: 'sheet', label: 'Sheet' }];
 
 // Where the old panels' links (go('predictions'), go('teach'), …) land in the new map (fixplan Appendix C).
 const PLACE = {
@@ -239,6 +240,7 @@ export default function App({ user }) {
           <AutoRead s={s} unit={u.code} refresh={refresh} />
           {tab === 'topics' && <UnitTopics {...props} unit={u.code} />}
           {tab === 'papers' && <UnitPapers {...props} unit={u.code} />}
+          {tab === 'schemes' && <UnitSchemes {...props} unit={u.code} />}
           {tab === 'notes' && <UnitNotes {...props} unit={u.code} />}
           {tab === 'sheet' && <div className="sheet-tab"><Kit {...props} unit={u.code} /></div>}
         </>

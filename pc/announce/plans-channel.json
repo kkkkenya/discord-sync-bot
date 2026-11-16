@@ -1,0 +1,23 @@
+{
+  "content": "",
+  "embeds": [
+    {
+      "title": "✦ Plans · per semester",
+      "color": 15248459,
+      "fields": [
+        { "name": "Imai · Free for 7 days", "value": "Everything in Gacrux while you try it." },
+        { "name": "Gacrux · KES 50", "value": "All unit libraries and homework help.\nCrux: 15 AI actions and 2 downloads a day." },
+        { "name": "Mimosa · KES 500", "value": "Crux: 40 AI actions a day, unlimited downloads.\nMembers' channels and project guides." },
+        { "name": "Acrux · KES 999", "value": "Crux: 80 AI actions a day.\nThe strongest models in the desktop app." }
+      ],
+      "footer": { "text": "Upgrade: Gacrux → Mimosa KES 350 · Mimosa → Acrux KES 499" }
+    },
+    {
+      "title": "💳 How to pay",
+      "color": 3908957,
+      "description": "**1.** Send the amount by M-Pesa to **0745947704** (Peter Mwangi).\n**2.** Press **✅ I've paid** below. Paste the code from the SMS and the plan name.\n**3.** You get a DM when you're in.",
+      "footer": { "text": "7-day refund if it's not for you" }
+    }
+  ],
+  "reactions": ["⭐", "💳", "✅"]
+}

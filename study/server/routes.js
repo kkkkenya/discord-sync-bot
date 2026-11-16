@@ -30,6 +30,8 @@ import { newMaterial } from './inbox.js';
 import { makeGuideFor } from './guide.js';
 import { contributors, finishUpload, myUploads, postedDays, startUpload, unitPapers } from './hub-uploads.js';
 import { rewardInfo } from './rewards.js';
+import { askText, firstAsk, schemeList } from './schemes.js';
+import { dm } from '../../lib/discord.js';
 import { learnFor, topicPlaces } from './learn-store.js';
 import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, classExplain, disputeSolution, ensureCheckpoints, explainBatch, explainQuestion, markBroke, savedExplain } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
@@ -130,6 +132,27 @@ const routes = {
     const course = COURSES[q.get('course')] ? q.get('course') : saved.course;
     const year = Number(q.get('year')) || saved.year;
     return { courses: courses(ALL_UNITS), course, year, ...cohortUnits(ALL_UNITS, { course, year }), all: ALL_UNITS };
+  },
+  // A unit's marking schemes beside their papers, and the papers with none yet (UnitSchemes.jsx, Crux Harness).
+  'GET /api/schemes': async (q) => {
+    const unit = q.get('unit');
+    if (!unit) return { schemes: [], missing: [] };
+    const { files, note } = await filesFor(unit);
+    return { note: note || null, ...schemeList(files) };
+  },
+  // "Ask for the marking scheme": a DM to the owner about one of the unit's papers with no scheme, once per student,
+  // paper and day, and at most LIMITS.ask a day (counted in the database).
+  'POST /api/schemes/ask': async (q, { unit, paperId } = {}, ctx) => {
+    if (typeof unit !== 'string' || !unit.trim() || !/^\d{1,12}$/.test(String(paperId ?? ''))) throw Object.assign(new Error('Pick a paper first.'), { status: 400 });
+    const { files } = await filesFor(unit.trim());
+    const paper = schemeList(files).missing.find((p) => p.id === String(paperId));
+    if (!paper) throw Object.assign(new Error('That paper already has a scheme, or is not on the hub.'), { status: 400 });
+    if (!firstAsk(ctx.user.id, unit, paper.id, nairobiDay())) return { asked: true, again: true };
+    const used = await bump(ctx.user, 'ask');
+    if (!used.ok) throw Object.assign(new Error("You've asked for 5 schemes today. Ask again tomorrow."), { status: 429 });
+    const owner = process.env.OWNER_ID;
+    const sent = owner ? await dm(owner, askText(unit, paper.name, ctx.user.name)) : false;
+    return { asked: true, sent };
   },
   // A unit's server files merged with the ingested context-library cache (sync status + extracted text).
   'GET /api/library': async (q) => {

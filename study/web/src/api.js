@@ -21,9 +21,14 @@ const OUTBOX = 'crux-outbox';
 export const outbox = () => { try { return JSON.parse(localStorage.getItem(OUTBOX)) || []; } catch { return []; } };
 const keep = (list) => { try { localStorage.setItem(OUTBOX, JSON.stringify(list)); } catch { /* private window */ } window.dispatchEvent(new Event('crux-outbox')); };
 
+// Requests that use one of the day's AI answers (server/routes.js USES_AI): the answers-left count drops by one.
+const AI_PATHS = /^(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch|ask)|ask\/passage|learn\/guide|predict\/map)(\?.*)?$/;
+
 export async function api(method, path, body) {
   try {
-    return await send(method, path, body);
+    const out = await send(method, path, body);
+    if (method === 'POST' && AI_PATHS.test(path) && typeof window !== 'undefined') window.dispatchEvent(new Event('crux-ai-used'));
+    return out;
   } catch (e) {
     if (e.status) throw e; // the server answered: a real error, not a lost connection
     if (method === 'GET' || !QUEUE.test(path)) throw new Error(OFFLINE);

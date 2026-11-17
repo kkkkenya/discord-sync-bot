@@ -136,6 +136,8 @@ function UnitRow({ u, s, refresh }) {
   const auto = st && st.source !== 'unit' ? st.name : s.stages.find((x) => x.id === (s.settings.stage || 'adequate'))?.name;
   const topics = s.data.topics.filter((t) => t.unit === u.code);
   const solid = topics.filter((t) => s.mastery?.[t.id]?.status === 'green').length;
+  // Ready (fixplan-e E3): a topic list to study from, and the unit's files read, so Practise, Learn and Ask have material
+  const ready = topics.length >= 3 && Object.values(s.library || {}).some((e) => e.unit === u.code && (e.chars || 0) > 0);
   const set = (body) => api('PATCH', `units?code=${encodeURIComponent(u.code)}`, body).then(refresh);
   const id = u.code.replace(/\W+/g, '-');
   return (
@@ -147,6 +149,7 @@ function UnitRow({ u, s, refresh }) {
           {topics.length
             ? <span className="meter-wrap" title={`${solid} of ${topics.length} topics solid`}><span className="meter"><span style={{ width: `${Math.round((solid / topics.length) * 100)}%` }} /></span><span className="row-sub num">{solid}/{topics.length}</span></span>
             : <span className="meter-wrap row-sub">No topics</span>}
+          {ready && <span className="chip good" title="Topics set and files read">Ready</span>}
           <span className={`chip num ${st?.id || ''}`} title={u.catDate ? undefined : 'From the KU calendar'}>{tba ? 'TBA' : daysText(info.days)}</span>
         </a>
         <button type="button" className="iconbtn" aria-expanded={open} aria-controls={`edit-${id}`} aria-label={`${u.code} date and stage`} onClick={() => setOpen(!open)}><Icon name="edit" /></button>

@@ -30,6 +30,19 @@ export function topicMastery(topic, today = nairobiDay(), kappa) {
 }
 
 export const topicStatus = (topic, today) => topicMastery(topic, today).status;
+
+// The done bar (fixplan-e E3): a topic's status before and after a task, added to the task's own reply, so the page
+// can say "Torsion: amber → green" without another request. find: the topic the task is about, looked up before and
+// after (a task can create or rename it). A reply that is not a plain object goes back as it is.
+export async function withChange(find, run, today = nairobiDay()) {
+  const before = find();
+  const from = before ? topicStatus(before, today) : null;
+  const out = await run();
+  if (!out || typeof out !== 'object' || Array.isArray(out) || out instanceof Response) return out;
+  const after = find();
+  if (!after) return out;
+  return { ...out, change: { topic: after.name, from, to: topicStatus(after, today) } };
+}
 export function masteryMap(today = nairobiDay()) {
   const now = asOf(today);
   const kappa = Object.fromEntries([...new Set(data.topics.map((t) => t.unit))].map((u) => [u, calibration(data.topics.filter((t) => t.unit === u), lists(), now)]));

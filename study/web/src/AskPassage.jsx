@@ -6,6 +6,7 @@ import { api } from './api.js';
 import { AiWait } from './Busy.jsx';
 import { Icon } from './icons.jsx';
 import Rich from './Rich.jsx';
+import { AnswersLeft } from './Allowance.jsx';
 
 const STARTERS = ['Explain this in simpler words', 'Why is this true?', 'Show a small example'];
 const threads = new Map(); // where → messages, for as long as the page is open
@@ -46,7 +47,6 @@ export default function AskPassage({ unit, ai }) {
       if (r.needAi) throw new Error(r.message);
       const done = [...messages, { role: 'tutor', text: r.reply }];
       setChat(done); threads.set(key, done);
-      window.dispatchEvent(new Event('crux-ai-used'));
     } catch (e) { setProblem(e.message); setChat(chat); setText(ask); }
     setBusy(false);
   };
@@ -78,7 +78,7 @@ export default function AskPassage({ unit, ai }) {
           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(text); } }} />
         <button className="btn primary" disabled={busy || !text.trim() || !ai}>{busy ? 'Thinking…' : 'Ask'}</button>
       </form>
-      <p className="row-sub">Each question is one AI action.</p>
+      <p className="row-sub">Each question is one AI action. <AnswersLeft /></p>
     </section>
   );
 }

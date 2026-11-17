@@ -9,6 +9,7 @@ import { AiWait } from './Busy.jsx';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 import TopicNotes from './TopicNotes.jsx';
 import CodeCell from './CodeCell.jsx';
+import { finished } from './DoneBar.jsx';
 
 // programming units (server/defs.js PROGRAMMING_UNIT): Practise shows a code cell under the question
 const PROGRAMMING = /programming|coding/i;
@@ -132,7 +133,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
     && (!filter.trim() || `${qname(x)} ${x.text}`.toLowerCase().includes(filter.trim().toLowerCase()));
   const subName = (id) => s.data.subtopics.find((x) => x.id === id)?.name;
   const run = async (fn) => { setBusy(true); setProblem(''); try { await fn(); } catch (e) { setProblem(e.message); } setBusy(false); };
-  const took = (out) => { setRes(out); setSteps(out.checkpoints || []); if (out.attempt) refresh(); };
+  // a right answer ends the task (the done bar); a wrong one ends when its broken step is marked
+  const took = (out) => { setRes(out); setSteps(out.checkpoints || []); if (out.attempt) refresh(); if (out.verdict === 'right') finished({ change: out.change, questionId: qid, kind: 'check' }); };
   const reviewing = Boolean(start?.review) && start.questionId === qid; // opened from a Today review (E2)
   const check = (e) => { e.preventDefault(); run(async () => took(await api('POST', 'attempts/check', { unit, questionId: qid, answer, key: key || undefined, ...(reviewing && { review: true }) }))); };
   const photo = (file) => file && run(async () => {
@@ -143,10 +145,10 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
     if (out.suggest) { setBroke(out.suggest.brokeAt); setMistake({ subtopicId: out.guess?.subtopicId || '', errorType: out.suggest.errorType || out.guess?.errorType || '' }); }
   });
   const save = () => run(async () => {
-    await api('POST', 'attempts/broke', { id: res.attempt.id, step: broke, subtopicId: mistake.subtopicId || null, errorType: mistake.errorType });
+    const out = await api('POST', 'attempts/broke', { id: res.attempt.id, step: broke, subtopicId: mistake.subtopicId || null, errorType: mistake.errorType });
     setSaved(true);
-    notify('Saved to your weakspots.');
     await refresh();
+    finished({ change: out.change, questionId: qid, kind: 'broke' });
   });
   const deeper = () => go('prompt', { unit, questionId: qid || undefined, topicId: q?.topicId, goal: 'solution' });
 

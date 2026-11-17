@@ -1156,3 +1156,24 @@ button.chip:active, a.chip:active { transform: scale(.95); }
 .ask-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
 .ask-quote { margin: 0; padding: var(--s2) var(--s3); border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; font-size: var(--t-s); white-space: pre-wrap; }
 .ask-quote.is-short { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* The done bar (DoneBar.jsx): above the tab pill on phones, bottom centre on laptops; above the focus bar when both show. */
+.donebar { position: fixed; z-index: 20; left: var(--nav-gap); right: var(--nav-gap); bottom: calc(14px + var(--tabs) + 8px + 10px + env(safe-area-inset-bottom));
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); padding: var(--s2) var(--s2) var(--s2) var(--s4); border-radius: var(--radius-nav); animation: pop 0.28s var(--spring); }
+body:has(.focusbar) .donebar { bottom: calc(14px + var(--tabs) + 8px + 10px + 60px + env(safe-area-inset-bottom)); }
+.donebar-line { flex: 1 1 160px; min-width: 0; font-weight: 600; }
+.donebar .btn { min-height: 40px; }
+@media (min-width: 768px) { .donebar { left: 50%; right: auto; transform: translateX(-50%); width: min(640px, calc(100vw - 160px)); bottom: 24px; } body:has(.focusbar) .donebar { bottom: 88px; } }
+@media (prefers-reduced-motion: reduce) { .donebar { animation: none; } }
+.answers-left { white-space: nowrap; }
+.answers-left.warn-text { color: var(--warn-text); }
+.donebar .fdot { order: 0; }
+.donebar-line { order: 1; }
+.donebar > .iconbtn { order: 2; }
+.donebar > .btn { order: 3; }
+@media (max-width: 767px) { .donebar-line { flex-basis: calc(100% - 70px); } }
+/* the notes strip sits above the tab pill on phones: the done bar goes above it, and above the focus bar too */
+@media (max-width: 767px) {
+  body:has(.notesbar) .donebar { bottom: calc(14px + var(--tabs) + 8px + 56px + env(safe-area-inset-bottom)); }
+  body:has(.notesbar):has(.focusbar) .donebar { bottom: calc(14px + var(--tabs) + 8px + 56px + 60px + env(safe-area-inset-bottom)); }
+}

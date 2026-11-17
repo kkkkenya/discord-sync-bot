@@ -4,6 +4,7 @@ import Busy from './Busy.jsx';
 import LimitNote from './LimitNote.jsx';
 import { wavData } from './media.js';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
+import { finished } from './DoneBar.jsx';
 
 const MAX_SECS = 240; // 4 minutes of voice is about 7.7 MB as WAV, under the upload limit
 
@@ -61,7 +62,7 @@ export default function Teach({ s, unit, refresh, focus, go }) {
   const send = async (e) => {
     e.preventDefault();
     setBusy(true); setResult(null);
-    try { setResult(await api('POST', 'teach', { unit, topic, text })); setText(''); refresh(); }
+    try { const out = await api('POST', 'teach', { unit, topic, text }); setResult(out); setText(''); await refresh(); finished({ change: out.change, kind: 'teach', topic }); }
     catch (err) { setResult({ error: err.message }); }
     setBusy(false);
   };
@@ -81,7 +82,7 @@ export default function Teach({ s, unit, refresh, focus, go }) {
     try {
       const out = await api('POST', 'teach/audio', { unit, topic, audio: await wavData(blob) });
       if (out.unclear) setResult({ error: out.message, transcript: out.transcript });
-      else { setResult(out); refresh(); }
+      else { setResult(out); await refresh(); finished({ change: out.change, kind: 'teach', topic }); }
     } catch (err) { setResult({ error: err.message }); }
     setBusy(false);
   };

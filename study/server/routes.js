@@ -9,7 +9,10 @@ import { ALL_UNITS, calendar, filesFor, nextAssessment } from './library.js';
 import { COURSES, cohortUnits, courses, validCohort } from './cohort.js';
 import { ERROR_TYPES, LEARNER, PUBLIC_ROOMS, STAGES, TBA } from './defs.js';
 import { stageMix, validStage } from './stages.js';
-import { masteryMap } from './mastery.js';
+import { masteryMap, withChange } from './mastery.js';
+
+// the topic a practice question is filed under (the done bar's before and after)
+const topicOfQuestion = (questionId) => data.topics.find((t) => t.id === data.paperq.find((x) => x.id === questionId)?.topicId);
 import { checkSubtopic } from './analysis.js';
 import { PARSER_VERSION, hintFields, isBook, parsePapers, pastePaper, predictFor, scannedPapers, teachFlags, weakspotsFor } from './weakspots.js';
 import { predictedMock } from './predict.js';
@@ -230,7 +233,7 @@ const routes = {
     save();
     return state();
   },
-  'POST /api/teach': async (q, { unit, topic, text }) => teachBack({ unit, topic, text }),
+  'POST /api/teach': async (q, { unit, topic, text }, ctx) => withChange(() => data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === String(topic || '').toLowerCase()), () => teachBack({ unit, topic, text }), ctx?.today),
   // A spoken teach-back (Phase 9): { unit, topic, audio: { mime, data } } → transcribed, then marked like a typed one.
   'POST /api/teach/audio': async (q, { unit, topic, audio }) => {
     if (!unit || !topic) throw Object.assign(new Error('Pick the unit and the topic first.'), { status: 400 });
@@ -326,10 +329,10 @@ const routes = {
   'POST /api/learn/guide': async (q, body) => makeGuideFor(body || {}),
   // Study kit (Phase 10): { unit, kind?, topicId? } → the saved material, or { needKey, goal } with no AI key.
   'POST /api/materials/make': async (q, body) => makeKitFor(body || {}),
-  'POST /api/attempts/check': async (q, body) => checkAnswer(body || {}),
+  'POST /api/attempts/check': async (q, body, ctx) => withChange(() => topicOfQuestion(body?.questionId), () => checkAnswer(body || {}), ctx?.today),
   // A photo of your working (Phase 9): { unit, questionId? | question?, image: { mime, data } } → read, checked, and
   // the broken checkpoint suggested.
-  'POST /api/attempts/photo': async (q, body) => checkPhoto(body || {}),
+  'POST /api/attempts/photo': async (q, body, ctx) => withChange(() => topicOfQuestion(body?.questionId), () => checkPhoto(body || {}), ctx?.today),
   'POST /api/attempts/checkpoints': async (q, body) => ensureCheckpoints(body || {}),
   // The full worked solution and free body diagram for a question: { unit, questionId, fresh? }.
   'GET /api/attempts/explain': async (q) => {
@@ -342,7 +345,7 @@ const routes = {
   // "Ask about this": { unit, questionId, messages } → { reply }, a follow-up on the question and its solution
   'POST /api/attempts/ask': async (q, body) => askAbout(body || {}),
   'POST /api/ask/passage': async (q, body) => askPassage(body || {}), // fixplan-e E4: ask about selected text
-  'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
+  'POST /api/attempts/broke': (q, body, ctx) => withChange(() => data.topics.find((t) => t.id === data.attempts.find((a) => a.id === body?.id)?.topicId), () => markBroke(body || {}), ctx?.today),
   'POST /api/attempts/flag': async (q, body) => disputeSolution(body || {}),
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
   // Insights across every unit: weakspots by priority (with the mistakes behind each and when it was last tried),

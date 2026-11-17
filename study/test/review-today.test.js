@@ -79,3 +79,19 @@ test('the review flag is kept only for today\'s due review question; any other f
   const other = (await check('q4')).result;
   assert.equal(other.review, undefined);
 });
+
+// The done bar (fixplan-e E3): a task's reply carries the topic's status before and after
+const { withChange } = await import('../server/mastery.js');
+test('withChange adds the topic before and after; replies that are not objects, or have no topic, pass through', async () => {
+  const doc = record();
+  const { result } = await withDoc(doc, () => withChange(() => doc.topics[0], async () => ({ verdict: 'right' }), TODAY));
+  assert.equal(result.verdict, 'right');
+  assert.deepEqual(Object.keys(result.change), ['topic', 'from', 'to']);
+  assert.equal(result.change.topic, 'Torsion');
+  assert.equal(result.change.from, 'green');
+  const { result: none } = await withDoc(doc, () => withChange(() => undefined, async () => ({ ok: 1 }), TODAY));
+  assert.deepEqual(none, { ok: 1 });
+  const res = new Response('x');
+  const { result: file } = await withDoc(doc, () => withChange(() => doc.topics[0], async () => res, TODAY));
+  assert.equal(file, res);
+});

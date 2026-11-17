@@ -6,6 +6,8 @@ import { keptPages, memoryUse } from './keep.js';
 import { onSync, pull, push } from './sync.js';
 import Focus, { FocusBar } from './Focus.jsx';
 import StickyBar from './StickyBar.jsx';
+import DoneBar from './DoneBar.jsx';
+import { AnswersLeft, NoAiLeft } from './Allowance.jsx';
 
 const PdfViewer = lazy(() => import('./PdfViewer.jsx')); // only when a file is opened
 import PromptBuilder from './PromptBuilder.jsx';
@@ -251,7 +253,7 @@ export default function App({ user }) {
       const mode = MODES.some((m) => m.id === r.rest[0]) ? r.rest[0] : 'questions';
       content = (
         <>
-          <header className="page-head practise-head"><a className="btn" href={href('deeper')}>Prompt builder</a><h1>Practise</h1><p><span className="num">{pu}</span> · {s.data.units.find((x) => x.code === pu)?.title}</p></header>
+          <header className="page-head practise-head"><a className="btn" href={href('deeper')}>Prompt builder</a><h1>Practise</h1><p><span className="num">{pu}</span> · {s.data.units.find((x) => x.code === pu)?.title} <AnswersLeft className="row-sub" /></p></header>
           <nav className="segmented" aria-label="Ways to practise">
             {MODES.map((m) => <a key={m.id} href={href('practise', m.id)} aria-current={mode === m.id ? 'page' : undefined}>{m.label}</a>)}
           </nav>
@@ -304,7 +306,8 @@ export default function App({ user }) {
           {newer && <p className="notice good" role="status">A new version of Crux is ready. <button type="button" className="btn plain" onClick={() => window.location.reload()}>Load it</button></p>}
           {!online && <p className="notice" role="status">Offline. You're seeing your last saved data. Changes that don't need AI are kept on this device and sent when you're back.</p>}
           {queued > 0 && <p className="notice" role="status"><span className="num">{queued}</span> change{queued === 1 ? '' : 's'} waiting to sync.</p>}
-          {problem && (
+          {problem && problem.startsWith("Today's AI limit") && <NoAiLeft go={(section, extra) => { setProblem(''); go(section, extra); }} unit={unit} />}
+          {problem && !problem.startsWith("Today's AI limit") && (
             <p className="notice bad" role="alert">{problem}{' '}
               {problem.startsWith("Today's AI limit") ? <button className="btn plain" onClick={() => { setProblem(''); setDeeper({ unit }); }}>Go deeper</button> : <button className="btn plain" onClick={refresh}>Try again</button>}
             </p>
@@ -313,6 +316,7 @@ export default function App({ user }) {
           {bare ? <Guard>{content}</Guard> : content}
         </main>
       {!bare && page !== 'focus' && page !== 'room' && <FocusBar />}
+      {!bare && <DoneBar s={s} go={go} />}
       {!bare && <StickyBar s={s} unit={unit} onProblem={setProblem} />}
       {!bare && files.length > 0 && (
         <Suspense fallback={null}>

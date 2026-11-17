@@ -8,6 +8,10 @@ import OpenAt from './OpenAt.jsx';
 import { AiWait } from './Busy.jsx';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 import TopicNotes from './TopicNotes.jsx';
+import CodeCell from './CodeCell.jsx';
+
+// programming units (server/defs.js PROGRAMMING_UNIT): Practise shows a code cell under the question
+const PROGRAMMING = /programming|coding/i;
 
 const qname = (x) => `${x.source} · ${x.label || `Q${x.number}`}`;
 // How far a shared solution was checked (server/gold.js levels).
@@ -246,6 +250,10 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
         <QuestionBox text={q.text} meta={[q.source, q.label, q.year, q.type]} marks={q.marks}>
           <div className="qbox-tools"><OpenAt fileId={q.fileId} page={q.page} book={q.type === 'Book'} /></div>
         </QuestionBox>
+      )}
+
+      {q && PROGRAMMING.test(s.data.units.find((u) => u.code === unit)?.title || '') && (
+        <CodeCell key={q.id} question={q.text} storageKey={`crux-code-${q.id}`} reference={sol?.code && /^(python|py|)$/i.test(sol.language || '') ? sol.code : null} />
       )}
 
       {q && !res && (

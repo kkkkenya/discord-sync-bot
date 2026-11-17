@@ -1,6 +1,6 @@
 {
-  "version": "0.6.3",
+  "version": "0.6.4",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "Now called Crux Harness. Later versions install from inside the app with Update now. Add several Hub files at once.",
-  "released": "2026-11-15"
+  "notes": "Study rooms: host one with a four-letter code, or join a public room. Marking schemes in the left bar. Crux's own file viewer, with Add to notes and Ask the tutor.",
+  "released": "2026-11-17"
 }

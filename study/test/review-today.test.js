@@ -9,8 +9,12 @@ const { nextActions } = await import('../server/next.js');
 const { reviewsDoneOn, reviewsToday } = await import('../server/review-store.js');
 const { checkAnswer } = await import('../server/practice.js');
 
-const TODAY = '2026-11-17';
-const at = (daysAgo) => new Date(Date.parse(`${TODAY}T10:00:00+03:00`) - daysAgo * 864e5).toISOString();
+const { nairobiDay } = await import('../server/plan.js');
+// Today, and answer times counted back from the moment the test runs: mastery reads "now" on the real today, so fixed
+// clock times would make the fade depend on the hour the tests run.
+const NOW = Date.now();
+const TODAY = nairobiDay(new Date(NOW));
+const at = (daysAgo) => new Date(NOW - daysAgo * 864e5).toISOString();
 
 // one topic, five right answers over three weeks: green, and it fades in about two days
 const record = () => {

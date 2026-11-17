@@ -22,10 +22,11 @@ export default function AskPassage({ unit, ai }) {
   const [problem, setProblem] = useState('');
   const [full, setFull] = useState(false);
   const input = useRef(null);
+  const current = useRef(''); // the passage on screen, so a late reply lands in its own thread
   const key = at ? `${at.fileId || at.label}|${at.page || ''}|${at.text.slice(0, 80)}` : '';
 
   useEffect(() => {
-    const open = (e) => { setAt(e.detail); setChat(threads.get(`${e.detail.fileId || e.detail.label}|${e.detail.page || ''}|${e.detail.text.slice(0, 80)}`) || []); setText(''); setProblem(''); setFull(false); setTimeout(() => input.current?.focus(), 50); };
+    const open = (e) => { setBusy(false); setAt(e.detail); setChat(threads.get(`${e.detail.fileId || e.detail.label}|${e.detail.page || ''}|${e.detail.text.slice(0, 80)}`) || []); setText(''); setProblem(''); setFull(false); setTimeout(() => input.current?.focus(), 50); };
     window.addEventListener('crux-ask', open);
     return () => window.removeEventListener('crux-ask', open);
   }, []);
@@ -35,19 +36,23 @@ export default function AskPassage({ unit, ai }) {
     window.addEventListener('keydown', esc);
     return () => window.removeEventListener('keydown', esc);
   }, [at]);
+  current.current = key;
   if (!at) return null;
 
   const send = async (q) => {
     const ask = String(q || '').trim();
     if (!ask || busy) return;
     const messages = [...chat, { role: 'student', text: ask }];
+    const mine = key;
     setChat(messages); setText(''); setBusy(true); setProblem('');
     try {
       const r = await api('POST', 'ask/passage', { unit, passage: at.text, where: { fileId: at.fileId || null, page: at.page || null, label: at.label || '' }, messages });
       if (r.needAi) throw new Error(r.message);
       const done = [...messages, { role: 'tutor', text: r.reply }];
-      setChat(done); threads.set(key, done);
-    } catch (e) { setProblem(e.message); setChat(chat); setText(ask); }
+      threads.set(mine, done);
+      if (current.current !== mine) return; // the student moved to another passage: kept for when they come back
+      setChat(done);
+    } catch (e) { if (current.current !== mine) return; setProblem(e.message.startsWith("Today's AI limit") ? "Today's AI answers are used up. They come back tomorrow." : e.message); setChat(chat); setText(ask); }
     setBusy(false);
   };
   const lines = at.text.split('\n');

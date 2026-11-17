@@ -67,10 +67,12 @@ export function cleanWork(w) {
 }
 export const CHECKINS = ['done', 'partly', 'stuck'];
 // this round's check-ins: counts only (the host sees how the room is doing, not who said what)
+// Counts only from CHECKIN_MIN answers: with fewer, a host could tell who said what (two people in a room).
+export const CHECKIN_MIN = 3;
 export function checkinCounts(members, round) {
   const out = { done: 0, partly: 0, stuck: 0 };
   for (const m of members) if (!m.removed && m.checkin?.round === round && CHECKINS.includes(m.checkin.how)) out[m.checkin.how]++;
-  return out;
+  return out.done + out.partly + out.stuck >= CHECKIN_MIN ? out : null;
 }
 export function canAct(room, member, action) {
   if (!room || room.ended_at) throw fail('This room has ended.', 410);

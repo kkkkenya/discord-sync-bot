@@ -5,6 +5,7 @@ import LimitNote from './LimitNote.jsx';
 import { wavData } from './media.js';
 import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 import { finished } from './DoneBar.jsx';
+import { NoAiLeft } from './Allowance.jsx';
 
 const MAX_SECS = 240; // 4 minutes of voice is about 7.7 MB as WAV, under the upload limit
 
@@ -119,7 +120,7 @@ export default function Teach({ s, unit, refresh, focus, go }) {
         {!s.media?.audio && <p className="muted small">Speaking needs Gemini (Settings → AI). Typing works with either.</p>}
         {rec && <p className="muted small" role="status">Recording. Up to 4 minutes, then press Stop.</p>}
       </form>
-      {result?.error && <p className="notice bad" role="alert">{result.error}</p>}
+      {result?.error && (result.error.startsWith("Today's AI limit") ? <NoAiLeft go={go} unit={unit} /> : <p className="notice bad" role="alert">{result.error}</p>)}
       {result?.transcript && <details className="disclosure" open><summary>What you said</summary><p className="muted small">{result.transcript}</p></details>}
       {result?.item && <LimitNote s={s} unit={unit} topic={topic} go={go} what="marking a derivation" />}
       {result?.item?.feedback && <Feedback f={result.item.feedback} />}

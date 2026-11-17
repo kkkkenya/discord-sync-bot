@@ -55,3 +55,11 @@ test('sample input and output in a question', () => {
   assert.deepEqual(sampleFrom('Print the first three squares.\nExample output:\n1\n4\n9'), { input: '', output: '1\n4\n9' });
   assert.equal(sampleFrom('Explain what a loop is. (4 marks)'), null);
 });
+
+test('review fixes: indentation counts, small numbers compare relatively, prose that starts with Output is not a sample', () => {
+  assert.equal(compareOutputs('   *\n  ***', '*\n***').same, false);
+  assert.equal(compareOutputs('9e-7', '2e-7').same, false);
+  assert.equal(compareOutputs('0.30000000000000004', '0.3').same, true);
+  assert.equal(sampleFrom('Write a program.\nOutput the largest of the three numbers.\n(5 marks)'), null);
+  assert.deepEqual(sampleFrom('Read n and print n squared.\nInput:\n4\nOutput:\n16'), { input: '4', output: '16' });
+});

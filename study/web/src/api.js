@@ -30,6 +30,7 @@ export async function api(method, path, body) {
     if (method === 'POST' && AI_PATHS.test(path) && typeof window !== 'undefined') window.dispatchEvent(new Event('crux-ai-used'));
     return out;
   } catch (e) {
+    if (e.status && method === 'POST' && AI_PATHS.test(path) && typeof window !== 'undefined') window.dispatchEvent(new Event('crux-ai-check'));
     if (e.status) throw e; // the server answered: a real error, not a lost connection
     if (method === 'GET' || !QUEUE.test(path)) throw new Error(OFFLINE);
     keep([...outbox(), { method, path, body, at: Date.now() }]);

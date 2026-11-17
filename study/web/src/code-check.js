@@ -10,10 +10,12 @@ const lines = (t) => {
 };
 const sameToken = (a, b) => {
   if (a === b) return true;
-  if (NUM.test(a) && NUM.test(b)) { const x = Number(a), y = Number(b); return Math.abs(x - y) <= 1e-6 * Math.max(1, Math.abs(y)); }
+  if (NUM.test(a) && NUM.test(b)) { const x = Number(a), y = Number(b); return Math.abs(x - y) <= 1e-6 * Math.max(Math.abs(x), Math.abs(y)) || Math.abs(x - y) < 1e-12; }
   return false;
 };
+const indent = (l) => /^\s*/.exec(l)[0].length;
 const sameLine = (a, b) => {
+  if (indent(a) !== indent(b)) return false; // "   *" is not "*": patterns and tables depend on it
   const x = a.trim().split(/\s+/), y = b.trim().split(/\s+/);
   return x.length === y.length && x.every((t, i) => sameToken(t, y[i]));
 };
@@ -36,7 +38,8 @@ export function describe(r, against) {
 }
 
 // Sample input and output printed in a question ("Sample input: ... Sample output: ..."), or null.
-const HEAD = (w) => new RegExp(`(?:^|\\n)\\s*(?:sample|example)?\\s*${w}\\s*(?:\\d+)?\\s*:?\\s*\\n?`, 'i');
+// "Sample output:", "Example output 1", or a line that is only "Output:" (not "Output the largest number.")
+const HEAD = (w) => new RegExp(`(?:^|\\n)[ \\t]*(?:(?:sample|example)[ \\t]+${w}(?:[ \\t]*\\d+)?[ \\t]*:?|${w}[ \\t]*:)[ \\t]*\\n?`, 'i');
 export function sampleFrom(text) {
   const t = String(text || '').replace(/\r/g, '');
   const o = HEAD('output').exec(t);

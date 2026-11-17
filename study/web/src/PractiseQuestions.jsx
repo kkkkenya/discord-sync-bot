@@ -10,6 +10,7 @@ import Rich, { AnswerBox, QuestionBox } from './Rich.jsx';
 import TopicNotes from './TopicNotes.jsx';
 import CodeCell from './CodeCell.jsx';
 import { finished } from './DoneBar.jsx';
+import { NoAiLeft } from './Allowance.jsx';
 
 // programming units (server/defs.js PROGRAMMING_UNIT): Practise shows a code cell under the question
 const PROGRAMMING = /programming|coding/i;
@@ -293,7 +294,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
         </section>
       )}
 
-      {problem && <p className="notice bad" role="alert">{problem}{problem.startsWith("Today's AI limit") && <> <button className="btn plain" onClick={deeper}>Go deeper</button></>}</p>}
+      {problem && problem.startsWith("Today's AI limit") && <NoAiLeft go={go} unit={unit} />}
+      {problem && !problem.startsWith("Today's AI limit") && <p className="notice bad" role="alert">{problem}</p>}
       {res?.needKey && (
         <div className="notice" role="status">
           <p>{res.message}</p>

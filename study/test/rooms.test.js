@@ -204,10 +204,13 @@ test("today's work: host only, cleaned, Hub papers only; check-ins count per rou
   const b = await call(brian, 'POST', '/api/rooms/checkin', { code: room.code, how: 'stuck' }, T0 + 26 * M);
   assert.deepEqual([b.checkin.mine, b.checkin.counts], ['stuck', null]); // members don't see the counts
   await call(wanjiru, 'POST', '/api/rooms/checkin', { code: room.code, how: 'done' }, T0 + 27 * M);
+  const two = await call(amina, 'GET', '/api/rooms/state', null, T0 + 27 * M, `code=${room.code}`);
+  assert.equal(two.checkin.counts, null, 'with 2 answers the host could tell who said what: no counts');
+  await call(amina, 'POST', '/api/rooms/checkin', { code: room.code, how: 'partly' }, T0 + 27 * M);
   const h = await call(amina, 'GET', '/api/rooms/state', null, T0 + 28 * M, `code=${room.code}`);
-  assert.deepEqual(h.checkin, { round: 1, mine: null, counts: { done: 1, partly: 0, stuck: 1 } });
+  assert.deepEqual(h.checkin, { round: 1, mine: 'partly', counts: { done: 1, partly: 1, stuck: 1 } });
   const next = await call(amina, 'GET', '/api/rooms/state', null, T0 + 31 * M, `code=${room.code}`);
-  assert.deepEqual(next.checkin.counts, { done: 0, partly: 0, stuck: 0 }); // round 2 starts clean
+  assert.equal(next.checkin.counts, null); // round 2 starts clean (no answers yet)
   assert.equal(JSON.stringify(h).includes('Brian'), true); // names are in the people list…
   assert.equal(JSON.stringify(h.checkin).includes('Brian'), false); // …but never beside a check-in
 });

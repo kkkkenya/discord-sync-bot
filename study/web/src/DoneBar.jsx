@@ -17,7 +17,9 @@ export function changeLine(change, kind) {
 
 // the first action that is not the task just done
 export function nextAfter(actions = [], done = {}) {
-  return actions.find((a) => !(done.questionId && a.focus?.questionId === done.questionId) && !(done.kind === 'teach' && a.kind === 'teach' && a.focus?.topic === done.topic)) || null;
+  const same = (a) => (done.questionId && a.focus?.questionId === done.questionId)
+    || (done.kind === 'teach' && a.focus?.section === 'teach' && String(a.focus?.topic || '').toLowerCase() === String(done.topic || '').toLowerCase());
+  return actions.find((a) => !same(a)) || null;
 }
 
 export default function DoneBar({ s, go }) {

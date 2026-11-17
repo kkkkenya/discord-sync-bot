@@ -16,6 +16,7 @@ export function refreshAllowance() {
 if (typeof window !== 'undefined') {
   window.addEventListener('crux-ai-used', () => { if (st.used != null) set({ used: st.used + 1 }); });
   window.addEventListener('focus', refreshAllowance);
+  window.addEventListener('crux-ai-check', () => { asked = 0; refreshAllowance(); }); // a refused AI request may still have been counted
 }
 export const answersLeft = () => (st.limit == null || st.used == null ? null : Math.max(0, st.limit - st.used));
 

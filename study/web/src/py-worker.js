@@ -1,5 +1,6 @@
 // The worker that runs a student's Python (fixplan-f F9). One run per worker: the page ends the worker after 3 s, so a
-// program that never stops costs nothing. The interpreter (about 200 KB) loads on first use and is cached after.
+// program that never stops costs nothing. The interpreter file (about 200 KB) downloads on first use; after that the
+// browser keeps it, and each run only starts it again (a fraction of a second).
 import { loadMicroPython } from '@micropython/micropython-webassembly-pyscript/micropython.mjs';
 import wasm from '@micropython/micropython-webassembly-pyscript/micropython.wasm?url';
 import { runPython } from './py-run.js';

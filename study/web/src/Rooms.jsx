@@ -141,6 +141,7 @@ function TodaysWork({ room, me, run }) {
             <label className="field">Paper <span className="hint">(optional)</span>
               <select value={fileId} onChange={(e) => setFileId(e.target.value)} disabled={files === null}>
                 <option value="">{files === null ? 'Loading…' : 'None'}</option>
+                {w?.fileId && !(files || []).some((f) => String(f.id) === w.fileId) && <option value={w.fileId}>{w.fileName}</option>}
                 {(files || []).map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
               </select>
             </label>
@@ -170,7 +171,8 @@ function TodaysWork({ room, me, run }) {
 // At a break: how did that block go? Each person answers for themselves; the host sees only the counts.
 function CheckIn({ v, data, me, run }) {
   const c = data.checkin;
-  if (!c || (v.mode === 'focus' && v.state === 'running') || v.state === 'idle') return null;
+  const atBreak = v.mode !== 'focus' || v.state === 'waiting' || v.state === 'done';
+  if (!c || !atBreak || v.state === 'idle') return null;
   const n = c.counts;
   return (
     <section className="card stack-s" aria-label="Check in">
@@ -181,6 +183,7 @@ function CheckIn({ v, data, me, run }) {
         ))}
       </div>
       {me && n && <p className="row-sub">Round <span className="num">{c.round}</span>: <span className="num">{n.done}</span> done, <span className="num">{n.partly}</span> partly, <span className="num">{n.stuck}</span> stuck. Only counts are shown, never who.</p>}
+      {me && !n && <p className="row-sub">The counts show once 3 people have answered, so nobody's answer can be told apart.</p>}
     </section>
   );
 }

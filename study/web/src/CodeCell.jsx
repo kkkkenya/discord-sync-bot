@@ -69,7 +69,7 @@ export default function CodeCell({ question = '', reference = null, storageKey =
       </div>
       {res && (
         <div className="stack-s" aria-live="polite">
-          {res.stopped && <p className="notice bad">Stopped after 3 seconds. Check for a loop that never ends, or an input() waiting for a line.</p>}
+          {res.stopped && <p className="notice bad">Stopped: it ran for more than 3 seconds. Check for a loop that never ends.</p>}
           {res.blocked && <p className="notice">{BLOCKED(res.blocked)}</p>}
           {!res.stopped && !res.blocked && (
             <>

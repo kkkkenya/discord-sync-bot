@@ -192,3 +192,39 @@ create or replace function crux_flag_question(p_qkey text)
 returns integer language sql as $$
   update crux_question_kb set flagged = flagged + 1 where qkey = p_qkey returning flagged;
 $$;
+
+-- Study rooms (fixplan-f, 2026-11-17): hosted rooms joined with a four-letter code. Server only (service key):
+-- RLS on, no policies. The clock is a schedule (study/web/src/room-clock.js); host actions are compare-and-set on
+-- version. Rows are deleted 7 days after a room ends (the daily backup cron). Wrong-code tries use crux_bump.
+create table if not exists crux_rooms (
+  id          bigserial primary key,
+  code        text not null,                   -- 4 letters, unique among live rooms
+  name        text not null,
+  unit_code   text,
+  host_id     text not null,                   -- Discord id
+  plan        jsonb not null,                  -- { focus, short, long, longEvery, rounds, wait } in minutes
+  state       text not null default 'idle',    -- idle | running | paused | waiting | done | ended
+  phase       text not null default 'focus',   -- focus | short | long
+  round       int not null default 1,
+  phase_start timestamptz,
+  left_ms     bigint,
+  version     int not null default 0,
+  locked      boolean not null default false,
+  created_at  timestamptz not null default now(),
+  ended_at    timestamptz
+);
+create unique index if not exists crux_rooms_live_code on crux_rooms (code) where ended_at is null;
+create index if not exists crux_rooms_code on crux_rooms (code, ended_at);
+create index if not exists crux_rooms_host on crux_rooms (host_id) where ended_at is null;
+create table if not exists crux_room_members (
+  room_id    bigint not null references crux_rooms (id) on delete cascade,
+  user_id    text not null,                    -- Discord id
+  name       text not null,                    -- display name at join; shown to the room
+  joined_at  timestamptz not null default now(),
+  seen_at    timestamptz not null default now(),
+  removed    boolean not null default false,
+  primary key (room_id, user_id)
+);
+create index if not exists crux_room_members_user on crux_room_members (user_id);
+alter table crux_rooms enable row level security;
+alter table crux_room_members enable row level security;

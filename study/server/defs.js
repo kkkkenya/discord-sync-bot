@@ -66,3 +66,16 @@ export const REVIEW = { withinDays: 2, perDay: 2, quietDays: 3 };
 // The learner file (fixplan-e E5, server/learner.js): what Crux may say about a student, and the floors it needs.
 // Lines appear only when their evidence reaches these counts; the block sent to prompts is at most `blockChars`.
 export const LEARNER = { days: 60, minMistakes: 3, minBottleneck: 3, minBreaks: 2, kappaLow: 0.5, kappaHigh: 0.85, notes: 5, noteChars: 140, blockChars: 600 };
+
+// Study rooms (fixplan-f): hosted rooms joined with a four-letter code, and the public rooms everyone shares.
+// codeLetters has no vowels (no words) and no I or O (misread). Times in the names' units.
+export const ROOMS = {
+  codeLetters: 'BCDFGHJKLMNPQRSTVWXZ', codeLength: 4, maxPeople: 50, pollSeconds: 20, hereSeconds: 90, dropMinutes: 10,
+  hostAwayMinutes: 5, emptyEndMinutes: 30, maxHours: 12, codeRestHours: 24, wrongPerHour: 10, wrongPerDay: 30,
+  nameChars: 40, keepDays: 7, seenEverySeconds: 60,
+};
+// Public rooms: always on, no host, fixed to the clock (web/src/focus-store.js roomPhase). Counts only, never names.
+export const PUBLIC_ROOMS = [
+  { id: 'hub', name: 'Study room', focus: 25, block: 30 },
+  { id: 'long', name: 'Long room', focus: 50, block: 60 },
+];

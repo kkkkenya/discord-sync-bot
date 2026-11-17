@@ -23,6 +23,7 @@ if (live) {
 }
 
 const { dispatch } = await import('./routes.js');
+const { ROOM_PATHS, roomsRoute } = await import('./rooms-routes.js');
 const { fileBytes } = await import('./file-bytes.js');
 const { docStore, withSavedDoc } = await import('./doc-store.js');
 const docs = live ? docStore((await import('../../lib/db.js')).db) : null;
@@ -32,6 +33,13 @@ const PORT = Number(process.env.PORT) || 5190;
 const DIST = new URL('../dist/', import.meta.url);
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.json': 'application/json' };
 const user = { id: process.env.OWNER_ID || 'local', name: 'You', tier: 'owner' };
+
+// Local testing of study rooms with two people: a `crux-as=<name>` cookie makes the rooms API treat this browser as
+// another student. This file only runs on this computer; the website (api/router.js) never reads it.
+const localAs = (req) => {
+  const name = /(?:^|;\s*)crux-as=([^;]+)/.exec(req.headers.cookie || '')?.[1];
+  return name ? { id: `local-${decodeURIComponent(name)}`, name: decodeURIComponent(name).slice(0, 30), tier: 'owner' } : null;
+};
 
 createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -45,6 +53,11 @@ createServer(async (req, res) => {
       const raw = ['POST', 'PUT', 'PATCH'].includes(req.method) ? Buffer.concat(await req.toArray()) : null;
       if (raw && raw.length > 14 * 1024 * 1024) throw Object.assign(new Error('That upload is too big.'), { status: 413 });
       const body = raw ? JSON.parse(raw.toString() || '{}') : null;
+      if (ROOM_PATHS.test(url.pathname)) { // study rooms: their own tables, no document
+        const out = await roomsRoute(req.method, url.pathname, url.searchParams, body, localAs(req) || user); // before writeHead: it may throw
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));
+        return;
+      }
       const ask = (extra) => dispatch(req.method, url.pathname, url.searchParams, body, { user, today: nairobiDay(), ...extra });
       const out = live ? await withSavedDoc(docs, user.id, ask) : await ask();
       if (out instanceof Response) { // a file download (Anki export)

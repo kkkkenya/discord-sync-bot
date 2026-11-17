@@ -34,3 +34,13 @@ export async function setFocus(userId, until, now = Date.now(), unit = null) {
 }
 
 export const resetFocusForTests = () => memory.clear();
+
+// { others, rooms: { hub: n, long: n } }: everyone focusing now, and how many in each public room (GET /api/rooms)
+export async function focusByRoom(userId, now = Date.now()) {
+  const live = !remote()
+    ? [...memory].filter(([id, f]) => id !== userId && f.until > now).map(([, f]) => f.unit)
+    : (await db.select('crux_focus', `until=gt.${enc(new Date(now).toISOString())}&user_id=neq.${enc(userId)}&select=unit_code&limit=500`)).map((r) => r.unit_code);
+  const rooms = {};
+  for (const u of live) if (u) rooms[u] = (rooms[u] || 0) + 1;
+  return { others: live.length, rooms };
+}

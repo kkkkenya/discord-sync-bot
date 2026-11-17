@@ -7,7 +7,7 @@ import { checkMedia, saveUpload } from './uploads.js';
 import { LOCAL_TYPES, addLocalFile, bookExamples, contextFor, ensureLibrary, library, libraryMeta, localFiles, outlineContext, prepareUnit, remote, removeLocalFile } from './ingest.js';
 import { ALL_UNITS, calendar, filesFor, nextAssessment } from './library.js';
 import { COURSES, cohortUnits, courses, validCohort } from './cohort.js';
-import { ERROR_TYPES, LEARNER, STAGES, TBA } from './defs.js';
+import { ERROR_TYPES, LEARNER, PUBLIC_ROOMS, STAGES, TBA } from './defs.js';
 import { stageMix, validStage } from './stages.js';
 import { masteryMap } from './mastery.js';
 import { checkSubtopic } from './analysis.js';
@@ -127,7 +127,7 @@ const routes = {
   },
   'GET /api/inbox': (q) => newMaterial(data.units.map((u) => u.code), q.get('since')),
   'GET /api/focus': (q, body, ctx) => focusCounts(ctx?.user?.id || 'local', q.get('unit') || null).catch(() => ({ others: null, room: null })),
-  'POST /api/focus': (q, { until = null, unit = null } = {}, ctx) => setFocus(ctx?.user?.id || 'local', until, Date.now(), unit === 'hub' ? 'hub' : null) /* the study room is one for the whole hub */.catch((e) => { if (e.status) throw e; return { others: null, room: null }; }),
+  'POST /api/focus': (q, { until = null, unit = null } = {}, ctx) => setFocus(ctx?.user?.id || 'local', until, Date.now(), PUBLIC_ROOMS.some((r) => r.id === unit) ? unit : null) /* the public rooms (defs.js); hosted rooms count as focusing, without a room */.catch((e) => { if (e.status) throw e; return { others: null, room: null }; }),
   'GET /api/usage': async (q, body, ctx) => ({ ai: await usedToday(ctx?.user, 'ai'), download: await usedToday(ctx?.user, 'download') }),
   'POST /api/notes/import': (q, { notes } = {}, ctx) => importNotes(ctx.user.id, notes, data.units.map((u) => u.code)),
   // Units for a course + year (default: the saved cohort, else EMM year 3), plus the whole catalogue to search.

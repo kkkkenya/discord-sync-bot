@@ -9,6 +9,7 @@ import { withReward } from '../server/rewards.js';
 import { aiToken, relay } from '../server/ai-relay.js';
 import { nairobiDay } from '../server/plan.js';
 import { dispatch } from '../server/routes.js';
+import { cleanRooms, ROOM_PATHS, roomsRoute } from '../server/rooms-routes.js';
 import { VERSION } from '../server/store.js';
 
 const MAX_BODY = 14 * 1024 * 1024; // photos of working and voice teach-backs come in as base64
@@ -36,7 +37,9 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
     if (path.startsWith('/api/ai/v1/') || path === '/api/ai/usage') return relay(request, path);
     if (path === '/api/cron/backup') { // Vercel's daily cron (vercel.json) sends the CRON_SECRET
       if (!process.env.CRON_SECRET || request.headers.get('authorization') !== `Bearer ${process.env.CRON_SECRET}`) return json({ error: 'Not allowed.' }, 401);
-      return json(await runBackup({ db: deps.db, storage: deps.storage || supabaseStorage }));
+      const backup = await runBackup({ db: deps.db, storage: deps.storage || supabaseStorage });
+      const rooms = await cleanRooms().catch((e) => ({ error: e.message })); // study rooms: end old ones, delete after 7 days
+      return json({ ...backup, rooms });
     }
     try {
       const session = readSession(request);
@@ -57,6 +60,8 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       }
       const query = new URLSearchParams(url.searchParams);
       query.delete('path');
+      // study rooms read only their own tables: no document to load or save (a full room polls every 20 s)
+      if (ROOM_PATHS.test(path)) return reply(await roomsRoute(request.method, path, query, body, user));
       const result = await withSavedDoc(docs, user.id, (extra) => dispatch(request.method, path, query, body, { user, today: nairobiDay(), ...extra }));
       if (result instanceof Response) { // a file download (Anki export)
         if (cookie) result.headers.append('Set-Cookie', cookie);

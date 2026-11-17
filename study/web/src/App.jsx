@@ -264,6 +264,8 @@ export default function App({ user }) {
       content = <PromptBuilder {...props} target={deeper} />;
     } else if (page === 'focus') {
       content = <Focus {...props} />;
+    } else if (page === 'room') { // an invite link: #/room/KXQT opens the join screen with the code filled in
+      content = <Focus {...props} invite={r.rest[0] || ''} />;
     } else if (page === 'insights') {
       content = <><header className="page-head"><h1>Insights</h1></header><Insights {...props} deeper={setDeeper} /></>;
     } else {
@@ -310,7 +312,7 @@ export default function App({ user }) {
           {heavy && <p className="notice" role="status">Crux is using {heavy.mb} MB of memory with {alive.current.length} pages kept open, which can slow this device down. <button type="button" className="btn plain" onClick={freeMemory}>Close the hidden pages</button></p>}
           {bare ? <Guard>{content}</Guard> : content}
         </main>
-      {!bare && page !== 'focus' && <FocusBar />}
+      {!bare && page !== 'focus' && page !== 'room' && <FocusBar />}
       {!bare && <StickyBar s={s} unit={unit} onProblem={setProblem} />}
       {!bare && files.length > 0 && (
         <Suspense fallback={null}>

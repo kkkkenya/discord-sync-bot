@@ -8,8 +8,10 @@ export const MODES = { focus: 'Focus', short: 'Short break', long: 'Long break' 
 export const PLANS = { classic: { focus: 25, short: 5, long: 15 }, long: { focus: 50, short: 10, long: 20 } };
 const KEY = 'crux-focus';
 const fresh = { active: false, mode: 'focus', running: false, endsAt: 0, left: 25 * 60e3, round: 1, plan: 'classic', others: null, room: null, roomCount: null };
-// rooms used to be per unit: anyone still in one is now in the hub's study room
-const oneRoom = (st) => (st.room && st.room !== 'hub' ? { ...st, room: 'hub' } : st);
+// The public rooms (server/defs.js PUBLIC_ROOMS): always on, fixed to the clock. Rooms used to be per unit: anyone
+// still in one of those is now in the hub's study room.
+export const PUBLIC_ROOMS = { hub: { name: 'Study room', focus: 25, block: 30 }, long: { name: 'Long room', focus: 50, block: 60 } };
+const oneRoom = (st) => (st.room && !PUBLIC_ROOMS[st.room] ? { ...st, room: 'hub' } : st);
 let state = (() => { try { return oneRoom({ ...fresh, ...JSON.parse(localStorage.getItem(KEY)), others: null }); } catch { return fresh; } })();
 const subs = new Set();
 function set(patch) {
@@ -21,16 +23,18 @@ function set(patch) {
 const share = () => { const { others, ...rest } = state; push('focus', rest); };
 export const adoptFocus = (v) => { if (v) set(oneRoom({ ...fresh, ...v, others: state.others })); };
 export const useFocus = () => useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => state);
-// The study room: one for the whole hub (HUB_ROOM), everyone in it on the same clock, so nobody has to coordinate. Focus from :00 to :25
-// and :30 to :55, breaks in between. (Nairobi is a whole number of hours from UTC, so UTC minutes are local minutes.)
-const BLOCK = 30 * 60e3, ROOM_FOCUS = 25 * 60e3;
-export function roomPhase(now = Date.now()) {
+// A public room: everyone in it on the same clock, so nobody has to coordinate. The study room (HUB_ROOM) focuses from :00
+// to :25 and :30 to :55, the long room from :00 to :50, breaks in between. (Nairobi is a whole number of hours from UTC, so
+// UTC minutes are local minutes.)
+export function roomPhase(now = Date.now(), id = 'hub') {
+  const r = PUBLIC_ROOMS[id] || PUBLIC_ROOMS.hub;
+  const BLOCK = r.block * 60e3, ROOM_FOCUS = r.focus * 60e3;
   const into = now % BLOCK;
   return into < ROOM_FOCUS ? { mode: 'focus', left: ROOM_FOCUS - into, total: ROOM_FOCUS } : { mode: 'short', left: BLOCK - into, total: BLOCK - ROOM_FOCUS };
 }
 // what the timer shows: the room's clock when you're in a room, your own timer otherwise
 export function view(st, now = Date.now()) {
-  if (st.room) return { ...roomPhase(now), running: true };
+  if (st.room) return { ...roomPhase(now, st.room), running: true };
   return { mode: st.mode, left: st.running ? Math.max(0, st.endsAt - now) : st.left, total: PLANS[st.plan][st.mode] * 60e3, running: st.running };
 }
 export const remaining = (st, now = Date.now()) => view(st, now).left;
@@ -41,8 +45,8 @@ const tell = (until) => api('POST', 'focus', { until, unit: state.room }).then((
 export const refreshOthers = () => api('GET', `focus${state.room ? `?unit=${encodeURIComponent(state.room)}` : ''}`).then((r) => set({ others: r.others, roomCount: r.room ?? null })).catch(() => {});
 
 let audio;
-const prime = () => { try { audio = audio || new AudioContext(); audio.resume(); } catch { /* no sound */ } };
-function chime() {
+export const prime = () => { try { audio = audio || new AudioContext(); audio.resume(); } catch { /* no sound */ } };
+export function chime() {
   try {
     [0, 0.22].forEach((at, i) => {
       const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + at;
@@ -87,12 +91,18 @@ export function end() {
   share();
 }
 export const HUB_ROOM = 'hub';
+// a hosted room takes over: your own timer and any public room stop, without a sound
+export function stopOwn() {
+  if ((state.running && state.mode === 'focus') || state.room) tell(null);
+  set({ ...fresh, plan: state.plan, left: minutes('focus', state.plan) });
+  share();
+}
 // join the study room: your own timer stops and you follow the room's clock
 export function joinRoom(unit = HUB_ROOM) {
   prime();
   if (state.running && state.mode === 'focus') tell(null);
   set({ room: unit, active: true, running: false, roomCount: null });
-  const p = roomPhase();
+  const p = roomPhase(Date.now(), unit);
   if (p.mode === 'focus') tell(new Date(Date.now() + p.left).toISOString()); else refreshOthers();
   share();
 }
@@ -109,6 +119,10 @@ function finish() {
   share();
 }
 
+// which block of which public room we last chimed for: `${room}:${block start}`
+let roomBlock = null;
+const roomKey = (room) => { const p = roomPhase(Date.now(), room); return `${room}:${p.mode}:${Math.round((Date.now() + p.left) / 60e3)}`; };
+
 // re-render once a second while the timer runs; finish the block when it reaches zero
 export function useTick() {
   const st = useFocus();
@@ -116,10 +130,12 @@ export function useTick() {
   useEffect(() => {
     if (st.room) {
       // in a room: chime when the room's block changes, and say you're focusing until the new block ends
-      let last = roomPhase().mode;
+      // shared across every mounted screen (kept pages, the mini bar), so a block change chimes once
+      if (!roomBlock) roomBlock = roomKey(st.room);
       const t = setInterval(() => {
-        const p = roomPhase();
-        if (p.mode !== last) { last = p.mode; chime(); if (p.mode === 'focus') tell(new Date(Date.now() + p.left).toISOString()); }
+        const p = roomPhase(Date.now(), st.room);
+        const key = roomKey(st.room);
+        if (key !== roomBlock) { roomBlock = key; chime(); if (p.mode === 'focus') tell(new Date(Date.now() + p.left).toISOString()); }
         setNow(Date.now());
       }, 1000);
       return () => clearInterval(t);

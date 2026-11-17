@@ -1118,3 +1118,25 @@ button.chip:active, a.chip:active { transform: scale(.95); }
 .about-notes h3 { font-size: var(--t-m); font-weight: 600; }
 .about-block summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
 .about-block .hint { overflow-wrap: anywhere; }
+
+/* Study rooms (Rooms.jsx): the code field, the host form, the people list. */
+.room-join { display: flex; gap: var(--s2); }
+.field .room-code { flex: 1; min-width: 0; font-size: 22px; font-weight: 650; letter-spacing: 0.32em; text-transform: uppercase; }
+.room-code-inline { letter-spacing: 0.12em; }
+.room-row { display: flex; align-items: center; gap: var(--s3); }
+.room-row .row-main, .room-people .row-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.room-row .row-sub, .room-people .row-sub { color: var(--text-2); font-size: var(--t-s); }
+.room-form { display: grid; gap: var(--s4); }
+.room-h { font-size: var(--t-m); font-weight: 650; margin: 0; display: flex; gap: var(--s2); align-items: baseline; }
+.room-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--s3); }
+.room-num { display: flex; align-items: center; gap: var(--s2); }
+.room-num input { width: 84px; flex: none; }
+.room-check { display: flex; align-items: center; gap: var(--s2); font-size: var(--t-s); min-height: 44px; }
+.room-check input { width: 20px; height: 20px; accent-color: var(--accent); }
+.room-people { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.room-people li { display: flex; align-items: center; gap: var(--s3); min-height: 44px; }
+.room-people li .person { margin-left: 0; flex: none; }
+.room-people li.away { opacity: 0.6; }
+.room-person-actions { display: flex; gap: var(--s1); flex-wrap: wrap; justify-content: flex-end; }
+.btn.danger { background: var(--bad); color: #fff; }
+@media (max-width: 480px) { .room-people li { flex-wrap: wrap; } .room-person-actions { flex-basis: 100%; justify-content: flex-start; padding-left: 42px; } }

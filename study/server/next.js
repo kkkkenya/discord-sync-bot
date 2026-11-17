@@ -1,8 +1,9 @@
-// Today's next actions: up to 3, each { kind, unit, label, reason, minutes, href, focus }. kind is practise, audit,
-// prepare or date. The order comes from todayPlan (weakest and soonest unit first); this turns each unit's task into
+// Today's next actions: each { kind, unit, label, reason, minutes, href, focus }. kind is practise, audit, prepare,
+// review (fixplan-e E2: one question on a fading topic, after prepare and audit, before practise) or date. The order comes from todayPlan (weakest and soonest unit first); this turns each unit's task into
 // a short action, and puts the groundwork first: files to read, then topics to list.
 import { data } from './store.js';
 import { todayPlan } from './plan.js';
+import { reviewsToday } from './review-store.js';
 
 const slug = (code) => code.replace(/\s+/g, '-');
 const MINUTES = { teach: 15, practice: 30, mock: 30, paper: 90, kit: 20, prompt: 20, topics: 10 };
@@ -35,7 +36,7 @@ function labelFor(task, p) {
 export function nextActions(today, { prepared = new Set() } = {}) {
   if (!data.units.length) return [];
   const plan = todayPlan(today);
-  return plan.map((p) => {
+  const acts = plan.map((p) => {
     const when = whenText(p.days);
     const base = { unit: p.code, reason: `${when} · ${p.stage.name.toLowerCase()}` };
     if (!prepared.has(p.code)) {
@@ -54,4 +55,11 @@ export function nextActions(today, { prepared = new Set() } = {}) {
       focus: { section: SECTION[task.kind], unit: p.code, topic: task.topic, questionId: task.questionId, kit: task.kit, kind: task.promptKind },
     };
   });
+  // a review (fixplan-e E2) ranks after prepare and audit, and before practise: one question on a topic that is about to fade
+  const reviews = reviewsToday(today).map((r) => ({
+    kind: 'review', unit: r.unit, label: `Keep ${r.topic}`, reason: r.reason, minutes: 10,
+    href: '#/practise/questions', focus: { section: 'practice', unit: r.unit, topic: r.topic, questionId: r.questionId, review: true },
+  }));
+  const groundwork = acts.filter((a) => a.kind === 'prepare' || a.kind === 'audit');
+  return [...groundwork, ...reviews, ...acts.filter((a) => a.kind !== 'prepare' && a.kind !== 'audit')];
 }

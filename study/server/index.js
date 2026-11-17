@@ -47,6 +47,10 @@ createServer(async (req, res) => {
       const body = raw ? JSON.parse(raw.toString() || '{}') : null;
       const ask = (extra) => dispatch(req.method, url.pathname, url.searchParams, body, { user, today: nairobiDay(), ...extra });
       const out = live ? await withSavedDoc(docs, user.id, ask) : await ask();
+      if (out instanceof Response) { // a file download (Anki export)
+        res.writeHead(out.status, Object.fromEntries(out.headers)).end(Buffer.from(await out.arrayBuffer()));
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));
     } catch (e) {
       if (!e.status) console.error(e);

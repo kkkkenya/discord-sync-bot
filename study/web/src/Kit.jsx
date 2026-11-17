@@ -177,6 +177,18 @@ export default function Kit({ s, unit, refresh, go, focus, notify }) {
   const save = (m) => (path, value) => api('PATCH', `materials/${m.id}`, { content: setIn(m.content, path, value), edited: true }).then(refresh);
   const del = (m) => api('DELETE', `materials/${m.id}`).then(() => { notify(`Deleted the ${s.kits.names[m.kind].name.toLowerCase()}`, () => api('POST', 'materials', m)); setOpenId(null); refresh(); });
 
+  // Anki cards for the unit: its method recipes and the questions you got wrong (GET /api/export/anki, a text file)
+  const exportAnki = async () => {
+    setErr('');
+    try {
+      const r = await fetch(`/api/export/anki?unit=${encodeURIComponent(unit)}`);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Could not export the cards.');
+      const url = URL.createObjectURL(await r.blob());
+      Object.assign(document.createElement('a'), { href: url, download: `crux-${unit.replace(/\s+/g, '-').toLowerCase()}-anki.txt` }).click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (x) { setErr(x.message); }
+  };
+
   const Body = shown && BODY[shown.kind];
   return (
     <div className="stack">
@@ -202,7 +214,7 @@ export default function Kit({ s, unit, refresh, go, focus, notify }) {
             </label>
           )}
         </div>
-        <div className="toolbar"><button className="btn primary" type="button" onClick={() => make()} disabled={busy || !unit}><Busy on={busy} kind="kit" idle="Make it" /></button></div>
+        <div className="toolbar"><button className="btn primary" type="button" onClick={() => make()} disabled={busy || !unit}><Busy on={busy} kind="kit" idle="Make it" /></button><button className="btn" type="button" onClick={exportAnki} disabled={!unit}>Export cards to Anki</button></div>
         {err && <p className="notice bad" role="alert">{err}</p>}
         {need && (
           <p className="notice" role="status">{need.message}{' '}

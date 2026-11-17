@@ -58,3 +58,11 @@ export const GOLD = { levels: ['single', 'agreed', 'key'], strongModels: ['opus'
 // Programming units (owner, 2026-11-15): answers use only what the unit's notes teach, with no comments in the code
 // (server/taught.js). Matched on the unit's title.
 export const PROGRAMMING_UNIT = /programming|coding/i;
+
+// Reviews in Today (fixplan-e E2, server/review.js): a green topic whose understanding fades within `withinDays` comes
+// back as one question. At most `perDay` a day (Nairobi). In the last `quietDays` before a paper, only that unit's.
+export const REVIEW = { withinDays: 2, perDay: 2, quietDays: 3 };
+
+// The learner file (fixplan-e E5, server/learner.js): what Crux may say about a student, and the floors it needs.
+// Lines appear only when their evidence reaches these counts; the block sent to prompts is at most `blockChars`.
+export const LEARNER = { days: 60, minMistakes: 3, minBottleneck: 3, minBreaks: 2, kappaLow: 0.5, kappaHigh: 0.85, notes: 5, noteChars: 140, blockChars: 600 };

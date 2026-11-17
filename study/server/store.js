@@ -27,17 +27,20 @@ export const DATA_DIR = DIR; // uploads (photos of working, voice teach-backs) l
 // settings: { aiProvider: 'gemini'|'deepseek', tour: { step, done, skipped }, cardsNotice: true once
 //   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
 //   unitArchive: { code: { catDate, confidence, ... } } (units you un-ticked, restored if you tick them again) }
+// learner: { notes: [{ id, text, at }] (up to 5, 140 characters), hidden: [line ids the student hid] } (the learner file, learner.js)
 const EMPTY = {
   units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [], materials: [], stickies: [], marks: [],
   settings: { aiProvider: 'gemini', tour: {}, cohort: null, unitArchive: {} },
+  learner: { notes: [], hidden: [] },
 };
 
 // Bump when a build changes what's stored. Older documents are backed up before their first save (normalize).
-export const VERSION = 2;
+export const VERSION = 3;
 
 // Old documents load with every list present and every setting defaulted; nothing in them is dropped.
 export function normalize(saved) {
   const doc = { ...structuredClone(EMPTY), ...saved, settings: { ...structuredClone(EMPTY.settings), ...saved?.settings } };
+  doc.learner = { notes: Array.isArray(saved?.learner?.notes) ? saved.learner.notes : [], hidden: Array.isArray(saved?.learner?.hidden) ? saved.learner.hidden : [] };
   if (!['gemini', 'deepseek'].includes(doc.settings.aiProvider)) doc.settings.aiProvider = 'gemini'; // anthropic and hub are retired
   doc.version = VERSION;
   return doc;

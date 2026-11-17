@@ -129,7 +129,8 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
   const subName = (id) => s.data.subtopics.find((x) => x.id === id)?.name;
   const run = async (fn) => { setBusy(true); setProblem(''); try { await fn(); } catch (e) { setProblem(e.message); } setBusy(false); };
   const took = (out) => { setRes(out); setSteps(out.checkpoints || []); if (out.attempt) refresh(); };
-  const check = (e) => { e.preventDefault(); run(async () => took(await api('POST', 'attempts/check', { unit, questionId: qid, answer, key: key || undefined }))); };
+  const reviewing = Boolean(start?.review) && start.questionId === qid; // opened from a Today review (E2)
+  const check = (e) => { e.preventDefault(); run(async () => took(await api('POST', 'attempts/check', { unit, questionId: qid, answer, key: key || undefined, ...(reviewing && { review: true }) }))); };
   const photo = (file) => file && run(async () => {
     const out = await api('POST', 'attempts/photo', { unit, questionId: qid, image: await photoData(file), key: key || undefined });
     if (out.needVision || out.unreadablePhoto) throw new Error(out.message || out.note);

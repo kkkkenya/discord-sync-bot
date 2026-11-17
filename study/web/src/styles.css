@@ -1108,3 +1108,13 @@ button.chip:active, a.chip:active { transform: scale(.95); }
 /* Programming answers (Solution.jsx): plain monospace, scrolls sideways on a phone instead of wrapping code */
 .code-block { margin: 0; padding: var(--s3); background: var(--surface-2); border-radius: var(--radius); overflow-x: auto; font: 400 var(--t-s)/1.55 var(--mono); color: var(--text); white-space: pre; tab-size: 4; }
 .code-block code { font: inherit; }
+
+/* What Crux knows about you (AboutYou.jsx, Settings): lines with evidence, Hide/Show, notes */
+.about-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+.about-line { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); padding: var(--s2) 0; border-top: 1px solid var(--separator); }
+.about-text { display: grid; gap: var(--s1); min-width: 0; overflow-wrap: anywhere; }
+.about-off { color: var(--text-2); }
+.about-notes, .about-add { display: grid; gap: var(--s2); }
+.about-notes h3 { font-size: var(--t-m); font-weight: 600; }
+.about-block summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.about-block .hint { overflow-wrap: anywhere; }

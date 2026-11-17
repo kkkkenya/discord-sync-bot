@@ -16,6 +16,9 @@ import { checkTruss } from './diagram-check.js';
 import { flagSolution, shareSolution, sharedSolution } from './shared.js';
 import { add, data, patch, save } from './store.js';
 import { checkMedia, saveUpload } from './uploads.js';
+import { aboutStudent } from './learner-store.js';
+import { nairobiDay } from './plan.js';
+import { reviewsToday } from './review-store.js';
 
 const bad = (message, status = 400) => Object.assign(new Error(message), { status });
 const SCHEME_WORDS = /mark(?:ing)?[\s_-]*scheme|solutions?|memo|answers?/i;
@@ -73,7 +76,7 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
   const topic = data.topics.find((t) => t.unit === unit.code && t.id === (body.topicId || row?.topicId)) || null;
   const subs = data.subtopics.filter((s) => s.unit === unit.code && (!topic || s.topicId === topic.id));
   const fallbackSub = row?.subtopicIds?.[0] || null;
-  const ask = (extra) => solve({ unit: unit.code, topic: topic?.name || '', question, subtopics: subs.map((s) => s.name), ...extra });
+  const ask = (extra) => solve({ about: aboutStudent(), unit: unit.code, topic: topic?.name || '', question, subtopics: subs.map((s) => s.name), ...extra });
 
   // 1. the key
   let key = row?.key || null;
@@ -120,11 +123,14 @@ export async function checkAnswer(body, { solve = solveWithCheckpoints, ready = 
   if (row) { row.key = key; save(); }
 
   const right = cmp.verdict === 'right';
+  // the review flag counts only for a question that is one of today's due reviews (E2); any other flag is ignored
+  const reviewing = body.review === true && reviewsToday(nairobiDay()).some((r) => r.questionId === body.questionId);
   const attempt = add('attempts', {
     unit: unit.code, questionId: row?.id || null, topicId: topic?.id || null, subtopicId: right ? fallbackSub : null,
     answer, operations: String(body.operations || '').trim().slice(0, 500), verdict: right ? 'right' : 'mismatch',
     keySource: key.source, keyAnswer: shown, checkpoints: key.checkpoints || [], brokeAt: null, errorType: null,
     ...(key.fromClass && { fromClass: true, checkLevel: key.level || 'single' }),
+    ...(reviewing && { review: true }), // asked from a Today review (E2): counts toward today's reviews
     ...(!row && { question: question.slice(0, 1500) }),
   });
   return {
@@ -159,7 +165,7 @@ export async function checkPhoto(body, { read = readWorking, compare = compareWo
   if (out.attempt) result.attempt = patch('attempts', out.attempt.id, { photo: saveUpload(image, 'photo'), steps });
   if (out.verdict === 'wrong' && out.checkpoints?.length && steps.length) {
     try {
-      const s = await compare({ question, steps, checkpoints: out.checkpoints, expected: out.key.answer });
+      const s = await compare({ question, steps, checkpoints: out.checkpoints, expected: out.key.answer, about: aboutStudent() });
       if (Number.isInteger(s.brokeAt) && s.brokeAt >= 1 && s.brokeAt <= out.checkpoints.length) {
         result.suggest = { brokeAt: s.brokeAt, errorType: ERROR_IDS.includes(s.errorType) ? s.errorType : null, why: String(s.why || '').trim() };
       }
@@ -206,7 +212,7 @@ export async function explainQuestion({ unit, questionId, fresh = false }, { exp
   if (!ready()) return { needAi: true, message: 'The full solution needs the built-in AI. Take the question to the Prompt Builder instead.' };
   const topic = data.topics.find((t) => t.id === row.topicId);
   const scheme = schemeFor(row);
-  const out = await explain({ unit, topic: topic?.name || '', question: row.text, expected: row.key?.answer || '', scheme: scheme?.text || '' });
+  const out = await explain({ unit, topic: topic?.name || '', question: row.text, expected: row.key?.answer || '', scheme: scheme?.text || '', about: aboutStudent() });
   return keepSolution(row, out, scheme?.name);
 }
 
@@ -259,7 +265,7 @@ const codeBreakdown = (x) => [`\`\`\`${x.language || ''}`, x.code, '\`\`\`', ...
 export async function explainCode(row, { program = explainProgram, files = library.files, notes = contextFor } = {}) {
   const taught = taughtNames(Object.values(files).filter((e) => e.unit === row.unit && e.text).map((e) => e.text));
   const topic = data.topics.find((t) => t.id === row.topicId);
-  const base = { unit: row.unit, topic: topic?.name || '', question: row.text, taught: [...taught].sort(), notes: notes(row.unit, topic?.name || row.text.slice(0, 120), 6000) || '' };
+  const base = { about: aboutStudent(), unit: row.unit, topic: topic?.name || '', question: row.text, taught: [...taught].sort(), notes: notes(row.unit, topic?.name || row.text.slice(0, 120), 6000) || '' };
   const read = (out) => { const c = stripComments(out.code, out.language); return { out, clean: c, extra: untaught(c.code, taught) }; };
   let best = read(await program(base));
   if (!taught.size) best.extra = []; // notes with no text teach nothing to check against
@@ -334,7 +340,7 @@ export async function explainBatch({ unit, questionIds = [] }, { explain = expla
   let room = SCHEME_BUDGET;
   const schemeText = schemes.map((x) => { const t = x.text.slice(0, Math.max(room, 0)); room -= t.length; return t; }).filter(Boolean);
   const items = batch.map((r) => ({ id: r.id, topic: data.topics.find((t) => t.id === r.topicId)?.name || '', question: r.text, expected: r.key?.answer || '' }));
-  const out = await explain({ unit, items, schemes: schemeText, maxTokens: Math.min(24000, Math.round(tokens * 2.2)) });
+  const out = await explain({ unit, items, schemes: schemeText, about: aboutStudent(), maxTokens: Math.min(24000, Math.round(tokens * 2.2)) });
   const done = [];
   for (const sol of out.solutions || []) {
     const row = batch.find((r) => r.id === sol.id);
@@ -358,6 +364,7 @@ export async function askAbout({ unit, questionId, messages = [] }, { ask = foll
   const sol = row.explain;
   const steps = (row.key?.checkpoints || []).map((c) => `${c.n}. ${c.step} ${c.equation} = ${c.value}`).join('\n');
   const out = await ask({
+    about: aboutStudent(),
     unit, topic: topic?.name || '', question: row.text, solution: sol?.breakdown || steps, answer: sol?.answer || row.key?.answer || '',
     notes: topic ? notes(unit, topic.name, 4000) : '', history,
   });

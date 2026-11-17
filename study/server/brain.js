@@ -2,6 +2,7 @@
 // All three calls go through the shared structured() helper so they match coach.js behaviour.
 import { structured } from './ai.js';
 import { ERROR_TYPES } from './defs.js';
+import { aboutLine, aboutSystem } from './learner.js';
 
 const TUTOR = `You are a tough but fair Mechanical Engineering tutor at Kenyatta University, coaching a 3rd-year student
 for CATs and exams. Be specific and technically correct at KU CAT level: name the exact equation, sign convention,
@@ -167,7 +168,7 @@ export async function markAnswers(items) {
 // One question solved as 3-6 numbered checkpoints plus a final answer, for the checkpoint feedback. `expected` is
 // an answer key the student typed (the checkpoints must reach it); `scheme` is marking-scheme text to follow;
 // `subtopics` are the names a checkpoint may be tagged with.
-export async function solveWithCheckpoints({ unit, topic = '', question, subtopics = [], expected = '', scheme = '' }) {
+export async function solveWithCheckpoints({ unit, topic = '', question, subtopics = [], expected = '', scheme = '', about = '' }) {
   const schema = {
     type: 'object',
     properties: {
@@ -199,10 +200,11 @@ export async function solveWithCheckpoints({ unit, topic = '', question, subtopi
     scheme ? `Marking scheme material. Follow it, and do not contradict its answers:\n${scheme}` : '',
     expected ? `The answer key says the final answer is ${expected}. Make the checkpoints lead to it.` : '',
     `Question:\n${question}`,
+    aboutLine(about),
     'Solve it in 3 to 6 numbered checkpoints, SI units carried through every step, assumptions and sign convention stated in the first checkpoint. If you are not sure of the final answer, still give your best working.',
     CLEAN,
   ].filter(Boolean).join('\n\n');
-  return structured(schema, TUTOR, content, 6000);
+  return structured(schema, aboutSystem(TUTOR, about), content, 6000);
 }
 
 // The full worked solution, for reading, laid out like a model answer: given, find, assumptions, the free body
@@ -281,7 +283,7 @@ with empty lists and section show false.`;
 
 // Several questions solved in one call (2 to 4, sized by the caller): items [{ id, topic, question, expected }],
 // schemes (marking-scheme text shared by the batch). Returns { solutions: [{ id, ...SOLUTION_FIELDS }] }.
-export async function explainSolutions({ unit, items, schemes = [], maxTokens = 16000 }) {
+export async function explainSolutions({ unit, items, schemes = [], maxTokens = 16000, about = '' }) {
   const schema = {
     type: 'object',
     properties: { solutions: { type: 'array', description: 'One solution per question, in the order given.', items: { type: 'object', properties: { id: { type: 'string', description: 'The question id exactly as given.' }, ...SOLUTION_FIELDS }, required: ['id', ...Object.keys(SOLUTION_FIELDS)], additionalProperties: false } } },
@@ -292,21 +294,23 @@ export async function explainSolutions({ unit, items, schemes = [], maxTokens = 
     `Unit: ${unit}`,
     schemes.length ? `Marking scheme material. Follow it, and do not contradict its answers:\n${schemes.join('\n\n')}` : '',
     ...items.map((x) => `Question id ${x.id}${x.topic ? ` (topic: ${x.topic})` : ''}:\n${x.question}${x.expected ? `\nThe answer key says the final answer is ${x.expected}. Your solution must reach it.` : ''}`),
+    aboutLine(about),
     `Solve every question above, each on its own. For each one: ${HOW_TO_SOLVE}`,
   ].filter(Boolean).join('\n\n');
-  return structured(schema, TUTOR, content, maxTokens);
+  return structured(schema, aboutSystem(TUTOR, about), content, maxTokens);
 }
 
-export async function explainSolution({ unit, topic = '', question, expected = '', scheme = '' }) {
+export async function explainSolution({ unit, topic = '', question, expected = '', scheme = '', about = '' }) {
   const schema = { type: 'object', properties: SOLUTION_FIELDS, required: Object.keys(SOLUTION_FIELDS), additionalProperties: false };
   const content = [
     `Unit: ${unit}${topic ? `\nTopic: ${topic}` : ''}`,
     scheme ? `Marking scheme material. Follow it, and do not contradict its answers:\n${scheme}` : '',
     expected ? `The answer key says the final answer is ${expected}. Your solution must reach it.` : '',
     `Question:\n${question}`,
+    aboutLine(about),
     HOW_TO_SOLVE,
   ].filter(Boolean).join('\n\n');
-  return structured(schema, TUTOR, content, 12000);
+  return structured(schema, aboutSystem(TUTOR, about), content, 12000);
 }
 
 // A programming question answered the way the course teaches it (owner, 2026-11-15): only the functions, methods,
@@ -315,7 +319,7 @@ export async function explainSolution({ unit, topic = '', question, expected = '
 const CODER = `You teach a university engineering programming course in Kenya. You answer exactly the way the course notes
 teach: the same language, the same functions and the same style, even when a shorter or newer way exists. Students are
 marked on what was taught, so anything from outside the notes costs them marks.`;
-export async function explainProgram({ unit, topic = '', question, taught = [], notes = '', avoid = [] }) {
+export async function explainProgram({ unit, topic = '', question, taught = [], notes = '', avoid = [], about = '' }) {
   const schema = {
     type: 'object',
     properties: {
@@ -334,14 +338,15 @@ export async function explainProgram({ unit, topic = '', question, taught = [], 
     taught.length ? `Use only these functions, methods, classes and modules, which the course notes use: ${taught.join(', ')}. Nothing else, even if it is shorter or better. Variables, arithmetic, if, for and while are always fine.` : '',
     avoid.length ? `Your last answer used ${avoid.join(', ')}, which the course never teaches. Write it again without them.` : '',
     `Question:\n${question}`,
+    aboutLine(about),
     'Answer as a well-taught student of this course would in the exam: the code first, written the way the notes write it, then the explanation.',
   ].filter(Boolean).join('\n\n');
-  return structured(schema, CODER, content, 8000);
+  return structured(schema, aboutSystem(CODER, about), content, 8000);
 }
 
 // "Ask about this": a follow-up on one question and its worked solution ("why this formula and not that one?",
 // "explain step 3"). history: [{ role: 'student' | 'tutor', text }], the last one the student's new question.
-export async function followUp({ unit, topic = '', question, solution = '', answer = '', notes = '', history = [] }) {
+export async function followUp({ unit, topic = '', question, solution = '', answer = '', notes = '', history = [], about = '' }) {
   const schema = {
     type: 'object',
     properties: {
@@ -354,13 +359,14 @@ export async function followUp({ unit, topic = '', question, solution = '', answ
   const content = [
     `Unit: ${unit}${topic ? `\nTopic: ${topic}` : ''}`,
     `Question:\n${question}`,
+    aboutLine(about),
     solution ? `The worked solution the student is reading:\n${solution}` : '',
     answer ? `Final answer: ${answer}` : '',
     notes ? `From the unit's notes and books (use their symbols and methods where they fit):\n${notes}` : '',
     `The conversation so far:\n${history.map((m) => `${m.role === 'tutor' ? 'Tutor' : 'Student'}: ${m.text}`).join('\n\n')}`,
     `Answer the student's last message about this question as their tutor. When they ask why one formula or method and not another, say what each assumes and when each applies, then why this question needs this one. When they ask you to explain a step, go through it slowly with the numbers. If the worked solution has a mistake, say so plainly and give the correction. ${CLEAN.replace('The fields after work are', 'The reply is')}`,
   ].filter(Boolean).join('\n\n');
-  return structured(schema, TUTOR, content, 4000);
+  return structured(schema, aboutSystem(TUTOR, about), content, 4000);
 }
 
 // Study material matched to the stage (Phase 10). kind: 'ladder' (Adequate Prep: worked → faded → solo, plus
@@ -471,7 +477,7 @@ export async function readWorking({ unit, question, image }) {
 }
 
 // The student's written steps against the key's checkpoints: the first checkpoint their working disagrees with.
-export async function compareWorking({ question, steps, checkpoints, expected }) {
+export async function compareWorking({ question, steps, checkpoints, expected, about = '' }) {
   const schema = {
     type: 'object',
     properties: {
@@ -483,7 +489,7 @@ export async function compareWorking({ question, steps, checkpoints, expected })
     additionalProperties: false,
   };
   const content = `Question:\n${question}\n\nCorrect final answer: ${expected}\n\nCheckpoints of a correct solution:\n${checkpoints.map((c) => `${c.n}. ${c.step}${c.equation ? `: ${c.equation}` : ''}${c.value ? ` = ${c.value}` : ''}`).join('\n')}\n\nThe student's working, step by step:\n${steps.map((s, i) => `(${i + 1}) ${s}`).join('\n')}\n\nFind the FIRST checkpoint where the student's working goes wrong (a different equation, sign, unit or value), and name the kind of mistake.`;
-  return structured(schema, TUTOR, content, 1000);
+  return structured(schema, aboutSystem(TUTOR, about), content, 1000);
 }
 
 // Phase 9: a spoken teach-back → its transcript (marked afterwards like a typed one).

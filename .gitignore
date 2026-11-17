@@ -11,6 +11,8 @@ study/dist-installer/
 # Local working plan (lists security findings; this repo is public)
 fixplan.md
 fixplan-e.md
+fixplan-f.md
+resume.md
 ops/data/
 ops/test/data/
 study/shots/

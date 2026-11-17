@@ -12,7 +12,7 @@ export const LAYER_OF_ERROR = {
   units: 'do', 'algebra-calculus': 'do', 'misread-question': 'do',
 };
 const LAYER_OF_KIND = { concept: 'why', derivation: 'why', assumption: 'why', method: 'how' };
-const SELF = { solid: 0.9, shaky: 0.5, stuck: 0.1 };
+export const SELF = { solid: 0.9, shaky: 0.5, stuck: 0.1 };
 export const GREEN = 0.6; // the floor U_lo must reach for "understood": a teach-back + 4 different questions over 2 weeks gets there
 const RED = 0.4;
 const Z = 1.28; // 90% one-sided
@@ -119,17 +119,24 @@ export function combine(layers) {
   };
 }
 
-// How far to trust self-ratings: 1 - the mean gap between what you rated a sub-topic and what the evidence says.
-export function calibration(topics, lists, now) {
+// Signed gaps between each self-rated sub-topic and what the objective evidence says: rated value minus U, so a
+// positive gap means you rated it higher than your results show. Sub-topics with no objective evidence are left out.
+export function ratingGaps(topics, lists, now) {
   const gaps = [];
   for (const topic of topics) {
     const ev = evidenceFor(topic, lists);
     for (const s of lists.subtopics.filter((x) => x.topicId === topic.id && x.auditFrom !== 'teach' && x.audit in SELF)) {
       const objective = ev.filter((e) => e.sub === s.id && !e.self);
       if (!objective.length) continue;
-      gaps.push(Math.abs(SELF[s.audit] - combine(layersOf(objective, now)).U));
+      gaps.push(SELF[s.audit] - combine(layersOf(objective, now)).U);
     }
   }
+  return gaps;
+}
+
+// How far to trust self-ratings: 1 - the mean gap between what you rated a sub-topic and what the evidence says.
+export function calibration(topics, lists, now) {
+  const gaps = ratingGaps(topics, lists, now).map(Math.abs);
   return gaps.length ? Math.max(0.2, Math.min(1, 1 - gaps.reduce((a, b) => a + b, 0) / gaps.length)) : 0.7;
 }
 

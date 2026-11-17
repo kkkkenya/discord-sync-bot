@@ -7,7 +7,7 @@ import { checkMedia, saveUpload } from './uploads.js';
 import { LOCAL_TYPES, addLocalFile, bookExamples, contextFor, ensureLibrary, library, libraryMeta, localFiles, outlineContext, prepareUnit, remote, removeLocalFile } from './ingest.js';
 import { ALL_UNITS, calendar, filesFor, nextAssessment } from './library.js';
 import { COURSES, cohortUnits, courses, validCohort } from './cohort.js';
-import { ERROR_TYPES, STAGES, TBA } from './defs.js';
+import { ERROR_TYPES, LEARNER, STAGES, TBA } from './defs.js';
 import { stageMix, validStage } from './stages.js';
 import { masteryMap } from './mastery.js';
 import { checkSubtopic } from './analysis.js';
@@ -18,6 +18,7 @@ import { isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
 import { todayBoard } from './board.js';
 import { buildPrompt } from './prompt.js';
 import { nextActions } from './next.js';
+import { ankiResponse } from './anki-store.js';
 import { activity, insights } from './insights.js';
 import { deleteNote, importNotes, listNotes, loadNotes, ownNotes } from './notes-store.js';
 import { bump, usedToday } from './usage.js';
@@ -33,6 +34,7 @@ import { rewardInfo } from './rewards.js';
 import { askText, firstAsk, schemeList } from './schemes.js';
 import { dm } from '../../lib/discord.js';
 import { learnFor, topicPlaces } from './learn-store.js';
+import { aboutStudent, learnerState, learnerUpdate } from './learner-store.js';
 import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, classExplain, disputeSolution, ensureCheckpoints, explainBatch, explainQuestion, markBroke, savedExplain } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
 
@@ -58,7 +60,9 @@ const routes = {
   'GET /api/state': () => state(),
   'GET /api/me': (q, body, ctx) => ctx.user,
   // Everything Crux keeps about you, as one JSON file (Settings → Export my data).
-  'GET /api/export': async (q, body, ctx) => ({ exportedAt: new Date().toISOString(), user: ctx?.user, doc: JSON.parse(JSON.stringify(data)), notes: await listNotes(ctx?.user?.id) }),
+  'GET /api/export': async (q, body, ctx) => ({ exportedAt: new Date().toISOString(), user: ctx?.user, doc: JSON.parse(JSON.stringify(data)), notes: await listNotes(ctx?.user?.id), about: learnerState(ctx?.today || nairobiDay()) }),
+  // a text file (Response), not JSON: the router and the local server send it as it is
+  'GET /api/export/anki': (q) => ankiResponse(q?.get?.('unit') || ''),
   // "Bring data back": a file from Export my data, merged in. Nothing you have now is replaced: units, topics,
   // attempts, notes, highlights and the rest come back only where they're missing. { added: { list: n }, notes }.
   'POST /api/import': async (q, body, ctx) => importData(body || {}, ctx?.user?.id),
@@ -309,6 +313,10 @@ const routes = {
   // mark the step where your working broke.
   // Learn a topic: { unit, topicId } → pages to read in your own files, questions to try, then what next. No AI.
   'GET /api/learn': async (q) => learnFor(q.get('unit'), q.get('topicId')),
+  // The learner file (E5): what Crux knows about you, with evidence, your notes, and the block prompts get (<= 600 characters).
+  // POST: one edit { action: addNote | deleteNote | hide | show | clear }. No AI.
+  'GET /api/learner': (q, body, ctx) => learnerState(ctx?.today || nairobiDay()),
+  'POST /api/learner': (q, body, ctx) => learnerUpdate(body || {}, ctx?.today || nairobiDay()),
   // Files a student adds for the hub: a link to upload straight to storage, then "done" queues it for the hub PC.
   'POST /api/uploads/start': async (q, body, ctx) => startUpload(body || {}, ctx.user),
   'POST /api/uploads/done': async (q, body, ctx) => finishUpload(body || {}, ctx.user),
@@ -471,7 +479,7 @@ async function teachBack({ unit, topic, text, audio }) {
   if (!unit || !topic || !text?.trim()) throw Object.assign(new Error('unit, topic and text are needed'), { status: 400 });
   let feedback = null;
   let error = null;
-  if (coachReady()) { try { feedback = await coach({ unit, topic, text }); } catch (e) { error = e.message; } }
+  if (coachReady()) { try { feedback = await coach({ unit, topic, text, about: aboutStudent() }); } catch (e) { error = e.message; } }
   const item = add('teach', { unit, topic, text, feedback, ...(audio && { audio, spoken: true }) });
   const tp = data.topics.find((x) => x.unit === unit && x.name.toLowerCase() === topic.toLowerCase());
   if (tp) { tp.taughtAt = item.at; save(); }
@@ -559,6 +567,10 @@ async function importData(file, userId) {
   const added = {};
   const units = new Set(data.units.map((u) => u.code));
   for (const u of doc.units) if (u?.code && !units.has(u.code)) { data.units.push(u); units.add(u.code); added.units = (added.units || 0) + 1; }
+  // the learner file's notes and hidden lines come back where they're missing (at most the note limit)
+  const have = new Set((data.learner?.notes || []).map((n) => n.id));
+  for (const n of doc.learner?.notes || []) if (n?.id && !have.has(n.id) && data.learner.notes.length < LEARNER.notes) { data.learner.notes.push(n); have.add(n.id); added.learnerNotes = (added.learnerNotes || 0) + 1; }
+  data.learner.hidden = [...new Set([...data.learner.hidden, ...(doc.learner?.hidden || [])])];
   for (const list of [...LISTS, 'attempts']) {
     if (!Array.isArray(doc[list]) || !Array.isArray(data[list])) continue;
     const have = new Set(data[list].map((x) => x?.id));

@@ -1,6 +1,7 @@
 // Teach-back feedback: you explain a topic as if teaching a classmate, the AI marks it like a tough tutor and
 // names the gaps (Phase 4 maps them onto sub-topics). Uses the shared ai.js helper, so it follows the provider toggle.
 import { aiReady, structured } from './ai.js';
+import { aboutLine, aboutSystem } from './learner.js';
 
 export const coachReady = () => aiReady();
 
@@ -22,7 +23,8 @@ Judge the explanation for technical correctness and completeness at the level of
 Be direct and specific: name the exact equation, sign convention, assumption or step that is missing or wrong.
 Do not rewrite their explanation for them. Plain text, no markdown. Use ^ and _ for powers and subscripts.`;
 
-export async function coach({ unit, topic, text }) {
+export async function coach({ unit, topic, text, about = '' }) {
   if (!coachReady()) throw new Error('No AI key for the selected provider. Pick another provider in the top bar, or add the key.');
-  return structured(SCHEMA, SYSTEM, `Unit: ${unit}\nTopic: ${topic}\n\nMy explanation:\n${text}`, 4000);
+  const content = [`Unit: ${unit}\nTopic: ${topic}\n\nMy explanation:\n${text}`, aboutLine(about)].filter(Boolean).join('\n\n');
+  return structured(SCHEMA, aboutSystem(SYSTEM, about), content, 4000);
 }

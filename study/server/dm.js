@@ -3,6 +3,7 @@
 import { coach, coachReady } from './coach.js';
 import { ALL_UNITS, filesFor, nextAssessment } from './library.js';
 import { daysBetween, isDay, nairobiDay, stats, todayPlan, unitStage } from './plan.js';
+import { reviewsToday } from './review-store.js';
 import { ERROR_TYPES } from './defs.js';
 import { canRead, provider } from './ai.js';
 import { transcribe } from './brain.js';
@@ -56,6 +57,8 @@ export function todayText(today = nairobiDay()) {
   const mix = stageMix(data.units.map((u) => unitStage(u, today).stage));
   lines.push('', `Stages: ${mix.map((m) => `${m.n} ${m.name}`).join(' · ')}`, '', '**Today**');
   plan.forEach((p, n) => lines.push(`${n + 1}. **${p.code}** ${p.title} _(${p.stage.name})_: ${p.task.text}`));
+  const reviews = reviewsToday(today); // fixplan-e E2: a fading topic, one question (asked on the dashboard, Today)
+  if (reviews.length) lines.push('', '**Keep these**', ...reviews.map((r) => `• **${r.topic}** (${r.unit}): ${r.reason} Open it on the dashboard, Today.`));
   const s = stats(today);
   lines.push('', `Streak ${s.streak} day${s.streak === 1 ? '' : 's'} · ${s.minutesToday} min today · log with \`log 45 ${plan[0].code}\``);
   return lines.join('\n');

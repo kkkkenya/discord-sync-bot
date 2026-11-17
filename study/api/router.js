@@ -58,6 +58,10 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       const query = new URLSearchParams(url.searchParams);
       query.delete('path');
       const result = await withSavedDoc(docs, user.id, (extra) => dispatch(request.method, path, query, body, { user, today: nairobiDay(), ...extra }));
+      if (result instanceof Response) { // a file download (Anki export)
+        if (cookie) result.headers.append('Set-Cookie', cookie);
+        return result;
+      }
       return reply(result);
     } catch (e) {
       if (!e.status) console.error(e);

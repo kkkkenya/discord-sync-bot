@@ -1,9 +1,11 @@
 // Study rooms on the Focus page (fixplan-f): join with a code, host a room, the public rooms, and the hosted room
 // itself (one clock run by the host, the names of the people in it). Not a call and not a screen share: everyone keeps
 // working in their own Crux, and talks on Discord or in person.
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from './api.js';
 import OpenAt from './OpenAt.jsx';
+import Rich from './Rich.jsx';
+import { runCode } from './CodeCell.jsx';
 import { PUBLIC_ROOMS, joinRoom } from './focus-store.js';
 import { Icon } from './icons.jsx';
 import { LIMITS, PRESETS } from './room-clock.js';
@@ -113,6 +115,75 @@ export function RoomsLobby({ unit, title, invite = '' }) {
   );
 }
 
+// The board (F8): what the host presents, followed on everyone's screen. Text, not video, so it is light on data.
+// The host writes or pastes a question and its working, one step per line, and shows the steps one at a time.
+function Board({ board, me, run }) {
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const go = (step) => { if (busy) return; setBusy(true); run(async () => { await act('board', { board: { ...board, step } }); })().finally(() => setBusy(false)); };
+  useEffect(() => {
+    if (!me || !board) return undefined;
+    const key = (e) => {
+      if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (e.key === 'ArrowRight' && board.step < board.steps.length) go(board.step + 1);
+      if (e.key === 'ArrowLeft' && board.step > 0) go(board.step - 1);
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  });
+  if (!board) return null;
+  if (hidden && !me) return <div className="card room-row"><span className="row-main"><b>The host is presenting</b></span><button className="btn" type="button" onClick={() => setHidden(false)}>Back to the board</button></div>;
+  return (
+    <section className="card stack board" aria-label="The board" aria-live="polite">
+      <div className="room-row">
+        <h2 className="room-h">{board.title || 'The board'}</h2>
+        {!me && <button className="btn plain" type="button" onClick={() => setHidden(true)}>Stop following</button>}
+      </div>
+      {board.text && <Rich text={board.text} />}
+      {board.steps.length > 0 && (
+        <ol className="board-steps">
+          {board.steps.slice(0, board.step).map((x, i) => <li key={i}><Rich as="span" text={x} /></li>)}
+        </ol>
+      )}
+      {board.steps.length > 0 && <p className="row-sub">Step <span className="num">{board.step}</span> of <span className="num">{board.steps.length}</span></p>}
+      {board.code && <pre className="code-block" tabIndex={0} aria-label="Code"><code>{board.code}</code></pre>}
+      {board.output && <pre className="code-block code-out" tabIndex={0} aria-label="Output"><code>{board.output}</code></pre>}
+      {me && (
+        <div className="actions start">
+          <button className="btn" type="button" disabled={busy || board.step <= 0} onClick={() => go(board.step - 1)}>Back</button>
+          <button className="btn primary" type="button" disabled={busy || board.step >= board.steps.length} onClick={() => go(board.step + 1)}>Next step</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// The host's board editor: a title, the question, the working (one step per line), and code to run here.
+function BoardEditor({ board, onDone, run }) {
+  const [title, setTitle] = useState(board?.title || '');
+  const [text, setText] = useState(board?.text || '');
+  const [steps, setSteps] = useState((board?.steps || []).join('\n'));
+  const [code, setCode] = useState(board?.code || '');
+  const [output, setOutput] = useState(board?.output || '');
+  const [running, setRunning] = useState(false);
+  const show = (e) => { e.preventDefault(); run(async () => { await act('board', { board: { title, text, steps: steps.split('\n'), step: board ? Math.min(board.step, steps.split('\n').filter((x) => x.trim()).length) : 0, code, output } }); onDone(); })(); };
+  const runIt = async () => { setRunning(true); const r = await runCode(code, ''); setOutput(r.stopped ? 'Stopped: it ran for more than 3 seconds.' : r.blocked ? `Plain Python only (no ${r.blocked}).` : `${r.out}${r.error ? `${r.error.type}${r.error.line ? ` on line ${r.error.line}` : ''}: ${r.error.message}` : ''}`); setRunning(false); };
+  return (
+    <form className="card room-form" aria-label="Present" onSubmit={show}>
+      <label className="field">Title<input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder="CAT 1 2024, question 3" /></label>
+      <label className="field">Question <span className="hint">(maths in $…$)</span><textarea value={text} maxLength={4000} rows={4} onChange={(e) => setText(e.target.value)} /></label>
+      <label className="field">Working <span className="hint">(one step per line; the room sees them one at a time)</span><textarea value={steps} rows={6} onChange={(e) => setSteps(e.target.value)} /></label>
+      <label className="field">Code <span className="hint">(optional, Python)</span><textarea className="code-input small" value={code} maxLength={6000} rows={4} spellCheck="false" onChange={(e) => setCode(e.target.value)} /></label>
+      {code.trim() && <div className="actions start"><button className="btn" type="button" disabled={running} onClick={runIt}>{running ? 'Running…' : 'Run to show its output'}</button></div>}
+      {output && <pre className="code-block code-out"><code>{output}</code></pre>}
+      <div className="actions">
+        <button className="btn primary" type="submit">{board ? 'Update the board' : 'Show to the room'}</button>
+        <button className="btn plain" type="button" onClick={onDone}>Cancel</button>
+      </div>
+    </form>
+  );
+}
+
 // a Hub file's name for a button: no extension or underscores, at most 60 characters
 const shortFile = (n) => { const t = String(n || 'paper').replace(/\.[a-z0-9]{2,4}$/i, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim(); return t.length > 60 ? `${t.slice(0, 57)}…` : t; };
 
@@ -205,6 +276,7 @@ export function HostedRoom() {
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [presenting, setPresenting] = useState(false);
   const v = roomView(s);
   if (!s.data || !v) return <div className="card" role="status"><p className="muted">Opening room {s.code}…</p><div className="actions"><button className="btn plain" type="button" onClick={leaveHosted}>Leave</button></div></div>;
   const { room, people } = s.data;
@@ -240,6 +312,14 @@ export function HostedRoom() {
         </div>
         {error && <p className="notice bad" role="alert">{error}</p>}
       </section>
+      {me && presenting && <BoardEditor board={room.board} run={run} onDone={() => setPresenting(false)} />}
+      {!presenting && <Board board={room.board} me={me} run={run} />}
+      {me && !presenting && (
+        <div className="actions start">
+          <button className="btn" type="button" onClick={() => setPresenting(true)}>{room.board ? 'Edit the board' : 'Present'}</button>
+          {room.board && <button className="btn plain" type="button" onClick={run(() => act('board', { board: { on: false } }))}>Stop presenting</button>}
+        </div>
+      )}
       <TodaysWork room={room} me={me} run={run} />
       <CheckIn v={v} data={s.data} me={me} run={run} />
       {me && settings && plan && (

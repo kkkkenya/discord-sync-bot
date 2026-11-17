@@ -1177,3 +1177,8 @@ body:has(.focusbar) .donebar { bottom: calc(14px + var(--tabs) + 8px + 10px + 60
   body:has(.notesbar) .donebar { bottom: calc(14px + var(--tabs) + 8px + 56px + env(safe-area-inset-bottom)); }
   body:has(.notesbar):has(.focusbar) .donebar { bottom: calc(14px + var(--tabs) + 8px + 56px + 60px + env(safe-area-inset-bottom)); }
 }
+
+/* The board (Rooms.jsx, F8): the host's question and working, step by step */
+.board-steps { margin: 0; padding-left: 1.4em; display: grid; gap: var(--s2); }
+.board-steps li { animation: pop 0.25s var(--spring); }
+@media (prefers-reduced-motion: reduce) { .board-steps li { animation: none; } }

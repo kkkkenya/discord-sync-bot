@@ -52,7 +52,7 @@ export function shouldEnd(room, members, now) {
   return null;
 }
 
-export const HOST_ACTIONS = ['start', 'pause', 'resume', 'skip', 'settings', 'end', 'lock', 'unlock', 'remove', 'host', 'rename', 'work'];
+export const HOST_ACTIONS = ['start', 'pause', 'resume', 'skip', 'settings', 'end', 'lock', 'unlock', 'remove', 'host', 'rename', 'work', 'board'];
 
 // Today's work (F4): what the host sets the room to do. A short line, and optionally a Hub paper at a page, which
 // members open in their own viewer. Only Hub files (numeric ids): a file the host added privately cannot be shared.
@@ -64,6 +64,17 @@ export function cleanWork(w) {
   const fileName = fileId ? String(w.fileName || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, 120) || 'Paper' : null;
   if (!text && !fileId) return null;
   return { text, fileId, fileName, page };
+}
+// The board (F8): what the host presents to the room, text and not video. A question, its working one step per line
+// (revealed one at a time with Next), and code with its output. Members' screens follow it. Kept only with the room.
+export const BOARD = { title: 120, text: 4000, steps: 30, stepChars: 600, code: 6000, output: 4000 };
+const plain = (v, max) => String(v ?? '').replace(/\r/g, '').replace(/[\u0000-\u0008\u000b-\u001f]/g, '').slice(0, max);
+export function cleanBoard(b) {
+  if (!b || typeof b !== 'object' || b.on === false) return null;
+  const steps = (Array.isArray(b.steps) ? b.steps : []).map((x) => plain(x, BOARD.stepChars).trim()).filter(Boolean).slice(0, BOARD.steps);
+  const step = Math.min(steps.length, Math.max(0, Math.round(Number(b.step) || 0)));
+  const out = { on: true, title: plain(b.title, BOARD.title).trim(), text: plain(b.text, BOARD.text).trim(), steps, step, code: plain(b.code, BOARD.code).replace(/\s+$/, ''), output: plain(b.output, BOARD.output) };
+  return out.title || out.text || out.steps.length || out.code ? out : null;
 }
 export const CHECKINS = ['done', 'partly', 'stuck'];
 // this round's check-ins: counts only (the host sees how the room is doing, not who said what)

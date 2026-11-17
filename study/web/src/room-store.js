@@ -107,7 +107,9 @@ function startEngine() {
       const c = settle(st.data.room.clock, serverNow());
       tellFocus(v.state === 'running' && v.mode === 'focus' ? new Date(c.phaseStart + length(c.plan, c.phase)).toISOString() : null);
     }
-    if (Date.now() - polled >= POLL && document.visibilityState === 'visible') { polled = Date.now(); refresh(); }
+    // while the host presents the board, every 5 s so members follow the steps closely; 20 s otherwise
+    const every = st.data?.room.board ? 5e3 : POLL;
+    if (Date.now() - polled >= every && document.visibilityState === 'visible') { polled = Date.now(); refresh(); }
   }, 1000);
   const back = () => { if (document.visibilityState === 'visible' && st.code) { polled = Date.now(); refresh(); } };
   // opening the Focus page (or an invite) shows the room as it is now, not as of the last poll

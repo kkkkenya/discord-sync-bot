@@ -233,3 +233,4 @@ alter table crux_room_members enable row level security;
 -- at a break (done / partly / stuck, for one round). Until these run, those two actions say the database needs updating.
 alter table crux_rooms add column if not exists work jsonb;                -- { text, fileId, fileName, page }
 alter table crux_room_members add column if not exists checkin jsonb;      -- { round, how }
+alter table crux_rooms add column if not exists board jsonb;               -- F8: { on, title, text, steps[], step, code, output }

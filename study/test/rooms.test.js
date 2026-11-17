@@ -214,3 +214,19 @@ test("today's work: host only, cleaned, Hub papers only; check-ins count per rou
   assert.equal(JSON.stringify(h).includes('Brian'), true); // names are in the people list…
   assert.equal(JSON.stringify(h.checkin).includes('Brian'), false); // …but never beside a check-in
 });
+
+test('the board: host only, cleaned and capped, steps revealed up to the step, cleared with on: false', async () => {
+  resetRoomsForTests();
+  const { room } = await host();
+  await call(brian, 'POST', '/api/rooms/join', { code: room.code });
+  await assert.rejects(call(brian, 'POST', '/api/rooms/act', { code: room.code, action: 'board', board: { text: 'x' } }), /Only the host/);
+  const s = await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'board', board: { title: 'Q3', text: 'A shaft carries 2 kNm.\u0007', steps: ['T = 2 kNm', ' ', 'J = πd⁴/32', ...Array(40).fill('more')], step: 99, code: 'print(1)   \n\n', output: '1\n' } });
+  assert.equal(s.room.board.text, 'A shaft carries 2 kNm.');
+  assert.equal(s.room.board.steps.length, 30);
+  assert.equal(s.room.board.step, 30, 'the step is kept within the steps');
+  assert.equal(s.room.board.code, 'print(1)');
+  const m = await call(brian, 'GET', '/api/rooms/state', null, T0, `code=${room.code}`);
+  assert.equal(m.room.board.title, 'Q3', 'members see the board');
+  const off = await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'board', board: { on: false } });
+  assert.equal(off.room.board, null);
+});

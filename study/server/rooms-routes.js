@@ -2,7 +2,7 @@
 // server/index.js): rooms read only their own tables, so a full room polling every 20 s stays cheap.
 import { ROOMS, PUBLIC_ROOMS } from './defs.js';
 import { focusByRoom } from './focus.js';
-import { CHECKINS, canAct, checkinCounts, cleanName, cleanWork, makeCode, nextHost, normalizeCode, personKey, presence, shouldEnd, validCode } from './rooms.js';
+import { CHECKINS, canAct, checkinCounts, cleanBoard, cleanName, cleanWork, makeCode, nextHost, normalizeCode, personKey, presence, shouldEnd, validCode } from './rooms.js';
 import { roomsStore } from './rooms-store.js';
 import { actions, cleanPlan, idle, phaseAt } from '../web/src/room-clock.js';
 
@@ -22,7 +22,7 @@ function view(room, members, userId, now) {
   const host = room.host_id === userId;
   return {
     now,
-    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock, version: room.version, locked: Boolean(room.locked), host, work: room.work || null },
+    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock, version: room.version, locked: Boolean(room.locked), host, work: room.work || null, board: room.board || null },
     people,
     // check-ins for this round: yours, and the counts for the host (never who said what)
     checkin: { round, mine: mine?.round === round ? mine.how : null, counts: host ? checkinCounts(members, round) : null },
@@ -130,6 +130,7 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     else if (action === 'lock' || action === 'unlock') patch = { locked: action === 'lock' };
     else if (action === 'rename') patch = { name: cleanName(body.name, room.name) };
     else if (action === 'work') patch = { work: cleanWork(body.work) };
+    else if (action === 'board') patch = { board: cleanBoard(body.board) };
     else if (action === 'host' || action === 'remove') {
       if (!target) throw fail('That person is not in the room any more.', 404);
       if (target.user_id === user.id) throw fail(action === 'host' ? 'You are already the host.' : 'Use Leave to leave the room.');

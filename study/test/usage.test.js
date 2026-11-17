@@ -61,3 +61,20 @@ test('with the limit at 1, the second AI action is refused with the plain messag
     assert.equal((await second.json()).error, "Today's AI limit is used. Take this pack to any AI.");
   } finally { LIMITS.ai.basic = was; }
 });
+
+test('asking about a passage is one AI action: signed out is 401, the second at a limit of 1 is 429', async () => {
+  resetUsageForTests();
+  const was = LIMITS.ai.basic;
+  LIMITS.ai.basic = 1;
+  try {
+    const docs = { load: async () => ({ rev: 1, doc: emptyDoc() }), save: async () => 2 };
+    const router = makeRouter(docs, { db: { upsert: async () => [] }, member: async () => null });
+    const body = JSON.stringify({ unit: 'EMM 302', passage: 'The shear stress varies linearly.', messages: [{ role: 'student', text: 'Why?' }] });
+    const anon = await router(new Request('https://crux.test/api/router?path=ask/passage', { method: 'POST', body }));
+    assert.equal(anon.status, 401);
+    const cookie = `crux_session=${sign({ id: 'amina', name: 'Amina', tier: 'basic', checked: Date.now(), exp: Date.now() + 60e3 })}`;
+    const ask = () => router(new Request('https://crux.test/api/router?path=ask/passage', { method: 'POST', headers: { cookie }, body }));
+    assert.notEqual((await ask()).status, 429); // counted (and refused for its own reasons: no such unit here)
+    assert.equal((await ask()).status, 429);
+  } finally { LIMITS.ai.basic = was; }
+});

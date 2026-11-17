@@ -326,7 +326,7 @@ export default function PdfViewer({ tabs, active, expanded, jump, marks: saved, 
     );
   }
   return (
-    <div className="pdfview" role="dialog" aria-modal="true" aria-label={short(tab.name)}>
+    <div className="pdfview" role="dialog" aria-modal="true" aria-label={short(tab.name)} data-file-id={tab.fileId}>
       <header className="pdf-bar glass">
         <button type="button" className="iconbtn" aria-label="Collapse the viewer" title="Collapse (Esc)" onClick={onCollapse}><Icon name="down" /></button>
         {strip}

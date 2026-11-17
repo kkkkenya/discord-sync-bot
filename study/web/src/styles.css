@@ -1146,3 +1146,13 @@ button.chip:active, a.chip:active { transform: scale(.95); }
 .code-input.small { min-height: 56px; }
 .code-out { max-height: 320px; overflow: auto; }
 .room-row .openat .btn { white-space: normal; text-align: left; overflow-wrap: anywhere; padding-left: 0; }
+
+/* Ask about a passage (AskPassage.jsx): a sheet at the bottom on phones, beside the notes column on laptops. */
+.pinbtn button + button + button { border-radius: 0 999px 999px 0; }
+.pinbtn button:nth-child(2):not(:last-child) { border-radius: 0; }
+.ask-sheet { position: fixed; z-index: 70; left: var(--nav-gap, 12px); right: var(--nav-gap, 12px); bottom: calc(14px + env(safe-area-inset-bottom)); max-height: min(78dvh, 640px); overflow-y: auto; display: grid; gap: var(--s3); padding: var(--s4); border-radius: var(--radius-l); animation: pop 0.28s var(--spring); }
+@media (min-width: 900px) { .ask-sheet { left: auto; right: 24px; bottom: 24px; width: 440px; } }
+@media (prefers-reduced-motion: reduce) { .ask-sheet { animation: none; } }
+.ask-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); }
+.ask-quote { margin: 0; padding: var(--s2) var(--s3); border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; font-size: var(--t-s); white-space: pre-wrap; }
+.ask-quote.is-short { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

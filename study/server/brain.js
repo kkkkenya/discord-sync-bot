@@ -346,7 +346,7 @@ export async function explainProgram({ unit, topic = '', question, taught = [], 
 
 // "Ask about this": a follow-up on one question and its worked solution ("why this formula and not that one?",
 // "explain step 3"). history: [{ role: 'student' | 'tutor', text }], the last one the student's new question.
-export async function followUp({ unit, topic = '', question, solution = '', answer = '', notes = '', history = [], about = '' }) {
+export async function followUp({ unit, topic = '', question, solution = '', answer = '', notes = '', history = [], about = '', passage = false }) {
   const schema = {
     type: 'object',
     properties: {
@@ -364,7 +364,10 @@ export async function followUp({ unit, topic = '', question, solution = '', answ
     answer ? `Final answer: ${answer}` : '',
     notes ? `From the unit's notes and books (use their symbols and methods where they fit):\n${notes}` : '',
     `The conversation so far:\n${history.map((m) => `${m.role === 'tutor' ? 'Tutor' : 'Student'}: ${m.text}`).join('\n\n')}`,
-    `Answer the student's last message about this question as their tutor. When they ask why one formula or method and not another, say what each assumes and when each applies, then why this question needs this one. When they ask you to explain a step, go through it slowly with the numbers. If the worked solution has a mistake, say so plainly and give the correction. ${CLEAN.replace('The fields after work are', 'The reply is')}`,
+    passage
+      // Ask about a passage (fixplan-e E4): the student selected text in a file, a solution or a guide
+      ? `Answer the student's last message about the passage they selected, as their tutor. Quote the words of the passage you are explaining, then explain them in plain words, with a small worked example when it helps. Use the text around the passage and the unit's notes for the meaning of its symbols. If the passage itself is wrong, say so plainly and give the correction. ${CLEAN.replace('The fields after work are', 'The reply is')}`
+      : `Answer the student's last message about this question as their tutor. When they ask why one formula or method and not another, say what each assumes and when each applies, then why this question needs this one. When they ask you to explain a step, go through it slowly with the numbers. If the worked solution has a mistake, say so plainly and give the correction. ${CLEAN.replace('The fields after work are', 'The reply is')}`,
   ].filter(Boolean).join('\n\n');
   return structured(schema, aboutSystem(TUTOR, about), content, 4000);
 }

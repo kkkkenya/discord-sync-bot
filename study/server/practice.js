@@ -371,6 +371,39 @@ export async function askAbout({ unit, questionId, messages = [] }, { ask = foll
   return { reply: String(out.reply || '').trim() };
 }
 
+// Ask about a passage (fixplan-e E4): text the student selected in a file, a solution or a guide, and their question.
+// The passage is capped at 2,000 characters and the chat at its last 6 turns. For a Hub file whose text Crux has, up
+// to 1,500 characters around the passage go with it, so symbols and the step before it make sense.
+export const PASSAGE = { chars: 2000, around: 1500, turns: 6 };
+const squash = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+export function aroundPassage(text, passage, around = PASSAGE.around) {
+  const all = squash(text), p = squash(passage).slice(0, 200);
+  if (!all || p.length < 8) return '';
+  const at = all.indexOf(p);
+  if (at < 0) return '';
+  const half = Math.floor((around - Math.min(around, squash(passage).length)) / 2);
+  return all.slice(Math.max(0, at - half), Math.min(all.length, at + squash(passage).length + half));
+}
+export async function askPassage({ unit, passage, where = {}, messages = [] }, { ask = followUp, ready = aiReady, notes = contextFor, files = () => library.files } = {}) {
+  if (!data.units.some((u) => u.code === unit)) throw bad('Pick one of your units first.');
+  const quote = String(passage || '').trim().slice(0, PASSAGE.chars);
+  if (quote.length < 2) throw bad('Select some text first.');
+  const history = (Array.isArray(messages) ? messages : []).slice(-PASSAGE.turns * 2)
+    .map((m) => ({ role: m.role === 'tutor' ? 'tutor' : 'student', text: String(m.text || '').trim().slice(0, 2000) })).filter((m) => m.text);
+  if (history.at(-1)?.role !== 'student') throw bad('Type your question first.');
+  if (!ready()) return { needAi: true, message: 'Asking about a passage needs the built-in AI. Copy it into the Prompt Builder instead.' };
+  const label = String(where.label || '').trim().slice(0, 120);
+  const file = where.fileId ? files()[where.fileId] : null;
+  const context = file?.unit === unit ? aroundPassage(file.text, quote) : '';
+  const out = await ask({
+    about: aboutStudent(), unit, passage: true,
+    question: `The passage the student selected${label ? ` (from ${label}${where.page ? `, page ${where.page}` : ''})` : ''}:\n> ${quote.replace(/\n/g, '\n> ')}`,
+    solution: context ? `The text around it in the same file:\n${context}` : '',
+    notes: notes(unit, quote.slice(0, 160), 3000) || '', history,
+  });
+  return { reply: String(out.reply || '').trim() };
+}
+
 // "Broke here": the student found the checkpoint where their paper diverged. This is the only thing that counts as a
 // failure against a sub-topic. Re-marking replaces the earlier mark.
 export function markBroke({ id, step, subtopicId = null, errorType }) {

@@ -35,7 +35,7 @@ import { askText, firstAsk, schemeList } from './schemes.js';
 import { dm } from '../../lib/discord.js';
 import { learnFor, topicPlaces } from './learn-store.js';
 import { aboutStudent, learnerState, learnerUpdate } from './learner-store.js';
-import { KEY_LABEL, askAbout, breakOf, checkAnswer, checkPhoto, classExplain, disputeSolution, ensureCheckpoints, explainBatch, explainQuestion, markBroke, savedExplain } from './practice.js';
+import { KEY_LABEL, askAbout, askPassage, breakOf, checkAnswer, checkPhoto, classExplain, disputeSolution, ensureCheckpoints, explainBatch, explainQuestion, markBroke, savedExplain } from './practice.js';
 import { LISTS, add, data, patch, remove, save } from './store.js';
 
 // The retired flashcards (cards, reviews) stay in study.json but never go to the dashboard; only their count does,
@@ -341,6 +341,7 @@ const routes = {
   'POST /api/attempts/explain-batch': async (q, body) => explainBatch(body || {}),
   // "Ask about this": { unit, questionId, messages } → { reply }, a follow-up on the question and its solution
   'POST /api/attempts/ask': async (q, body) => askAbout(body || {}),
+  'POST /api/ask/passage': async (q, body) => askPassage(body || {}), // fixplan-e E4: ask about selected text
   'POST /api/attempts/broke': (q, body) => markBroke(body || {}),
   'POST /api/attempts/flag': async (q, body) => disputeSolution(body || {}),
   // The weakspot matrix for one unit: critical sub-topics (exam weight × weakness) and recurring errors.
@@ -584,10 +585,10 @@ async function importData(file, userId) {
 // One request: method + path → a handler (query, body, ctx). ctx = { user: { id, name, tier }, today }.
 // Errors carry .status; the dev server and the Vercel router turn them into { error }.
 // Routes that ground their work in the student's own notes: those notes are loaded into the request first.
-const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints|explain|explain-batch|ask))/;
+const READS_NOTES = /^\/api\/(learn|teach|notes$|mocks|subtopics\/suggest|topics\/suggest|materials\/make|pack|attempts\/(check|photo|checkpoints|explain|explain-batch|ask)|ask\/passage)/;
 
 // Routes that use the AI: each request is one "AI action" against the member's daily limit.
-const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch|ask)|learn\/guide|predict\/map)$/;
+const USES_AI = /^\/api\/(teach(\/audio)?|notes|mocks(\/[\w-]+\/submit)?|subtopics\/suggest|topics\/suggest|materials\/make|attempts\/(check|photo|checkpoints|explain|explain-batch|ask)|ask\/passage|learn\/guide|predict\/map)$/;
 export const AI_LIMIT_MESSAGE = "Today's AI limit is used. Take this pack to any AI.";
 
 export async function dispatch(method, pathname, query, body, ctx) {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from './api.js';
 import { Icon } from './icons.jsx';
 import Rich from './Rich.jsx';
+import AskPassage, { askAbout } from './AskPassage.jsx';
 
 // The notes bar: clips pinned from anywhere in Crux and notes you write, kept in your account (data.stickies).
 // Laptop: a column fixed on the right that folds into a slim rail (remembered), giving the page its width back.
@@ -34,8 +35,16 @@ function sourceOf(node, unit) {
   return [unit, label.trim()].filter(Boolean).join(' · ').slice(0, 120);
 }
 
-// "Pin" next to any text selected outside the bar.
-function PinButton({ onPin }) {
+// Where a selection is, for Ask: a page of a Hub file in the viewer (its id and page), or the box it sits in.
+function whereOf(node, unit) {
+  const el = node.nodeType === 1 ? node : node.parentElement;
+  const page = el?.closest('.pdf-page');
+  const fileId = page ? el.closest('.pdfview')?.dataset.fileId : null;
+  return { label: sourceOf(node, unit).replace(/ · p\. \d+$/, ''), fileId: fileId && /^\d+$/.test(fileId) ? fileId : null, page: page ? Number(page.dataset.page) : null };
+}
+
+// "Pin" next to any text selected outside the bar; Ask beside it when the AI can answer (E4).
+function PinButton({ onPin, onAsk }) {
   const [at, setAt] = useState(null);
   useEffect(() => {
     let t;
@@ -61,6 +70,7 @@ function PinButton({ onPin }) {
   return (
     <span className="pinbtn glass" style={{ left: at.x, top: at.y }} onMouseDown={(e) => e.preventDefault()}>
       <button type="button" onClick={() => { onPin(at.range); done(); }}><Icon name="pin" /> Pin to notes</button>
+      {onAsk && <button type="button" onClick={() => { onAsk(at.range); done(); }}><Icon name="prompt" /> Ask</button>}
       {inPdf && <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('crux-highlight', { detail: { range: at.range.cloneRange() } })); done(); }}><Icon name="edit" /> Highlight</button>}
     </span>
   );
@@ -150,7 +160,9 @@ export default function StickyBar({ s, unit, onProblem }) {
   const newest = shown[0];
   return (
     <>
-      <PinButton onPin={(range) => create(selectionText(range), sourceOf(range.startContainer, unit))} />
+      <PinButton onPin={(range) => create(selectionText(range), sourceOf(range.startContainer, unit))}
+        onAsk={s.ai && navigator.onLine ? (range) => askAbout({ text: selectionText(range).slice(0, 2000), ...whereOf(range.startContainer, unit) }) : null} />
+      <AskPassage unit={unit} ai={s.ai} />
       <aside className={`notesbar glass${open ? ' is-open' : ''}${folded ? ' is-folded' : ''}`} aria-label="Notes">
         <button type="button" className="notes-rail" aria-expanded="false" aria-label={`Show notes (${shown.length})`} title="Show notes" onClick={() => fold(false)}>
           <Icon name="notes" /><span className="chip num">{shown.length}</span><span className="notes-rail-word">Notes</span>

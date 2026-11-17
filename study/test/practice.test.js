@@ -281,3 +281,30 @@ test('a solution with no forces on a body says nothing about a free body diagram
   assert.match(real.fbd, /20 kN/);
   assert.match(real.breakdown, /## Free body diagram/);
 });
+
+// Ask about a passage (fixplan-e E4): selected text, capped, with the text around it from the same Hub file
+const { askPassage, aroundPassage, PASSAGE } = await import('../server/practice.js');
+test('asking about a passage: capped, the last 6 turns, the text around it from the same file, needs the AI', async () => {
+  let seen = null;
+  const ask = async (x) => { seen = x; return { work: 'scratch', reply: 'It says the shear stress grows with the radius.' }; };
+  const notes = () => 'Notes on torsion';
+  const book = 'Chapter 3. Torsion of circular shafts. The shear stress varies linearly with the radius, from zero at the centre to a maximum at the surface. This is why hollow shafts save material.';
+  const files = () => ({ 77: { unit: 'EMM 302', text: book }, 78: { unit: 'EMM 999', text: book } });
+  const messages = [...Array.from({ length: 20 }, (_, i) => ({ role: i % 2 ? 'tutor' : 'student', text: `m${i}` })), { role: 'student', text: 'Why linear?' }];
+  const passage = 'The shear stress varies linearly with the radius';
+  assert.equal((await askPassage({ unit: 'EMM 302', passage, messages }, { ask, ready: () => false, notes, files })).needAi, true);
+  const r = await askPassage({ unit: 'EMM 302', passage: passage + ' x'.repeat(3000), where: { fileId: '77', page: 4, label: 'Hibbeler' }, messages }, { ask, ready: () => true, notes, files });
+  assert.deepEqual(Object.keys(r), ['reply']);
+  assert.equal(seen.passage, true);
+  assert.ok(seen.question.length < PASSAGE.chars + 120, 'the passage is capped');
+  assert.match(seen.question, /from Hibbeler, page 4/);
+  assert.equal(seen.history.length, PASSAGE.turns * 2);
+  assert.equal(seen.history.at(-1).text, 'Why linear?');
+  await askPassage({ unit: 'EMM 302', passage, where: { fileId: '77' }, messages }, { ask, ready: () => true, notes, files });
+  assert.match(seen.solution, /hollow shafts save material/);
+  await askPassage({ unit: 'EMM 302', passage, where: { fileId: '78' }, messages }, { ask, ready: () => true, notes, files });
+  assert.equal(seen.solution, '', 'a file from another unit is not read');
+  await assert.rejects(askPassage({ unit: 'EMM 302', passage: ' ', messages }, { ask, ready: () => true, notes, files }), /Select some text/);
+  await assert.rejects(askPassage({ unit: 'XYZ 100', passage, messages }, { ask, ready: () => true, notes, files }), /Pick one of your units/);
+  assert.equal(aroundPassage(book, 'not in the book at all, really'), '');
+});

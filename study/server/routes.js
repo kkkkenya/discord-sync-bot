@@ -166,7 +166,7 @@ const routes = {
     const files = [...hub, ...localFiles(unit)];
     const merged = files.map((f) => {
       const e = library.files[f.id];
-      return { id: f.id, name: f.name, paper: f.paper, url: f.url, synced: Boolean(e), chars: e?.text?.length || 0, pages: e?.pages || 0, text: e?.text || '', local: Boolean(e?.local) };
+      return { id: f.id, name: f.name, paper: f.paper, url: f.url, synced: Boolean(e), chars: e?.text?.length || 0, pages: e?.pages || 0, text: q.get('lite') ? '' : e?.text || '', local: Boolean(e?.local) }; // lite: names only (the rooms paper picker)
     });
     return { note, files: merged };
   },

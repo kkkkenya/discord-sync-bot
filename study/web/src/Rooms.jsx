@@ -2,10 +2,12 @@
 // itself (one clock run by the host, the names of the people in it). Not a call and not a screen share: everyone keeps
 // working in their own Crux, and talks on Discord or in person.
 import { useState } from 'react';
+import { api } from './api.js';
+import OpenAt from './OpenAt.jsx';
 import { PUBLIC_ROOMS, joinRoom } from './focus-store.js';
 import { Icon } from './icons.jsx';
 import { LIMITS, PRESETS } from './room-clock.js';
-import { act, clearNotice, hostRoom, joinCode, leaveHosted, roomView, useHostedRoom } from './room-store.js';
+import { act, checkin, clearNotice, hostRoom, joinCode, leaveHosted, roomView, useHostedRoom } from './room-store.js';
 
 const MODES = { focus: 'Focus', short: 'Short break', long: 'Long break' };
 const LETTERS = 'BCDFGHJKLMNPQRSTVWXZ'; // server/defs.js ROOMS.codeLetters
@@ -111,6 +113,78 @@ export function RoomsLobby({ unit, title, invite = '' }) {
   );
 }
 
+// a Hub file's name for a button: no extension or underscores, at most 60 characters
+const shortFile = (n) => { const t = String(n || 'paper').replace(/\.[a-z0-9]{2,4}$/i, '').replace(/_/g, ' ').replace(/\s+/g, ' ').trim(); return t.length > 60 ? `${t.slice(0, 57)}…` : t; };
+
+// Today's work (F4): what the host has the room do, with a Hub paper to open at a page. Each member opens it in their
+// own Crux; answers stay their own.
+function TodaysWork({ room, me, run }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState('');
+  const [fileId, setFileId] = useState('');
+  const [page, setPage] = useState('');
+  const [files, setFiles] = useState(null);
+  const w = room.work;
+  if (!w && !me) return null;
+  const edit = () => {
+    setText(w?.text || ''); setFileId(w?.fileId || ''); setPage(w?.page ? String(w.page) : ''); setEditing(true);
+    if (room.unit && !files) api('GET', `library?unit=${encodeURIComponent(room.unit)}&lite=1`).then((r) => setFiles((r.files || []).filter((f) => /^\d+$/.test(String(f.id))))).catch(() => setFiles([]));
+  };
+  const save = (work) => run(async () => { await act('work', { work }); setEditing(false); })();
+  if (editing) {
+    const file = files?.find((f) => String(f.id) === fileId);
+    return (
+      <form className="card room-form" aria-label="Today's work" onSubmit={(e) => { e.preventDefault(); save({ text, fileId: fileId || null, fileName: file?.name || w?.fileName || null, page: page ? Number(page) : null }); }}>
+        <label className="field">Today's work<input value={text} maxLength={140} onChange={(e) => setText(e.target.value)} placeholder="CAT 1 2024, questions 3 and 4" /></label>
+        {room.unit && (
+          <div className="room-fields">
+            <label className="field">Paper <span className="hint">(optional)</span>
+              <select value={fileId} onChange={(e) => setFileId(e.target.value)} disabled={files === null}>
+                <option value="">{files === null ? 'Loading…' : 'None'}</option>
+                {(files || []).map((f) => <option key={f.id} value={String(f.id)}>{f.name}</option>)}
+              </select>
+            </label>
+            <label className="field">Page<input type="number" inputMode="numeric" min={1} value={page} onChange={(e) => setPage(e.target.value)} disabled={!fileId} /></label>
+          </div>
+        )}
+        <div className="actions">
+          <button className="btn primary" type="submit" disabled={!text.trim() && !fileId}>Save</button>
+          {w && <button className="btn" type="button" onClick={() => save(null)}>Clear</button>}
+          <button className="btn plain" type="button" onClick={() => setEditing(false)}>Cancel</button>
+        </div>
+      </form>
+    );
+  }
+  return (
+    <section className="card room-row" aria-label="Today's work">
+      <span className="row-main">
+        <b>Today's work</b>
+        <span className="row-sub">{w ? w.text || w.fileName : 'Set what the room works on. Everyone opens it in their own Crux.'}</span>
+        {w?.fileId && <OpenAt fileId={w.fileId} page={w.page} label={`Open ${shortFile(w.fileName)}${w.page ? ` · p. ${w.page}` : ''}`} />}
+      </span>
+      {me && <button className="btn" type="button" onClick={edit}>{w ? 'Change' : 'Set'}</button>}
+    </section>
+  );
+}
+
+// At a break: how did that block go? Each person answers for themselves; the host sees only the counts.
+function CheckIn({ v, data, me, run }) {
+  const c = data.checkin;
+  if (!c || (v.mode === 'focus' && v.state === 'running') || v.state === 'idle') return null;
+  const n = c.counts;
+  return (
+    <section className="card stack-s" aria-label="Check in">
+      <h2 className="room-h">How did that block go?</h2>
+      <div className="segmented" role="group" aria-label="How did that block go">
+        {[['done', 'Done'], ['partly', 'Partly'], ['stuck', 'Stuck']].map(([id, label]) => (
+          <button key={id} type="button" aria-pressed={c.mine === id} onClick={run(() => checkin(id))}>{label}</button>
+        ))}
+      </div>
+      {me && n && <p className="row-sub">Round <span className="num">{c.round}</span>: <span className="num">{n.done}</span> done, <span className="num">{n.partly}</span> partly, <span className="num">{n.stuck}</span> stuck. Only counts are shown, never who.</p>}
+    </section>
+  );
+}
+
 function statusLine(v, hostName) {
   if (v.state === 'idle') return `Waiting for ${hostName} to start`;
   if (v.state === 'paused') return `${MODES[v.mode]}, paused`;
@@ -163,6 +237,8 @@ export function HostedRoom() {
         </div>
         {error && <p className="notice bad" role="alert">{error}</p>}
       </section>
+      <TodaysWork room={room} me={me} run={run} />
+      <CheckIn v={v} data={s.data} me={me} run={run} />
       {me && settings && plan && (
         <form className="card room-form" aria-label="Room settings" onSubmit={(e) => { e.preventDefault(); run(async () => { await act('settings', { plan, name }); setSettings(false); })(); }}>
           <label className="field">Name<input value={name} maxLength={40} onChange={(e) => setName(e.target.value)} /></label>

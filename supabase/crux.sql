@@ -228,3 +228,8 @@ create table if not exists crux_room_members (
 create index if not exists crux_room_members_user on crux_room_members (user_id);
 alter table crux_rooms enable row level security;
 alter table crux_room_members enable row level security;
+
+-- Study rooms, classroom tools (fixplan-f F4, 2026-11-18): today's work set by the host, and each member's check-in
+-- at a break (done / partly / stuck, for one round). Until these run, those two actions say the database needs updating.
+alter table crux_rooms add column if not exists work jsonb;                -- { text, fileId, fileName, page }
+alter table crux_room_members add column if not exists checkin jsonb;      -- { round, how }

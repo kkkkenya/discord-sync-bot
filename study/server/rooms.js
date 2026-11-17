@@ -52,7 +52,26 @@ export function shouldEnd(room, members, now) {
   return null;
 }
 
-export const HOST_ACTIONS = ['start', 'pause', 'resume', 'skip', 'settings', 'end', 'lock', 'unlock', 'remove', 'host', 'rename'];
+export const HOST_ACTIONS = ['start', 'pause', 'resume', 'skip', 'settings', 'end', 'lock', 'unlock', 'remove', 'host', 'rename', 'work'];
+
+// Today's work (F4): what the host sets the room to do. A short line, and optionally a Hub paper at a page, which
+// members open in their own viewer. Only Hub files (numeric ids): a file the host added privately cannot be shared.
+export function cleanWork(w) {
+  if (!w || typeof w !== 'object') return null;
+  const text = String(w.text || '').replace(/https?:\/\/\S+|www\.\S+/gi, '').replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140).trim();
+  const fileId = /^\d{1,12}$/.test(String(w.fileId ?? '')) ? String(w.fileId) : null;
+  const page = fileId && Number.isInteger(Number(w.page)) && Number(w.page) >= 1 && Number(w.page) <= 5000 ? Number(w.page) : null;
+  const fileName = fileId ? String(w.fileName || '').replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, 120) || 'Paper' : null;
+  if (!text && !fileId) return null;
+  return { text, fileId, fileName, page };
+}
+export const CHECKINS = ['done', 'partly', 'stuck'];
+// this round's check-ins: counts only (the host sees how the room is doing, not who said what)
+export function checkinCounts(members, round) {
+  const out = { done: 0, partly: 0, stuck: 0 };
+  for (const m of members) if (!m.removed && m.checkin?.round === round && CHECKINS.includes(m.checkin.how)) out[m.checkin.how]++;
+  return out;
+}
 export function canAct(room, member, action) {
   if (!room || room.ended_at) throw fail('This room has ended.', 410);
   if (!member || member.removed) throw fail('You are not in this room.', 403);

@@ -1145,3 +1145,4 @@ button.chip:active, a.chip:active { transform: scale(.95); }
 .code-input { width: 100%; min-height: 140px; padding: var(--s3); border-radius: var(--radius); border: 1px solid var(--separator); background: var(--surface-solid); color: var(--text); font: 400 var(--t-s)/1.55 var(--mono); tab-size: 4; resize: vertical; white-space: pre; overflow-x: auto; }
 .code-input.small { min-height: 56px; }
 .code-out { max-height: 320px; overflow: auto; }
+.room-row .openat .btn { white-space: normal; text-align: left; overflow-wrap: anywhere; padding-left: 0; }

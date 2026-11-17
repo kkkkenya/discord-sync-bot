@@ -36,6 +36,7 @@ const memory = {
   },
   async seen(roomId, userId, now) { const m = mem.members.find((x) => x.room_id === roomId && x.user_id === userId); if (m) m.seen_at = iso(now); },
   async setRemoved(roomId, userId) { const m = mem.members.find((x) => x.room_id === roomId && x.user_id === userId); if (m) m.removed = true; },
+  async setCheckin(roomId, userId, checkin) { const m = mem.members.find((x) => x.room_id === roomId && x.user_id === userId); if (m) m.checkin = checkin; },
   async leave(roomId, userId) { mem.members = mem.members.filter((x) => !(x.room_id === roomId && x.user_id === userId)); },
   async roomOf(userId) {
     const ids = mem.members.filter((m) => m.user_id === userId && !m.removed).map((m) => m.room_id);
@@ -54,6 +55,11 @@ const memory = {
 };
 
 // ---- Supabase (the website, and Crux (local).bat) ----
+// Today's work and check-ins (F4) need two columns (end of supabase/crux.sql). Until the owner adds them, say so plainly.
+const newColumns = (p) => p.catch((e) => {
+  if (/PGRST204|column .*(work|checkin)|(work|checkin).* column/i.test(e.message)) throw Object.assign(new Error("This part of rooms isn't switched on yet. The Hub admin needs to update Crux's database."), { status: 503 });
+  throw e;
+});
 const one = async (p) => (await p)?.[0] || null;
 const supabase = {
   live: (code) => one(db.select('crux_rooms', `code=eq.${enc(code)}&ended_at=is.null&limit=1`)),
@@ -64,13 +70,14 @@ const supabase = {
   },
   hostedBy: (userId) => one(db.select('crux_rooms', `host_id=eq.${enc(userId)}&ended_at=is.null&limit=1`)),
   insert: async (row) => (await db.insert('crux_rooms', [row]))[0],
-  cas: (id, version, patch, hostId) => one(db.update('crux_rooms', `id=eq.${id}&version=eq.${version}&ended_at=is.null${hostId ? `&host_id=eq.${enc(hostId)}` : ''}`, { ...patch, version: version + 1 })),
+  cas: (id, version, patch, hostId) => newColumns(one(db.update('crux_rooms', `id=eq.${id}&version=eq.${version}&ended_at=is.null${hostId ? `&host_id=eq.${enc(hostId)}` : ''}`, { ...patch, version: version + 1 }))),
   end: async (id, now) => { await db.update('crux_rooms', `id=eq.${id}&ended_at=is.null`, { ended_at: iso(now), state: 'ended' }); await supabase.dropMembers(id); },
   dropMembers: async (id) => { await db.remove('crux_room_members', `room_id=eq.${id}`); },
   members: (roomId) => db.select('crux_room_members', `room_id=eq.${roomId}&order=joined_at.asc&limit=200`),
   addMember: async (roomId, userId, name, now) => (await db.upsert('crux_room_members', [{ room_id: roomId, user_id: userId, name, seen_at: iso(now) }], 'room_id,user_id'))[0],
   seen: async (roomId, userId, now) => { await db.update('crux_room_members', `room_id=eq.${roomId}&user_id=eq.${enc(userId)}`, { seen_at: iso(now) }); },
   setRemoved: async (roomId, userId) => { await db.update('crux_room_members', `room_id=eq.${roomId}&user_id=eq.${enc(userId)}`, { removed: true }); },
+  setCheckin: (roomId, userId, checkin) => newColumns(db.update('crux_room_members', `room_id=eq.${roomId}&user_id=eq.${enc(userId)}`, { checkin })),
   leave: async (roomId, userId) => { await db.remove('crux_room_members', `room_id=eq.${roomId}&user_id=eq.${enc(userId)}`); },
   async roomOf(userId) {
     const mine = await db.select('crux_room_members', `user_id=eq.${enc(userId)}&removed=is.false&select=room_id&order=joined_at.desc&limit=20`);

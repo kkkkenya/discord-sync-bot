@@ -188,3 +188,26 @@ test('review fixes: valid joins never use up tries, a host leaving hands on to s
   await call(brian, 'POST', '/api/rooms/act', { code: room.code, action: 'end' }, T0 + 5 * M);
   assert.equal((await roomsStore().members(1)).length, 0); // nobody's membership outlives the room
 });
+
+test("today's work: host only, cleaned, Hub papers only; check-ins count per round and the host sees counts, not names", async () => {
+  resetRoomsForTests();
+  const { room } = await host();
+  await call(brian, 'POST', '/api/rooms/join', { code: room.code });
+  await call(wanjiru, 'POST', '/api/rooms/join', { code: room.code });
+  await assert.rejects(call(brian, 'POST', '/api/rooms/act', { code: room.code, action: 'work', work: { text: 'x' } }), /Only the host/);
+  let s = await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'work', work: { text: 'CAT 1 2024, Q3 and Q4 https://evil.example', fileId: '3691', fileName: 'CAT 1 2024.pdf', page: '2' } });
+  assert.deepEqual(s.room.work, { text: 'CAT 1 2024, Q3 and Q4', fileId: '3691', fileName: 'CAT 1 2024.pdf', page: 2 });
+  s = await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'work', work: { text: '', fileId: 'local-9' } });
+  assert.equal(s.room.work, null); // a private file can't be shared, and nothing else was set
+  await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'start' });
+  await assert.rejects(call(brian, 'POST', '/api/rooms/checkin', { code: room.code, how: 'great' }), /done, partly or stuck/);
+  const b = await call(brian, 'POST', '/api/rooms/checkin', { code: room.code, how: 'stuck' }, T0 + 26 * M);
+  assert.deepEqual([b.checkin.mine, b.checkin.counts], ['stuck', null]); // members don't see the counts
+  await call(wanjiru, 'POST', '/api/rooms/checkin', { code: room.code, how: 'done' }, T0 + 27 * M);
+  const h = await call(amina, 'GET', '/api/rooms/state', null, T0 + 28 * M, `code=${room.code}`);
+  assert.deepEqual(h.checkin, { round: 1, mine: null, counts: { done: 1, partly: 0, stuck: 1 } });
+  const next = await call(amina, 'GET', '/api/rooms/state', null, T0 + 31 * M, `code=${room.code}`);
+  assert.deepEqual(next.checkin.counts, { done: 0, partly: 0, stuck: 0 }); // round 2 starts clean
+  assert.equal(JSON.stringify(h).includes('Brian'), true); // names are in the people list…
+  assert.equal(JSON.stringify(h.checkin).includes('Brian'), false); // …but never beside a check-in
+});

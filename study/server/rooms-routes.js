@@ -2,9 +2,9 @@
 // server/index.js): rooms read only their own tables, so a full room polling every 20 s stays cheap.
 import { ROOMS, PUBLIC_ROOMS } from './defs.js';
 import { focusByRoom } from './focus.js';
-import { canAct, cleanName, makeCode, nextHost, normalizeCode, personKey, presence, shouldEnd, validCode } from './rooms.js';
+import { CHECKINS, canAct, checkinCounts, cleanName, cleanWork, makeCode, nextHost, normalizeCode, personKey, presence, shouldEnd, validCode } from './rooms.js';
 import { roomsStore } from './rooms-store.js';
-import { actions, cleanPlan, idle } from '../web/src/room-clock.js';
+import { actions, cleanPlan, idle, phaseAt } from '../web/src/room-clock.js';
 
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
 const iso = (ms) => new Date(ms).toISOString();
@@ -16,10 +16,16 @@ const fromClock = (c) => ({ plan: c.plan, state: c.state, phase: c.phase, round:
 // what a member sees: the clock, the people (names, never ids), and the server's time for the offset
 function view(room, members, userId, now) {
   const people = presence(members, now).map((m) => ({ key: personKey(room.id, m.user_id), name: m.name, host: m.user_id === room.host_id, here: m.here, me: m.user_id === userId }));
+  const clock = toClock(room);
+  const round = phaseAt(clock, now).round;
+  const mine = members.find((m) => m.user_id === userId)?.checkin;
+  const host = room.host_id === userId;
   return {
     now,
-    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock: toClock(room), version: room.version, locked: Boolean(room.locked), host: room.host_id === userId },
+    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock, version: room.version, locked: Boolean(room.locked), host, work: room.work || null },
     people,
+    // check-ins for this round: yours, and the counts for the host (never who said what)
+    checkin: { round, mine: mine?.round === round ? mine.how : null, counts: host ? checkinCounts(members, round) : null },
   };
 }
 
@@ -48,7 +54,7 @@ async function leaveCurrent(store, user, now, except = null) {
   else await store.end(room.id, now);
 }
 
-export const ROOM_PATHS = /^\/api\/rooms(\/(join|state|act|leave))?$/;
+export const ROOM_PATHS = /^\/api\/rooms(\/(join|state|act|leave|checkin))?$/;
 
 export async function roomsRoute(method, path, query, body, user, now = Date.now(), store = roomsStore()) {
   const route = `${method} ${path}`;
@@ -123,6 +129,7 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     if (action in actions) patch = fromClock(actions[action](toClock(room), now, body.plan || room.plan)); // a rename-only settings call keeps the plan
     else if (action === 'lock' || action === 'unlock') patch = { locked: action === 'lock' };
     else if (action === 'rename') patch = { name: cleanName(body.name, room.name) };
+    else if (action === 'work') patch = { work: cleanWork(body.work) };
     else if (action === 'host' || action === 'remove') {
       if (!target) throw fail('That person is not in the room any more.', 404);
       if (target.user_id === user.id) throw fail(action === 'host' ? 'You are already the host.' : 'Use Leave to leave the room.');
@@ -136,6 +143,21 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     if (action === 'remove') await store.setRemoved(room.id, target.user_id);
     if (action === 'end') { await store.dropMembers(room.id); return { ended: true, now }; }
     return view(next, await store.members(room.id), user.id, now);
+  }
+
+  // A member's check-in at a break (F4): done, partly or stuck, for the room's current round. Any time is fine; it
+  // counts for the round the clock is in.
+  if (route === 'POST /api/rooms/checkin') {
+    const { room, members } = await load(store, body.code, now);
+    const me = memberOf(members, user.id);
+    if (!me || me.removed) throw fail('You are not in this room.', 403);
+    if (!CHECKINS.includes(body.how)) throw fail('Pick done, partly or stuck.');
+    const round = phaseAt(toClock(room), now).round;
+    me.checkin = { round, how: body.how };
+    await store.setCheckin(room.id, user.id, me.checkin);
+    await store.seen(room.id, user.id, now); // checking in is being here
+    me.seen_at = new Date(now).toISOString();
+    return view(room, members, user.id, now);
   }
 
   if (route === 'POST /api/rooms/leave') {

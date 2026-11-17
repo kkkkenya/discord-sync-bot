@@ -69,6 +69,14 @@ export async function act(action, extra = {}) {
     throw e;
   }
 }
+// a check-in at a break: done, partly or stuck (counts only reach the host)
+export async function checkin(how) {
+  if (!st.code) return;
+  try { adopt(await api('POST', 'rooms/checkin', { code: st.code, how })); } catch (e) {
+    if (e.status === 410 || e.status === 403) return gone(e.message);
+    throw e;
+  }
+}
 export async function leaveHosted() {
   await api('POST', 'rooms/leave', {}).catch(() => {});
   gone(null);

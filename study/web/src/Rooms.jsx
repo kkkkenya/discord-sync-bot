@@ -130,7 +130,7 @@ function Board({ board, me, run }) {
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  });
+  }, [board, me, busy]);
   if (!board) return null;
   if (hidden && !me) return <div className="card room-row"><span className="row-main"><b>The host is presenting</b></span><button className="btn" type="button" onClick={() => setHidden(false)}>Back to the board</button></div>;
   return (
@@ -140,12 +140,12 @@ function Board({ board, me, run }) {
         {!me && <button className="btn plain" type="button" onClick={() => setHidden(true)}>Stop following</button>}
       </div>
       {board.text && <Rich text={board.text} />}
-      {board.steps.length > 0 && (
+      {board.step > 0 && (
         <ol className="board-steps">
           {board.steps.slice(0, board.step).map((x, i) => <li key={i}><Rich as="span" text={x} /></li>)}
         </ol>
       )}
-      {board.steps.length > 0 && <p className="row-sub">Step <span className="num">{board.step}</span> of <span className="num">{board.steps.length}</span></p>}
+      {(board.stepCount ?? board.steps.length) > 0 && <p className="row-sub">Step <span className="num">{board.step}</span> of <span className="num">{board.stepCount ?? board.steps.length}</span></p>}
       {board.code && <pre className="code-block" tabIndex={0} aria-label="Code"><code>{board.code}</code></pre>}
       {board.output && <pre className="code-block code-out" tabIndex={0} aria-label="Output"><code>{board.output}</code></pre>}
       {me && (

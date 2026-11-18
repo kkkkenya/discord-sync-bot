@@ -23,7 +23,7 @@ const memory = {
     Object.assign(r, patch, { version: version + 1 });
     return { ...r };
   },
-  async end(id, now) { const r = mem.rooms.find((x) => x.id === id && !x.ended_at); if (r) Object.assign(r, { ended_at: iso(now), state: 'ended', version: r.version + 1 }); await memory.dropMembers(id); },
+  async end(id, now) { const r = mem.rooms.find((x) => x.id === id && !x.ended_at); if (r) Object.assign(r, { ended_at: iso(now), state: 'ended', version: r.version + 1 }); await memory.dropMembers(id); return r ? { ...r } : null; },
   // nobody's membership outlives the room (privacy, and roomOf stays short)
   async dropMembers(id) { mem.members = mem.members.filter((m) => m.room_id !== id); },
   async members(roomId) { return mem.members.filter((m) => m.room_id === roomId).map((m) => ({ ...m })); },
@@ -71,7 +71,7 @@ const supabase = {
   hostedBy: (userId) => one(db.select('crux_rooms', `host_id=eq.${enc(userId)}&ended_at=is.null&limit=1`)),
   insert: async (row) => (await db.insert('crux_rooms', [row]))[0],
   cas: (id, version, patch, hostId) => newColumns(one(db.update('crux_rooms', `id=eq.${id}&version=eq.${version}&ended_at=is.null${hostId ? `&host_id=eq.${enc(hostId)}` : ''}`, { ...patch, version: version + 1 }))),
-  end: async (id, now) => { await db.update('crux_rooms', `id=eq.${id}&ended_at=is.null`, { ended_at: iso(now), state: 'ended' }); await supabase.dropMembers(id); },
+  end: async (id, now) => { const [r] = await db.update('crux_rooms', `id=eq.${id}&ended_at=is.null`, { ended_at: iso(now), state: 'ended' }); await supabase.dropMembers(id); return r || null; },
   dropMembers: async (id) => { await db.remove('crux_room_members', `room_id=eq.${id}`); },
   members: (roomId) => db.select('crux_room_members', `room_id=eq.${roomId}&order=joined_at.asc&limit=200`),
   addMember: async (roomId, userId, name, now) => (await db.upsert('crux_room_members', [{ room_id: roomId, user_id: userId, name, seen_at: iso(now) }], 'room_id,user_id'))[0],

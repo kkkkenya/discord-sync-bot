@@ -74,7 +74,7 @@ export function cleanBoard(b) {
   const steps = (Array.isArray(b.steps) ? b.steps : []).map((x) => plain(x, BOARD.stepChars).trim()).filter(Boolean).slice(0, BOARD.steps);
   const step = Math.min(steps.length, Math.max(0, Math.round(Number(b.step) || 0)));
   const out = { on: true, title: plain(b.title, BOARD.title).trim(), text: plain(b.text, BOARD.text).trim(), steps, step, code: plain(b.code, BOARD.code).replace(/\s+$/, ''), output: plain(b.output, BOARD.output) };
-  return out.title || out.text || out.steps.length || out.code ? out : null;
+  return out.title || out.text || out.steps.length || out.code || out.output ? out : null;
 }
 export const CHECKINS = ['done', 'partly', 'stuck'];
 // this round's check-ins: counts only (the host sees how the room is doing, not who said what)

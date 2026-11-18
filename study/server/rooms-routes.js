@@ -4,14 +4,15 @@ import { ROOMS, PUBLIC_ROOMS } from './defs.js';
 import { focusByRoom } from './focus.js';
 import { CHECKINS, canAct, checkinCounts, cleanBoard, cleanName, cleanWork, makeCode, nextHost, normalizeCode, personKey, presence, shouldEnd, validCode } from './rooms.js';
 import { roomsStore } from './rooms-store.js';
-import { makeVoice, removeVoice, voiceCategory, voiceLink } from './rooms-voice.js';
+import { allowVoice, denyVoice, makeVoice, removeVoice, voiceCategory, voiceLink } from './rooms-voice.js';
+import { createHash } from 'node:crypto';
 
 // the Discord side of a room (F7); tests pass their own
-const VOICE = { make: makeVoice, remove: removeVoice, available: () => Boolean(voiceCategory()) };
+const VOICE = { make: makeVoice, remove: removeVoice, allow: allowVoice, deny: denyVoice, available: () => Boolean(voiceCategory()) };
 let voice = VOICE;
 export const useVoiceForTests = (v) => { voice = v ? { ...VOICE, ...v } : VOICE; };
 // a room ends: its row, and its voice channel if it has one
-async function endRoom(store, room, now) { await store.end(room.id, now); await voice.remove(room.voice_channel); }
+async function endRoom(store, room, now) { const ended = await store.end(room.id, now); await voice.remove(ended?.voice_channel ?? room.voice_channel); }
 import { actions, cleanPlan, idle, phaseAt } from '../web/src/room-clock.js';
 
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -20,6 +21,9 @@ const ms = (s) => (s ? Date.parse(s) : null);
 
 const toClock = (r) => ({ plan: cleanPlan(r.plan), state: r.state, phase: r.phase, round: r.round, phaseStart: ms(r.phase_start), leftMs: r.left_ms == null ? null : Number(r.left_ms) });
 const fromClock = (c) => ({ plan: c.plan, state: c.state, phase: c.phase, round: c.round, phase_start: c.phaseStart == null ? null : iso(c.phaseStart), left_ms: c.leftMs == null ? null : Math.round(c.leftMs) });
+
+// the board as one person sees it: the host has every step; members only those already shown (no reading ahead)
+const boardFor = (b, host) => (!b ? null : host ? b : { ...b, steps: b.steps.slice(0, b.step), stepCount: b.steps.length });
 
 // what a member sees: the clock, the people (names, never ids), and the server's time for the offset
 function view(room, members, userId, now) {
@@ -30,7 +34,7 @@ function view(room, members, userId, now) {
   const host = room.host_id === userId;
   return {
     now,
-    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock, version: room.version, locked: Boolean(room.locked), host, work: room.work || null, board: room.board || null, voice: voiceLink(room.voice_channel), voiceOn: voice.available() },
+    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock, version: room.version, locked: Boolean(room.locked), host, work: room.work || null, board: boardFor(room.board, host), voice: voiceLink(room.voice_channel), voiceOn: voice.available() },
     people,
     // check-ins for this round: yours, and the counts for the host (never who said what)
     checkin: { round, mine: mine?.round === round ? mine.how : null, counts: host ? checkinCounts(members, round) : null },
@@ -54,6 +58,7 @@ async function leaveCurrent(store, user, now, except = null) {
   const room = await store.roomOf(user.id);
   if (!room || room.id === except) return;
   await store.leave(room.id, user.id);
+  await voice.deny(room.voice_channel, user.id);
   if (room.host_id !== user.id) return;
   // the next host: someone here now, else anyone still listed (away less than 10 min); the room ends only when nobody is left
   const listed = presence(await store.members(room.id), now);
@@ -114,6 +119,7 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     }
     await leaveCurrent(store, user, now, room.id);
     await store.addMember(room.id, user.id, user.name || 'Student', now);
+    if (!me) await voice.allow(room.voice_channel, user.id); // the room's voice channel is members only
     return view(room, await store.members(room.id), user.id, now);
   }
 
@@ -125,7 +131,10 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     if (now - ms(me.seen_at) >= ROOMS.seenEverySeconds * 1e3) { await store.seen(room.id, user.id, now); me.seen_at = iso(now); }
     const heir = nextHost(room, members, now);
     if (heir) room = (await store.cas(room.id, room.version, { host_id: heir.user_id })) || room;
-    return view(room, members, user.id, now);
+    const v = view(room, members, user.id, now);
+    const tag = createHash('sha1').update(JSON.stringify({ ...v, now: 0, room: { ...v.room } })).digest('base64url').slice(0, 16);
+    if (query?.get?.('tag') === tag) return { now, same: true, tag };
+    return { ...v, tag };
   }
 
   if (route === 'POST /api/rooms/act') {
@@ -141,8 +150,9 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     else if (action === 'work') patch = { work: cleanWork(body.work) };
     else if (action === 'board') patch = { board: cleanBoard(body.board) };
     else if (action === 'voice') {
-      if (body.on && !room.voice_channel) patch = { voice_channel: await voice.make(room) };
-      else if (!body.on && room.voice_channel) { await voice.remove(room.voice_channel); patch = { voice_channel: null }; }
+      if (typeof body.on !== 'boolean') throw fail('Say whether the room should have a voice channel.');
+      if (body.on && !room.voice_channel) patch = { voice_channel: await voice.make(room, presence(members, now).map((m) => m.user_id)) };
+      else if (!body.on && room.voice_channel) patch = { voice_channel: null };
       else patch = {};
     }
     else if (action === 'host' || action === 'remove') {
@@ -153,10 +163,16 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     if (action === 'settings' && body.name != null) patch.name = cleanName(body.name, room.name);
     if (action === 'end') patch.ended_at = iso(now);
     const version = Number.isInteger(body.version) ? body.version : room.version;
-    const next = await store.cas(room.id, version, patch, user.id);
+    let next;
+    try { next = await store.cas(room.id, version, patch, user.id); } catch (e) {
+      if (action === 'voice' && patch.voice_channel) await voice.remove(patch.voice_channel); // made, but not saved: remove it
+      throw e;
+    }
     if (!next && action === 'voice' && patch.voice_channel) await voice.remove(patch.voice_channel); // made, but the room had moved on
     if (!next) throw fail('The room changed. Try again.', 409);
-    if (action === 'end') await voice.remove(room.voice_channel);
+    if (action === 'voice' && patch.voice_channel === null) await voice.remove(room.voice_channel); // after the room stopped pointing at it
+    if (action === 'end') await voice.remove(next.voice_channel ?? room.voice_channel);
+    if (action === 'remove') await voice.deny(room.voice_channel, target.user_id);
     if (action === 'remove') await store.setRemoved(room.id, target.user_id);
     if (action === 'end') { await store.dropMembers(room.id); return { ended: true, now }; }
     return view(next, await store.members(room.id), user.id, now);

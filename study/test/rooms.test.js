@@ -235,7 +235,8 @@ test('voice (F7): the host adds a Discord voice channel, members get its link, i
   resetRoomsForTests();
   const { useVoiceForTests } = await import('../server/rooms-routes.js');
   const made = [], removed = [];
-  useVoiceForTests({ make: async (room) => { made.push(room.code); return '111222333444555666'; }, remove: async (id) => { if (id) removed.push(id); }, available: () => true });
+  const allowed = [], denied = [];
+  useVoiceForTests({ make: async (room) => { made.push(room.code); return '111222333444555666'; }, remove: async (id) => { if (id) removed.push(id); }, allow: async (c, u) => { if (c) allowed.push(u); }, deny: async (c, u) => { if (c) denied.push(u); }, available: () => true });
   try {
     const { room } = await host();
     await call(brian, 'POST', '/api/rooms/join', { code: room.code });
@@ -247,6 +248,11 @@ test('voice (F7): the host adds a Discord voice channel, members get its link, i
     assert.equal(made.length, 1, 'one channel per room');
     const m = await call(brian, 'GET', '/api/rooms/state', null, T0, `code=${room.code}`);
     assert.equal(m.room.voice, s.room.voice, 'members get Join voice');
+    await call(wanjiru, 'POST', '/api/rooms/join', { code: room.code });
+    assert.deepEqual(allowed, ['w'], 'joining opens the private channel to the new member');
+    await call(wanjiru, 'POST', '/api/rooms/leave', {});
+    assert.deepEqual(denied, ['w'], 'leaving closes it');
+    await assert.rejects(call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'voice' }), /Say whether/);
     await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'end' });
     assert.deepEqual(removed, ['111222333444555666'], 'the channel goes with the room');
     resetRoomsForTests();
@@ -255,4 +261,34 @@ test('voice (F7): the host adds a Discord voice channel, members get its link, i
     await cleanRooms(T0 + 13 * 3600e3);
     assert.equal(removed.length, 2, 'a room that ends on its own loses its channel too');
   } finally { useVoiceForTests(null); }
+});
+
+test('review fixes: members get only the shown steps; an unchanged room answers "same"; a board of only output stays', async () => {
+  resetRoomsForTests();
+  const { room } = await host();
+  await call(brian, 'POST', '/api/rooms/join', { code: room.code });
+  await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'board', board: { title: 'Q', steps: ['a', 'b', 'c'], step: 1 } });
+  const m = await call(brian, 'GET', '/api/rooms/state', null, T0, `code=${room.code}`);
+  assert.deepEqual([m.room.board.steps, m.room.board.stepCount], [['a'], 3], 'no reading ahead');
+  const h = await call(amina, 'GET', '/api/rooms/state', null, T0, `code=${room.code}`);
+  assert.equal(h.room.board.steps.length, 3);
+  const again = await call(brian, 'GET', '/api/rooms/state', null, T0 + 5000, `code=${room.code}&tag=${m.tag}`);
+  assert.deepEqual(Object.keys(again).sort(), ['now', 'same', 'tag']);
+  const out = await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'board', board: { output: '42' } });
+  assert.equal(out.room.board.output, '42');
+});
+
+test('a voice channel that cannot be saved is removed, not left on the Hub', async () => {
+  resetRoomsForTests();
+  const { useVoiceForTests } = await import('../server/rooms-routes.js');
+  const removed = [];
+  useVoiceForTests({ make: async () => '999888777666555444', remove: async (id) => { if (id) removed.push(id); }, available: () => true });
+  const store = roomsStore();
+  const cas = store.cas;
+  try {
+    const { room } = await host();
+    store.cas = async () => { throw Object.assign(new Error('no voice_channel column yet'), { status: 503 }); };
+    await assert.rejects(call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'voice', on: true }), /no voice_channel/);
+    assert.deepEqual(removed, ['999888777666555444']);
+  } finally { store.cas = cas; useVoiceForTests(null); }
 });

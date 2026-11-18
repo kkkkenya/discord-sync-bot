@@ -50,7 +50,11 @@ export async function joinCode(code) {
 }
 export async function refresh() {
   if (!st.code) return;
-  try { adopt(await api('GET', `rooms/state?code=${encodeURIComponent(st.code)}`)); } catch (e) {
+  try {
+    const v = await api('GET', `rooms/state?code=${encodeURIComponent(st.code)}${st.data?.tag ? `&tag=${st.data.tag}` : ''}`);
+    if (v.same) set({ offset: v.now - Date.now() }); // nothing changed: a few bytes, not the whole room
+    else adopt(v);
+  } catch (e) {
     if (e.status === 410 || e.status === 403 || e.status === 400) gone(e.message);
     else if (e.status === 401) gone('Sign in again to rejoin the room.');
     // no connection: keep the last state; the clock runs on its own

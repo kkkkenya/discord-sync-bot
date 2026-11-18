@@ -1,14 +1,6 @@
 {
-  "version": "0.6.7",
+  "version": "0.7.0",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "Code, while you study.",
-  "released": "2026-11-18",
-  "patch": {
-    "version": "0.6.7",
-    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.6.7/crux-harness-server-0.6.7.zip",
-    "sha256": "ef76839b78e9ce52fbb1941c75c049c1cf6065a3ab796b4b31ee663ac3bc10e3",
-    "size": 63177062,
-    "shell": "0.6.5",
-    "sig": "v1tQld+LlZUDwy3UxGya8h0qdO00uVDK8sswK41RMis4O9GNYPodwqeMUSo9uPuOJstak3L9O6Jmt3EgjxZvDw=="
-  }
+  "notes": "The Hub files desk for staff, and sharing several files at once.",
+  "released": "2026-11-18"
 }

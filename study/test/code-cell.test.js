@@ -63,3 +63,40 @@ test('review fixes: indentation counts, small numbers compare relatively, prose 
   assert.equal(sampleFrom('Write a program.\nOutput the largest of the three numbers.\n(5 marks)'), null);
   assert.deepEqual(sampleFrom('Read n and print n squared.\nInput:\n4\nOutput:\n16'), { input: '4', output: '16' });
 });
+
+// SQL and JavaScript (fixplan-g G6), with the real engines
+import { createRequire } from 'node:module';
+import initSqlJs from 'sql.js';
+import { runSql, sameResult, tablesFrom, ordered } from '../web/src/sql-run.js';
+import { runJs } from '../web/src/js-run.js';
+import { languageOf } from '../web/src/code-check.js';
+const SQL = await initSqlJs({ locateFile: (f) => createRequire(import.meta.url).resolve(`sql.js/dist/${f}`) });
+
+test('SQL runs on a fresh copy of the question\'s tables; results compare by rows, in order only with ORDER BY', () => {
+  const q = 'Given:\nCREATE TABLE students (id INTEGER, name TEXT, marks INTEGER);\nINSERT INTO students VALUES (1, \'Amina\', 72), (2, \'Brian\', 45), (3, \'Wanjiru\', 88);\nList the students who passed (marks >= 50).';
+  const setup = tablesFrom(q);
+  assert.match(setup, /^CREATE TABLE students/);
+  const mine = runSql(SQL, "SELECT name FROM students WHERE marks >= 50;", setup);
+  assert.deepEqual(mine.results[0].rows, [['Amina'], ['Wanjiru']]);
+  const theirs = runSql(SQL, "SELECT name AS who FROM students WHERE marks > 49 ORDER BY name DESC;", setup);
+  assert.equal(sameResult(mine.results[0], theirs.results[0], false).same, true, 'aliases and order do not matter without ORDER BY');
+  assert.equal(sameResult(mine.results[0], theirs.results[0], ordered('... ORDER BY name DESC')).same, false);
+  assert.match(sameResult(runSql(SQL, 'SELECT name FROM students;', setup).results[0], theirs.results[0], false).why, /3 rows/);
+  const del = runSql(SQL, 'DELETE FROM students WHERE marks < 50;', setup);
+  assert.equal(del.changes, 1);
+  assert.equal(runSql(SQL, 'SELECT COUNT(*) FROM students;', setup).results[0].rows[0][0], 3, 'each run starts from the question again');
+  assert.equal(runSql(SQL, 'SELEC name FROM students;', setup).error.type, 'SQL error');
+});
+
+test('JavaScript runs with input() and console.log, errors with their line', () => {
+  assert.equal(runJs('const n = Number(input());\nconsole.log(n * 2);', '21').out, '21\n42\n'); // input() echoes the line, like a terminal
+  assert.deepEqual(runJs('let a = 1;\nlet b = c + 1;').error, { line: 2, type: 'ReferenceError', message: 'c is not defined' });
+  assert.equal(runJs('typeof self === "undefined" ? console.log("no worker scope") : console.log(typeof fetch)').error, null);
+});
+
+test('the cell picks the language from the question or the model answer', () => {
+  assert.equal(languageOf('Write a query to SELECT the names of students from the table'), 'sql');
+  assert.equal(languageOf('Using JavaScript, print the first 10 squares'), 'js');
+  assert.equal(languageOf('Write a program that reads n'), 'python');
+  assert.equal(languageOf('anything', 'sql'), 'sql');
+});

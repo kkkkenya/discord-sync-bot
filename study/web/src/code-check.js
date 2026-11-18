@@ -51,3 +51,15 @@ export function sampleFrom(text) {
   if (!output || output.length > 2000) return null;
   return { input: lines(inText).join('\n'), output };
 }
+
+/** The language a question is in: SQL when it shows tables or queries, JavaScript when it says so, else Python. */
+export function languageOf(text = '', codeLanguage = '') {
+  const l = String(codeLanguage || '').toLowerCase();
+  if (/^(sql|sqlite|mysql|postgres)/.test(l)) return 'sql';
+  if (/^(js|javascript|node)/.test(l)) return 'js';
+  if (/^(py|python)/.test(l)) return 'python';
+  const t = String(text || '');
+  if (/\b(SELECT\s+[\w*]|CREATE\s+TABLE|INSERT\s+INTO|SQL\b|query\b.*\btable)/i.test(t)) return 'sql';
+  if (/\b(javascript|console\.log|node\.?js)\b/i.test(t)) return 'js';
+  return 'python';
+}

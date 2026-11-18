@@ -1182,3 +1182,10 @@ body:has(.focusbar) .donebar { bottom: calc(14px + var(--tabs) + 8px + 10px + 60
 .board-steps { margin: 0; padding-left: 1.4em; display: grid; gap: var(--s2); }
 .board-steps li { animation: pop 0.25s var(--spring); }
 @media (prefers-reduced-motion: reduce) { .board-steps li { animation: none; } }
+
+/* Code cells, SQL (CodeCell.jsx): the language picker and query results as a table */
+.code-lang select { min-height: 36px; padding: 0 var(--s2); border-radius: var(--radius); border: 1px solid var(--separator); background: var(--surface-solid); color: var(--text); font: inherit; font-size: var(--t-s); }
+.sql-table-wrap { max-height: 320px; overflow: auto; border-radius: var(--radius); border: 1px solid var(--separator); }
+.sql-table { border-collapse: collapse; width: 100%; font: 400 var(--t-s)/1.4 var(--mono); }
+.sql-table th, .sql-table td { padding: 6px 10px; border-bottom: 1px solid var(--separator); text-align: left; white-space: nowrap; }
+.sql-table th { position: sticky; top: 0; background: var(--surface-2); font-weight: 650; }

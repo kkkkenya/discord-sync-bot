@@ -18,7 +18,8 @@
     "jszip": "^3.10.2",
     "katex": "0.19.0",
     "mammoth": "^1.13.0",
-    "pdfjs-dist": "^4.10.38"
+    "pdfjs-dist": "^4.10.38",
+    "sql.js": "^1.13.0"
   },
   "devDependencies": {
     "@fontsource-variable/fraunces": "5.3.0",

@@ -13,7 +13,7 @@ import { finished } from './DoneBar.jsx';
 import { NoAiLeft } from './Allowance.jsx';
 
 // programming units (server/defs.js PROGRAMMING_UNIT): Practise shows a code cell under the question
-const PROGRAMMING = /programming|coding/i;
+const PROGRAMMING = /programming|coding|database|software|web\s*dev|data\s*struct|algorithm/i;
 
 const qname = (x) => `${x.source} · ${x.label || `Q${x.number}`}`;
 // How far a shared solution was checked (server/gold.js levels).
@@ -256,7 +256,7 @@ export default function PractiseQuestions({ s, unit, setUnit, refresh, go, focus
       )}
 
       {q && PROGRAMMING.test(s.data.units.find((u) => u.code === unit)?.title || '') && (
-        <CodeCell key={q.id} question={q.text} storageKey={`crux-code-${q.id}`} reference={sol?.code && /^(python|py|)$/i.test(sol.language || '') ? sol.code : null} />
+        <CodeCell key={q.id} question={q.text} storageKey={`crux-code-${q.id}`} reference={sol?.code || null} referenceLanguage={sol?.language || ''} />
       )}
 
       {q && !res && (

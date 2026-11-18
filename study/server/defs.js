@@ -57,7 +57,7 @@ export const GOLD = { levels: ['single', 'agreed', 'key'], strongModels: ['opus'
 
 // Programming units (owner, 2026-11-15): answers use only what the unit's notes teach, with no comments in the code
 // (server/taught.js). Matched on the unit's title.
-export const PROGRAMMING_UNIT = /programming|coding/i;
+export const PROGRAMMING_UNIT = /programming|coding|database|software|web\s*dev|data\s*struct|algorithm/i; // fixplan-g G6/G7: software engineering units too
 
 // Reviews in Today (fixplan-e E2, server/review.js): a green topic whose understanding fades within `withinDays` comes
 // back as one question. At most `perDay` a day (Nairobi). In the last `quietDays` before a paper, only that unit's.

@@ -230,3 +230,29 @@ test('the board: host only, cleaned and capped, steps revealed up to the step, c
   const off = await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'board', board: { on: false } });
   assert.equal(off.room.board, null);
 });
+
+test('voice (F7): the host adds a Discord voice channel, members get its link, it goes when the room ends', async () => {
+  resetRoomsForTests();
+  const { useVoiceForTests } = await import('../server/rooms-routes.js');
+  const made = [], removed = [];
+  useVoiceForTests({ make: async (room) => { made.push(room.code); return '111222333444555666'; }, remove: async (id) => { if (id) removed.push(id); }, available: () => true });
+  try {
+    const { room } = await host();
+    await call(brian, 'POST', '/api/rooms/join', { code: room.code });
+    assert.equal((await call(brian, 'GET', '/api/rooms')).voice, true);
+    await assert.rejects(call(brian, 'POST', '/api/rooms/act', { code: room.code, action: 'voice', on: true }), /Only the host/);
+    const s = await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'voice', on: true });
+    assert.match(s.room.voice, /^https:\/\/discord\.com\/channels\/\d+\/111222333444555666$/);
+    await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'voice', on: true });
+    assert.equal(made.length, 1, 'one channel per room');
+    const m = await call(brian, 'GET', '/api/rooms/state', null, T0, `code=${room.code}`);
+    assert.equal(m.room.voice, s.room.voice, 'members get Join voice');
+    await call(amina, 'POST', '/api/rooms/act', { code: room.code, action: 'end' });
+    assert.deepEqual(removed, ['111222333444555666'], 'the channel goes with the room');
+    resetRoomsForTests();
+    const two = await host();
+    await call(amina, 'POST', '/api/rooms/act', { code: two.room.code, action: 'voice', on: true });
+    await cleanRooms(T0 + 13 * 3600e3);
+    assert.equal(removed.length, 2, 'a room that ends on its own loses its channel too');
+  } finally { useVoiceForTests(null); }
+});

@@ -234,3 +234,4 @@ alter table crux_room_members enable row level security;
 alter table crux_rooms add column if not exists work jsonb;                -- { text, fileId, fileName, page }
 alter table crux_room_members add column if not exists checkin jsonb;      -- { round, how }
 alter table crux_rooms add column if not exists board jsonb;               -- F8: { on, title, text, steps[], step, code, output }
+alter table crux_rooms add column if not exists voice_channel text;        -- F7: the room's Discord voice channel id

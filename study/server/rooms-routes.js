@@ -4,6 +4,14 @@ import { ROOMS, PUBLIC_ROOMS } from './defs.js';
 import { focusByRoom } from './focus.js';
 import { CHECKINS, canAct, checkinCounts, cleanBoard, cleanName, cleanWork, makeCode, nextHost, normalizeCode, personKey, presence, shouldEnd, validCode } from './rooms.js';
 import { roomsStore } from './rooms-store.js';
+import { makeVoice, removeVoice, voiceCategory, voiceLink } from './rooms-voice.js';
+
+// the Discord side of a room (F7); tests pass their own
+const VOICE = { make: makeVoice, remove: removeVoice, available: () => Boolean(voiceCategory()) };
+let voice = VOICE;
+export const useVoiceForTests = (v) => { voice = v ? { ...VOICE, ...v } : VOICE; };
+// a room ends: its row, and its voice channel if it has one
+async function endRoom(store, room, now) { await store.end(room.id, now); await voice.remove(room.voice_channel); }
 import { actions, cleanPlan, idle, phaseAt } from '../web/src/room-clock.js';
 
 const fail = (message, status = 400) => Object.assign(new Error(message), { status });
@@ -22,7 +30,7 @@ function view(room, members, userId, now) {
   const host = room.host_id === userId;
   return {
     now,
-    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock, version: room.version, locked: Boolean(room.locked), host, work: room.work || null, board: room.board || null },
+    room: { code: room.code, name: room.name, unit: room.unit_code || null, clock, version: room.version, locked: Boolean(room.locked), host, work: room.work || null, board: room.board || null, voice: voiceLink(room.voice_channel), voiceOn: voice.available() },
     people,
     // check-ins for this round: yours, and the counts for the host (never who said what)
     checkin: { round, mine: mine?.round === round ? mine.how : null, counts: host ? checkinCounts(members, round) : null },
@@ -36,7 +44,7 @@ async function load(store, code, now) {
   const room = await store.live(c);
   if (!room) throw fail('This room has ended or the code is not in use.', 410);
   const members = await store.members(room.id);
-  if (shouldEnd(room, members, now)) { await store.end(room.id, now); throw fail('This room has ended.', 410); }
+  if (shouldEnd(room, members, now)) { await endRoom(store, room, now); throw fail('This room has ended.', 410); }
   return { room, members };
 }
 const memberOf = (members, userId) => members.find((m) => m.user_id === userId) || null;
@@ -51,7 +59,7 @@ async function leaveCurrent(store, user, now, except = null) {
   const listed = presence(await store.members(room.id), now);
   const heir = listed.find((m) => m.here) || listed[0];
   if (heir) await store.cas(room.id, room.version, { host_id: heir.user_id });
-  else await store.end(room.id, now);
+  else await endRoom(store, room, now);
 }
 
 export const ROOM_PATHS = /^\/api\/rooms(\/(join|state|act|leave|checkin))?$/;
@@ -66,13 +74,14 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     return {
       now,
       public: PUBLIC_ROOMS.map((r) => ({ ...r, count: counts ? counts.rooms[r.id] || 0 : null })),
+      voice: voice.available(), // hosts can add a Discord voice channel
       mine: mine ? { code: mine.code, name: mine.name } : null,
     };
   }
 
   if (route === 'POST /api/rooms') { // host a room: anyone can (owner, 2026-11-17), one at a time
     const own = await store.hostedBy(user.id);
-    if (own) await store.end(own.id, now);
+    if (own) await endRoom(store, own, now);
     await leaveCurrent(store, user, now);
     const plan = cleanPlan(body.plan);
     const name = cleanName(body.name, `${user.name || 'A student'}'s room`);
@@ -131,6 +140,11 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     else if (action === 'rename') patch = { name: cleanName(body.name, room.name) };
     else if (action === 'work') patch = { work: cleanWork(body.work) };
     else if (action === 'board') patch = { board: cleanBoard(body.board) };
+    else if (action === 'voice') {
+      if (body.on && !room.voice_channel) patch = { voice_channel: await voice.make(room) };
+      else if (!body.on && room.voice_channel) { await voice.remove(room.voice_channel); patch = { voice_channel: null }; }
+      else patch = {};
+    }
     else if (action === 'host' || action === 'remove') {
       if (!target) throw fail('That person is not in the room any more.', 404);
       if (target.user_id === user.id) throw fail(action === 'host' ? 'You are already the host.' : 'Use Leave to leave the room.');
@@ -140,7 +154,9 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
     if (action === 'end') patch.ended_at = iso(now);
     const version = Number.isInteger(body.version) ? body.version : room.version;
     const next = await store.cas(room.id, version, patch, user.id);
+    if (!next && action === 'voice' && patch.voice_channel) await voice.remove(patch.voice_channel); // made, but the room had moved on
     if (!next) throw fail('The room changed. Try again.', 409);
+    if (action === 'end') await voice.remove(room.voice_channel);
     if (action === 'remove') await store.setRemoved(room.id, target.user_id);
     if (action === 'end') { await store.dropMembers(room.id); return { ended: true, now }; }
     return view(next, await store.members(room.id), user.id, now);
@@ -173,7 +189,7 @@ export async function roomsRoute(method, path, query, body, user, now = Date.now
 export async function cleanRooms(now = Date.now(), store = roomsStore()) {
   let ended = 0;
   for (const room of await store.liveRooms()) {
-    if (shouldEnd(room, await store.members(room.id), now)) { await store.end(room.id, now); ended++; }
+    if (shouldEnd(room, await store.members(room.id), now)) { await endRoom(store, room, now); ended++; }
   }
   return { ended, deleted: await store.purge(now) };
 }

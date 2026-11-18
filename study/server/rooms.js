@@ -52,7 +52,7 @@ export function shouldEnd(room, members, now) {
   return null;
 }
 
-export const HOST_ACTIONS = ['start', 'pause', 'resume', 'skip', 'settings', 'end', 'lock', 'unlock', 'remove', 'host', 'rename', 'work', 'board'];
+export const HOST_ACTIONS = ['start', 'pause', 'resume', 'skip', 'settings', 'end', 'lock', 'unlock', 'remove', 'host', 'rename', 'work', 'board', 'voice'];
 
 // Today's work (F4): what the host sets the room to do. A short line, and optionally a Hub paper at a page, which
 // members open in their own viewer. Only Hub files (numeric ids): a file the host added privately cannot be shared.

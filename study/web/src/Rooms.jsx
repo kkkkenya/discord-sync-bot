@@ -306,6 +306,7 @@ export function HostedRoom() {
           </div>
         )}
         <div className="actions focus-actions">
+          {room.voice && <a className="btn primary" href={room.voice} target="_blank" rel="noreferrer">Join voice</a>}
           <button className="btn" type="button" onClick={invite}><Icon name="copy" />{copied ? 'Link copied' : 'Copy invite'}</button>
           {me && <button className="btn" type="button" aria-expanded={settings} onClick={() => (settings ? setSettings(false) : openSettings())}><Icon name="settings" />Room settings</button>}
           <button className="btn plain" type="button" onClick={run(leaveHosted)}>Leave</button>
@@ -330,6 +331,7 @@ export function HostedRoom() {
           <div className="actions">
             <button className="btn primary" type="submit">Save</button>
             <button className="btn" type="button" onClick={run(() => act(room.locked ? 'unlock' : 'lock'))}>{room.locked ? 'Unlock the room' : 'Lock the room'}</button>
+            {room.voiceOn && <button className="btn" type="button" onClick={run(() => act('voice', { on: !room.voice }))}>{room.voice ? 'Remove the voice channel' : 'Add a Discord voice channel'}</button>}
             {!ending ? <button className="btn plain" type="button" onClick={() => setEnding(true)}>End the room</button>
               : <button className="btn danger" type="button" onClick={run(() => act('end'))}>End it for everyone</button>}
           </div>

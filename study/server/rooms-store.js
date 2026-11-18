@@ -57,7 +57,7 @@ const memory = {
 // ---- Supabase (the website, and Crux (local).bat) ----
 // Today's work and check-ins (F4) need two columns (end of supabase/crux.sql). Until the owner adds them, say so plainly.
 const newColumns = (p) => p.catch((e) => {
-  if (/PGRST204|column .*(work|checkin|board)|(work|checkin|board).* column/i.test(e.message)) throw Object.assign(new Error("This part of rooms isn't switched on yet. The Hub admin needs to update Crux's database."), { status: 503 });
+  if (/PGRST204|column .*(work|checkin|board|voice_channel)|(work|checkin|board|voice_channel).* column/i.test(e.message)) throw Object.assign(new Error("This part of rooms isn't switched on yet. The Hub admin needs to update Crux's database."), { status: 503 });
   throw e;
 });
 const one = async (p) => (await p)?.[0] || null;

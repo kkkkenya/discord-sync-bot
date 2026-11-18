@@ -6,7 +6,8 @@ let srv;
 before(async () => { srv = await startServer('legacy-study.json'); });
 after(() => srv.stop());
 
-const day = (n) => { const d = new Date(); d.setUTCHours(12); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+// n days from today in Nairobi (as Crux counts days); a UTC date is yesterday between midnight and 3 a.m. there
+const day = (n) => new Date(Date.now() + n * 864e5).toLocaleDateString('en-CA', { timeZone: 'Africa/Nairobi' });
 const unit = (s, code) => s.data.units.find((u) => u.code === code);
 const planOf = (s, code) => s.plan.find((p) => p.code === code);
 

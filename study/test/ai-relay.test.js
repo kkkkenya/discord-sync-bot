@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 process.env.CRUX_SESSION_SECRET = 'test-secret';
-const { aiToken, effortFor, modelsFor, PLANS, relay, BUSY_MARK } = await import('../server/ai-relay.js');
+const { aiToken, effortFor, modelsFor, PLANS, providerEffort, relay, BUSY_MARK } = await import('../server/ai-relay.js');
 const { sign } = await import('../../lib/session.js');
 
 const NOW = Date.now();
@@ -110,4 +110,15 @@ test('usage and models endpoints', async () => {
   assert.deepEqual(u, { tier: 'premium', answers: 3, perDay: 40, left: 37, day: DAY });
   const m = await (await relay(...req('vvip', null, { path: '/api/ai/v1/models' }), { store, now: () => NOW, env: ENV })).json();
   assert.equal(m.object, 'list');
+});
+
+test('each provider gets an effort word it accepts: GLM refuses medium, DeepSeek takes none', () => {
+  assert.equal(providerEffort('glm', 'medium'), 'low', 'a plan capped at medium never goes above it');
+  assert.equal(providerEffort('glm', 'minimal'), 'low');
+  assert.equal(providerEffort('glm', 'high'), 'high');
+  assert.equal(providerEffort('glm', 'max'), 'max');
+  assert.equal(providerEffort('gemini', 'medium'), 'medium');
+  assert.equal(providerEffort('gemini', 'max'), 'high');
+  assert.equal(providerEffort('deepseek', 'high'), null);
+  assert.equal(providerEffort('glm', null), null);
 });

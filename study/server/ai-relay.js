@@ -42,6 +42,14 @@ const fail = (message, status, code) => Response.json({ error: { message, type: 
 /** A relay key for a signed-in student: their id and plan, for 12 hours. */
 export const aiToken = (user, now = Date.now()) => ({ token: sign({ kind: 'ai', id: user.id, tier: user.tier, exp: now + TOKEN_HOURS * 3600e3 }), exp: now + TOKEN_HOURS * 3600e3, tier: user.tier });
 
+/** Pure: the effort word each provider accepts. DeepSeek takes none; Gemini low, medium or high; GLM low, high or max
+ * (it refuses medium: "use low, high, or max", 2026-11-18). A plan's effort is a ceiling, so medium becomes low on GLM. */
+export function providerEffort(provider, effort) {
+  if (!effort || provider === 'deepseek') return null;
+  if (provider === 'glm') return effort === 'max' ? 'max' : effort === 'high' ? 'high' : 'low';
+  return effort === 'max' ? 'high' : effort === 'minimal' ? 'low' : effort;
+}
+
 /** Pure: the effort a plan allows, given the one asked for. null = leave as asked. */
 export function effortFor(plan, asked) {
   if (!plan.effort) return asked ?? null;
@@ -95,7 +103,8 @@ export async function relay(request, path, { store = db, fetchImpl = fetch, now 
   const effort = effortFor(plan, body.reasoning_effort);
   const out = { ...body, model, max_tokens: Math.min(Number(body.max_tokens) || spec.maxTokens, spec.maxTokens) };
   delete out.max_completion_tokens;
-  if (effort && spec.provider !== 'deepseek') out.reasoning_effort = effort === 'max' ? 'high' : effort === 'minimal' ? 'low' : effort; else delete out.reasoning_effort;
+  const sent = providerEffort(spec.provider, effort);
+  if (sent) out.reasoning_effort = sent; else delete out.reasoning_effort;
   if (!spec.image) out.messages = (out.messages || []).map((m) => (Array.isArray(m.content) ? { ...m, content: m.content.filter((p) => p.type !== 'image_url') } : m));
 
   // Gemini: the asked model, then the lighter one (its own quota). On the entry plans DeepSeek is offered after that.

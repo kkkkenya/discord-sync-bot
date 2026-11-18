@@ -1,6 +1,6 @@
 {
-  "version": "0.6.4",
+  "version": "0.6.5",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "Study rooms: host one with a four-letter code, or join a public room. Marking schemes in the left bar. Crux's own file viewer, with Add to notes and Ask the tutor.",
-  "released": "2026-11-17"
+  "notes": "Study from your phone: leave the laptop on and study from your phone's browser anywhere. Rooms for a class: today's work, check-ins at breaks, and the board for teaching.",
+  "released": "2026-11-18"
 }

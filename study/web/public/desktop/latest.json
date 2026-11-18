@@ -1,14 +1,14 @@
 {
-  "version": "0.6.6",
+  "version": "0.6.7",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "The board shows maths.",
+  "notes": "Code, while you study.",
   "released": "2026-11-18",
   "patch": {
-    "version": "0.6.6",
-    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.6.6/crux-harness-server-0.6.6.zip",
-    "sha256": "01d482c0e42f67107084c784c5c6af49a89fe936c3af9bbec234b54beb2c9cff",
-    "size": 62569848,
+    "version": "0.6.7",
+    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.6.7/crux-harness-server-0.6.7.zip",
+    "sha256": "ef76839b78e9ce52fbb1941c75c049c1cf6065a3ab796b4b31ee663ac3bc10e3",
+    "size": 63177062,
     "shell": "0.6.5",
-    "sig": "W6IUMxNs1XOeuCqwOFvOPe5/3UgDcnmRK3JBQVLgqdZqMOvSFL1SuFAuPoh9odpJzatJetOeo3KB7u/TW7LKAw=="
+    "sig": "v1tQld+LlZUDwy3UxGya8h0qdO00uVDK8sswK41RMis4O9GNYPodwqeMUSo9uPuOJstak3L9O6Jmt3EgjxZvDw=="
   }
 }

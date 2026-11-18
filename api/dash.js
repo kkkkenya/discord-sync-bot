@@ -6,8 +6,9 @@
 import { api, isoDay } from '../lib/discord.js';
 import { CHANNELS, EXISTING, GUILD_ID, ROLES, SEMESTER_START, TRIAL_DAYS } from '../lib/config.js';
 import { APPROVED, priceOf } from '../lib/plans.js';
-import { allUnitPosts, forwardTo, normaliseCode, partsOf, postsFor, SHELVES } from '../lib/sorting.js';
+import { allUnitPosts, SHELVES } from '../lib/sorting.js';
 import { currentUser } from '../lib/session.js';
+import { deskQueue, deskSort, sortButton } from '../lib/hub-desk.js';
 
 const DAY = 24 * 3600 * 1000;
 const ADMINISTRATOR = 1n << 3n;
@@ -24,61 +25,6 @@ async function recent(channelId, max) {
   return out;
 }
 
-const sortButton = (m) => (m.components || []).flatMap((r) => r.components || []).find((c) => (c.custom_id || '').startsWith('sort:start:'));
-
-async function queue() {
-  const msgs = await recent(CHANNELS.toSort, 300);
-  const byId = new Map(msgs.map((m) => [m.id, m]));
-  const items = [];
-  for (const note of msgs) {
-    const btn = sortButton(note);
-    if (!btn) continue;
-    const fileMsgId = btn.custom_id.split(':')[2];
-    const file = byId.get(fileMsgId) || await api('GET', `/channels/${CHANNELS.toSort}/messages/${fileMsgId}`).catch(() => null);
-    const a = file?.attachments?.[0];
-    if (!a) continue;
-    items.push({
-      fileMsgId, noteMsgId: note.id, name: a.filename, size: a.size, url: a.url, type: a.content_type || '',
-      reason: (note.content.match(/Couldn't place this file\*\*: (.*)/) || [])[1] || '',
-      suggestion: (note.content.match(/💡 Suggestion: ([A-Z]{3} \d{3})/) || [])[1] || '',
-      snippet: (note.content.match(/Page 1 starts: "([\s\S]*?)"\n/) || [])[1] || '',
-      at: file.timestamp,
-    });
-  }
-  return items.reverse(); // oldest first
-}
-
-async function sort(body, user) {
-  const { fileMsgId, noteMsgId, targets } = body || {};
-  if (!fileMsgId || !noteMsgId || !Array.isArray(targets) || !targets.length) return json({ error: 'Pick at least one destination.' }, 400);
-  const note = await api('GET', `/channels/${CHANNELS.toSort}/messages/${noteMsgId}`);
-  if (!sortButton(note)) return json({ error: 'This file was already sorted.' }, 409);
-
-  // resolve every destination first, so a typo never leaves a file half-sorted
-  const plan = [];
-  for (const t of targets) {
-    if (t.kind === 'unit') {
-      const code = normaliseCode(t.code);
-      const posts = code ? await postsFor(code) : [];
-      if (!posts.length) return json({ error: `There's no post for ${t.code}.` }, 400);
-      plan.push({ label: posts[0].name, ids: posts.map((p) => p.id) });
-    } else if (t.kind === 'shelf') {
-      const s = SHELVES.find((x) => x.id === t.id);
-      if (!s) return json({ error: 'Unknown shelf.' }, 400);
-      plan.push({ label: `📚 ${s.name}`, ids: [s.id] });
-    } else if (t.kind === 'library') {
-      plan.push({ label: '#pdf-library', ids: [CHANNELS.library] });
-    }
-  }
-  const parts = partsOf(note.content, fileMsgId); // every part of a split book
-  for (const p of plan) for (const id of p.ids) for (const part of parts) await forwardTo(id, part, CHANNELS.toSort);
-  const labels = plan.map((p) => p.label);
-  await api('PATCH', `/channels/${CHANNELS.toSort}/messages/${noteMsgId}`, {
-    content: `${note.content}\n\n✅ Sorted into ${labels.join(', ')} by ${user.name} (dashboard) on ${isoDay(new Date())}`,
-    components: [], allowed_mentions: { parse: [] },
-  });
-  return json({ ok: true, sortedInto: labels });
-}
 
 async function allMembers() {
   const out = [];
@@ -147,7 +93,7 @@ export async function GET(request) {
   const op = new URL(request.url).searchParams.get('op');
   try {
     if (op === 'me') return json({ name: user.name });
-    if (op === 'queue') return json(await queue());
+    if (op === 'queue') return json(await deskQueue());
     if (op === 'targets') return json({ units: allUnitPosts(), shelves: SHELVES });
     if (op === 'stats') return json(await stats());
   } catch (e) {
@@ -162,8 +108,9 @@ export async function POST(request) {
   if (!user) return json({ error: 'signed-out' }, 401);
   if (new URL(request.url).searchParams.get('op') !== 'sort') return json({ error: 'unknown op' }, 404);
   try {
-    return await sort(await request.json(), user);
+    return json(await deskSort(await request.json(), user));
   } catch (e) {
+    if (e.status) return json({ error: e.message }, e.status);
     console.error(e);
     return json({ error: e.message }, 502);
   }

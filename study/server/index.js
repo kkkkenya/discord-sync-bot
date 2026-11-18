@@ -24,6 +24,7 @@ if (live) {
 
 const { dispatch } = await import('./routes.js');
 const { ROOM_PATHS, roomsRoute } = await import('./rooms-routes.js');
+const { HUB_PATHS, hubRoute } = await import('./hub-desk-routes.js');
 const { fileBytes } = await import('./file-bytes.js');
 const { docStore, withSavedDoc } = await import('./doc-store.js');
 const docs = live ? docStore((await import('../../lib/db.js')).db) : null;
@@ -53,6 +54,11 @@ createServer(async (req, res) => {
       const raw = ['POST', 'PUT', 'PATCH'].includes(req.method) ? Buffer.concat(await req.toArray()) : null;
       if (raw && raw.length > 14 * 1024 * 1024) throw Object.assign(new Error('That upload is too big.'), { status: 413 });
       const body = raw ? JSON.parse(raw.toString() || '{}') : null;
+      if (HUB_PATHS.test(url.pathname)) { // the Hub files desk
+        const out = await hubRoute(req.method, url.pathname, url.searchParams, body, user);
+        res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));
+        return;
+      }
       if (ROOM_PATHS.test(url.pathname)) { // study rooms: their own tables, no document
         const out = await roomsRoute(req.method, url.pathname, url.searchParams, body, localAs(req) || user); // before writeHead: it may throw
         res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify(out));

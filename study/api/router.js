@@ -10,6 +10,7 @@ import { aiToken, relay } from '../server/ai-relay.js';
 import { nairobiDay } from '../server/plan.js';
 import { dispatch } from '../server/routes.js';
 import { cleanRooms, ROOM_PATHS, roomsRoute } from '../server/rooms-routes.js';
+import { HUB_PATHS, hubRoute } from '../server/hub-desk-routes.js';
 import { VERSION } from '../server/store.js';
 
 const MAX_BODY = 14 * 1024 * 1024; // photos of working and voice teach-backs come in as base64
@@ -62,6 +63,7 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       query.delete('path');
       // study rooms read only their own tables: no document to load or save (a full room polls every 20 s)
       if (ROOM_PATHS.test(path)) return reply(await roomsRoute(request.method, path, query, body, user));
+      if (HUB_PATHS.test(path)) return reply(await hubRoute(request.method, path, query, body, user)); // the Hub files desk: Discord and Supabase only
       const result = await withSavedDoc(docs, user.id, (extra) => dispatch(request.method, path, query, body, { user, today: nairobiDay(), ...extra }));
       if (result instanceof Response) { // a file download (Anki export)
         if (cookie) result.headers.append('Set-Cookie', cookie);

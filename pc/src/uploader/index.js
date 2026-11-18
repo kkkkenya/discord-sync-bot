@@ -8,7 +8,7 @@
 // files, which move to Done (or Problems). The sha256 of each one is kept in Supabase so nothing is uploaded twice.
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createReadStream, existsSync, mkdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, renameSync, statSync, watch, writeFileSync } from 'node:fs';
 import { lookup } from 'node:dns/promises';
 import { open, stat } from 'node:fs/promises';
 import { basename, dirname, extname, relative, resolve } from 'node:path';
@@ -418,6 +418,12 @@ export async function startUploader(ctx) {
   if (pending === 0) done();
   const rescan = (full) => () => { if (!down) scanNow(full).catch((e) => console.error('scan:', e.message)); };
   setInterval(rescan(false), 60e3);
+  // A file dropped from Crux Harness's Hub files desk (or by hand) is picked up within seconds, not at the next minute.
+  // Drive's virtual drive doesn't always report changes, so the minute scan stays as the fallback.
+  let dropSoon = null;
+  try {
+    if (existsSync(dumper.drop)) watch(dumper.drop, () => { clearTimeout(dropSoon); dropSoon = setTimeout(rescan(false), 5000); }).on('error', () => {});
+  } catch { /* no watching on this drive: the minute scan covers it */ }
   setInterval(() => { if (!down) collectFromCrux(dumper, ctx.log).catch((e) => console.error('from Crux:', e.message)); }, 2 * 60e3);
   setInterval(rescan(true), 10 * 60e3);
   let tick = Date.now(); // a long gap between ticks means the laptop slept

@@ -1,6 +1,14 @@
 {
-  "version": "0.6.5",
+  "version": "0.6.6",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "Study from your phone: leave the laptop on and study from your phone's browser anywhere. Rooms for a class: today's work, check-ins at breaks, and the board for teaching.",
-  "released": "2026-11-18"
+  "notes": "The board shows maths.",
+  "released": "2026-11-18",
+  "patch": {
+    "version": "0.6.6",
+    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.6.6/crux-harness-server-0.6.6.zip",
+    "sha256": "01d482c0e42f67107084c784c5c6af49a89fe936c3af9bbec234b54beb2c9cff",
+    "size": 62569848,
+    "shell": "0.6.5",
+    "sig": "W6IUMxNs1XOeuCqwOFvOPe5/3UgDcnmRK3JBQVLgqdZqMOvSFL1SuFAuPoh9odpJzatJetOeo3KB7u/TW7LKAw=="
+  }
 }

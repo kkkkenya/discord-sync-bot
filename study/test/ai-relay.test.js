@@ -69,7 +69,7 @@ test('a Gacrux answer goes to Gemini with the Hub key, low effort, and counts on
 test('a model outside the plan, or past the daily allowance, is refused before any call', async () => {
   const seen = [];
   const a = setup();
-  assert.equal((await relay(...req('basic', { model: 'glm-5.3', messages: [] }), { store: a.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV })).status, 403);
+  assert.equal((await relay(...req('basic', { model: 'deepseek-v4-pro', messages: [] }), { store: a.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV })).status, 403);
   const b = setup({ u1: { answers: 40, gemini_failed_at: null } });
   const r = await relay(...req('premium', { model: 'deepseek-flash', messages: [] }), { store: b.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV });
   assert.equal(r.status, 429);
@@ -126,4 +126,13 @@ test('each provider gets an effort word it accepts: GLM refuses medium, DeepSeek
 test('GLM is paused: no plan lists it', () => {
   for (const tier of ['premium', 'vvip', 'owner']) assert.equal(modelsFor(tier).some((m) => /glm/.test(m.id)), false, tier);
   assert.ok(modelsFor('premium').some((m) => m.id === 'deepseek-flash'));
+});
+
+test('a session that still names a paused GLM model is answered by the plan\'s first live model', async () => {
+  const seen = [];
+  const a = setup();
+  const r = await relay(...req('premium', { model: 'glm-5.3-flash', messages: [{ role: 'user', content: 'hi' }] }), { store: a.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV });
+  assert.equal(r.status, 200);
+  assert.match(seen[0].url, /generativelanguage/);
+  assert.equal(seen[0].body.model, 'gemini-3.8-flash');
 });

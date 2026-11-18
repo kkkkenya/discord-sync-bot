@@ -89,8 +89,9 @@ export async function relay(request, path, { store = db, fetchImpl = fetch, now 
 
   let body;
   try { body = await request.json(); } catch { return fail('That request was not valid JSON.', 400, 'bad_request'); }
-  const model = String(body?.model || '');
-  if (MODELS[model]?.off) return fail(`${MODELS[model].name} is paused on Crux for now. Pick DeepSeek or Gemini in the list.`, 403, 'model_paused');
+  let model = String(body?.model || '');
+  // a paused model (GLM) that a saved session still names goes to the plan's first live model, not to an error
+  if (MODELS[model]?.off) model = plan.models.find((id) => !MODELS[id].off) || model;
   if (!plan.models.includes(model)) return fail(`${model || 'That model'} isn't part of your plan. Pick another model in the list.`, 403, 'model_not_in_plan');
   if (model === plan.fallback) {
     const failedAt = usage.gemini_failed_at ? Date.parse(usage.gemini_failed_at) : 0;

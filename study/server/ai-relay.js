@@ -20,8 +20,9 @@ export const MODELS = {
   'gemini-3.8-flash': { provider: 'gemini', name: 'Gemini 3.8 Flash', context: 1048576, maxTokens: 65536, image: true, reasoning: true },
   'deepseek-flash': { provider: 'deepseek', name: 'DeepSeek Flash', context: 131072, maxTokens: 32768, image: false, reasoning: true },
   'deepseek-v4-pro': { provider: 'deepseek', name: 'DeepSeek V4 Pro', context: 131072, maxTokens: 32768, image: false, reasoning: true },
-  'glm-5.3-flash': { provider: 'glm', name: 'GLM 5.3 Flash', context: 200000, maxTokens: 32768, image: false, reasoning: true },
-  'glm-5.3': { provider: 'glm', name: 'GLM 5.3', context: 200000, maxTokens: 32768, image: false, reasoning: true },
+  // GLM is paused (owner, 2026-11-18: the z.ai account has no credit; DeepSeek carries on). Remove `off` to bring it back.
+  'glm-5.3-flash': { provider: 'glm', name: 'GLM 5.3 Flash', context: 200000, maxTokens: 32768, image: false, reasoning: true, off: true },
+  'glm-5.3': { provider: 'glm', name: 'GLM 5.3', context: 200000, maxTokens: 32768, image: false, reasoning: true, off: true },
 };
 const ENTRY = ['gemini-3.8-flash', 'deepseek-flash'];
 export const PLANS = {
@@ -61,7 +62,7 @@ export function effortFor(plan, asked) {
 export function modelsFor(tier) {
   const plan = PLANS[tier];
   if (!plan) return [];
-  return plan.models.map((id) => ({ id, object: 'model', owned_by: 'crux', name: plan.fallback === id ? `${MODELS[id].name} (when Gemini is busy)` : MODELS[id].name, context_length: MODELS[id].context, max_tokens: MODELS[id].maxTokens, image: MODELS[id].image, reasoning: MODELS[id].reasoning }));
+  return plan.models.filter((id) => !MODELS[id].off).map((id) => ({ id, object: 'model', owned_by: 'crux', name: plan.fallback === id ? `${MODELS[id].name} (when Gemini is busy)` : MODELS[id].name, context_length: MODELS[id].context, max_tokens: MODELS[id].maxTokens, image: MODELS[id].image, reasoning: MODELS[id].reasoning }));
 }
 
 const usageRow = async (store, userId, day) => (await store.select('crux_ai_usage', `user_id=eq.${encodeURIComponent(userId)}&day=eq.${day}&select=answers,gemini_failed_at`))[0] || { answers: 0, gemini_failed_at: null };
@@ -89,6 +90,7 @@ export async function relay(request, path, { store = db, fetchImpl = fetch, now 
   let body;
   try { body = await request.json(); } catch { return fail('That request was not valid JSON.', 400, 'bad_request'); }
   const model = String(body?.model || '');
+  if (MODELS[model]?.off) return fail(`${MODELS[model].name} is paused on Crux for now. Pick DeepSeek or Gemini in the list.`, 403, 'model_paused');
   if (!plan.models.includes(model)) return fail(`${model || 'That model'} isn't part of your plan. Pick another model in the list.`, 403, 'model_not_in_plan');
   if (model === plan.fallback) {
     const failedAt = usage.gemini_failed_at ? Date.parse(usage.gemini_failed_at) : 0;

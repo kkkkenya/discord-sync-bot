@@ -38,8 +38,8 @@ test('only a relay key gets in: no key, a session cookie token, or a stale key a
 test('each plan sees its models; the entry plans see DeepSeek only as the Gemini-busy choice', () => {
   assert.deepEqual(modelsFor('basic').map((m) => m.id), ['gemini-3.8-flash', 'deepseek-flash']);
   assert.match(modelsFor('basic')[1].name, /when Gemini is busy/);
-  assert.deepEqual(modelsFor('premium').map((m) => m.id), ['gemini-3.8-flash', 'deepseek-flash', 'glm-5.3-flash']);
-  assert.ok(modelsFor('vvip').some((m) => m.id === 'glm-5.3') && modelsFor('vvip').some((m) => m.id === 'deepseek-v4-pro'));
+  assert.deepEqual(modelsFor('premium').map((m) => m.id), ['gemini-3.8-flash', 'deepseek-flash']); // GLM paused (2026-11-18)
+  assert.ok(modelsFor('vvip').some((m) => m.id === 'deepseek-v4-pro'));
   assert.deepEqual(modelsFor('none'), []);
   assert.deepEqual([PLANS.basic.perDay, PLANS.premium.perDay, PLANS.vvip.perDay], [15, 40, 80]);
 });
@@ -71,7 +71,7 @@ test('a model outside the plan, or past the daily allowance, is refused before a
   const a = setup();
   assert.equal((await relay(...req('basic', { model: 'glm-5.3', messages: [] }), { store: a.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV })).status, 403);
   const b = setup({ u1: { answers: 40, gemini_failed_at: null } });
-  const r = await relay(...req('premium', { model: 'glm-5.3-flash', messages: [] }), { store: b.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV });
+  const r = await relay(...req('premium', { model: 'deepseek-flash', messages: [] }), { store: b.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV });
   assert.equal(r.status, 429);
   assert.match((await r.json()).error.message, /40 answers/);
   assert.equal(seen.length, 0);
@@ -121,4 +121,9 @@ test('each provider gets an effort word it accepts: GLM refuses medium, DeepSeek
   assert.equal(providerEffort('gemini', 'max'), 'high');
   assert.equal(providerEffort('deepseek', 'high'), null);
   assert.equal(providerEffort('glm', null), null);
+});
+
+test('GLM is paused: no plan lists it', () => {
+  for (const tier of ['premium', 'vvip', 'owner']) assert.equal(modelsFor(tier).some((m) => /glm/.test(m.id)), false, tier);
+  assert.ok(modelsFor('premium').some((m) => m.id === 'deepseek-flash'));
 });

@@ -47,14 +47,21 @@ async function pageText(doc, n) {
 }
 const short = (name) => String(name || 'File').replace(/\.[a-z0-9]+$/i, '').replace(/\(?z-?library\)?/gi, '').replace(/_/g, ' ').trim();
 
+// Each page's own shape (height / width), once it has been read: pages of one file differ (a landscape cover, photos
+// of a paper joined into one PDF), and a box shaped like page 1 squashed them (Track H2). Until a page is read, its box
+// takes page 1's shape; the browser's scroll anchoring keeps your place while boxes above you change size.
+const shapes = new WeakMap();
+const shapeOf = (doc, n) => shapes.get(doc)?.get(n);
 function Page({ doc, n, width, ratio, onSeen, marks, onMark, hit }) {
   const box = useRef(null);
+  const [own, setOwn] = useState(() => shapeOf(doc, n) || ratio);
   const canvas = useRef(null);
   const text = useRef(null);
   const [near, setNear] = useState(false);
   useEffect(() => {
     const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) setNear(true); }, { rootMargin: '1200px 0px' });
-    const seen = new IntersectionObserver(([e]) => { if (e.isIntersecting) onSeen(n); }, { threshold: 0.5 });
+    // the page you're on is the one across the middle of the viewer: a page taller than the window is never half in view
+    const seen = new IntersectionObserver(([e]) => { if (e.isIntersecting) onSeen(n); }, { root: box.current.closest('.pdf-scroll'), rootMargin: '-50% 0px -50% 0px', threshold: 0 });
     io.observe(box.current); seen.observe(box.current);
     return () => { io.disconnect(); seen.disconnect(); };
   }, [n, onSeen]);
@@ -65,7 +72,11 @@ function Page({ doc, n, width, ratio, onSeen, marks, onMark, hit }) {
     let gone = false;
     doc.getPage(n).then((p) => {
       if (gone) return;
-      const scale = width / p.getViewport({ scale: 1 }).width;
+      const one = p.getViewport({ scale: 1 });
+      if (!shapes.has(doc)) shapes.set(doc, new Map());
+      shapes.get(doc).set(n, one.height / one.width);
+      setOwn(one.height / one.width);
+      const scale = width / one.width;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const vp = p.getViewport({ scale: scale * dpr });
       const c = canvas.current;
@@ -90,7 +101,7 @@ function Page({ doc, n, width, ratio, onSeen, marks, onMark, hit }) {
     return () => t.removeEventListener('drawn', light);
   }, [hit]);
   return (
-    <div ref={box} className="pdf-page" data-page={n} style={{ width, height: width * ratio }}>
+    <div ref={box} className="pdf-page" data-page={n} style={{ width, height: width * own }}>
       <canvas ref={canvas} aria-label={`Page ${n}`} />
       <div ref={text} className="textLayer" />
       {marks.map((m) => m.rects.map((r, i) => (

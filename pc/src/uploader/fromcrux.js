@@ -10,6 +10,7 @@ import { REWARD, creditsQuery, earned } from '../../../lib/rewards.js';
 import { save, state } from '../state.js';
 
 const BUCKET = 'crux-uploads';
+export const TEST_PREFIX = 'Crux upload check';
 const clean = (s, n) => String(s || '').replace(/[\\/:*?"<>|()]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
 const stem = (name) => clean(String(name).slice(0, String(name).length - extname(String(name)).length), 50);
 
@@ -26,7 +27,9 @@ let quietUntil = 0; // the table isn't there yet (supabase/crux.sql not run): as
 export async function collectFromCrux(dumper, log = console.log) {
   if (Date.now() < quietUntil || !process.env.SUPABASE_URL || !existsSync(dumper.drop)) return 0;
   let rows;
-  try { rows = await db.select('crux_uploads', 'status=eq.new&order=id.asc&limit=25&select=*'); } catch (e) {
+  // study/shots/upload-e2e.mjs names its test files "Crux upload check …": never collected, so never posted
+  // (one was, on 2026-11-20, before its row was cleaned up).
+  try { rows = await db.select('crux_uploads', `status=eq.new&name=not.like.${enc(`${TEST_PREFIX}*`)}&order=id.asc&limit=25&select=*`); } catch (e) {
     quietUntil = Date.now() + 30 * 60e3;
     console.error(`files from Crux: ${e.message} (is crux_uploads made? supabase/crux.sql)`);
     return 0;

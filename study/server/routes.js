@@ -427,6 +427,7 @@ const routes = {
       if (k === 'cohort' && !validCohort(v)) throw Object.assign(new Error('pick a course, a year (1-5) and a semester (1 or 2)'), { status: 400 });
       if (k === 'stage' && !validStage(v)) throw Object.assign(new Error('unknown study stage'), { status: 400 });
       data.settings[k] = v;
+      if (k === 'aiProvider') data.settings.aiPicked = true;
     }
     save();
     return state();

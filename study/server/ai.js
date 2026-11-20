@@ -1,5 +1,6 @@
 // One AI helper for Crux, with a provider switch. Every AI call goes through structured().
-// Providers: gemini (default; native REST, schema-enforced), deepseek (OpenAI-compatible JSON, validated + retried).
+// Providers: deepseek (first, owner 2026-11-20 Track H1; OpenAI-compatible JSON, validated + retried) and gemini
+// (native REST, schema-enforced; reads photos and recordings, and takes over above DeepSeek's monthly cap).
 // Keys: GEMINI_API_KEY, DEEPSEEK_API_KEY. Model names override via AI_MODEL.
 // On the owner's own computer (never on Vercel), CRUX_AI=claude-code sends every call to Claude Code instead: the
 // owner's Claude plan, no API key (claudeCodeCall).
@@ -14,9 +15,8 @@ import { data, requestScope } from './store.js';
 import { addDeepseekSpend, deepseekOpen } from './usage.js';
 
 export const PROVIDERS = ['gemini', 'deepseek'];
-// DeepSeek is Premium's (and the owner's), and only while the month's budget lasts; everyone else uses Gemini.
-// Locally (no request) the setting is used as it is.
-const deepseekFor = () => { const u = requestScope()?.user; return (!u || ['premium', 'vvip', 'owner'].includes(u.tier)) && deepseekOpen(); };
+// DeepSeek is every plan's first model while the month's budget lasts (defs.js DEEPSEEK.monthlyCapUsd); then Gemini.
+const deepseekFor = () => deepseekOpen();
 export const localClaude = () => !process.env.VERCEL && process.env.CRUX_AI === 'claude-code';
 
 // tools/gold.js runs two model families side by side in one process: withModel(provider, model, fn) picks them for
@@ -32,7 +32,7 @@ const pin = () => pinned.getStore();
 export const provider = () => {
   if (pin()) return pin().via;
   if (localClaude()) return 'claude-code';
-  const p = data?.settings?.aiProvider || process.env.AI_PROVIDER || 'gemini';
+  const p = data?.settings?.aiProvider || process.env.AI_PROVIDER || 'deepseek';
   return p === 'deepseek' && !deepseekFor() ? 'gemini' : p;
 };
 
@@ -42,7 +42,9 @@ const KEYS = { gemini: 'GEMINI_API_KEY', deepseek: 'DEEPSEEK_API_KEY' };
 export const aiReady = () => provider() === 'claude-code' || Boolean(process.env[KEYS[provider()]]);
 // What each provider can read besides text: photos of working, and voice teach-backs.
 export const CAN = { gemini: { image: true, audio: true }, deepseek: { image: false, audio: false }, 'claude-code': { image: false, audio: false } };
-export const canRead = (kind) => aiReady() && Boolean(CAN[provider()]?.[kind]);
+// A photo or a recording goes to Gemini when the student's provider can't read it (mediaProvider).
+const mediaProvider = (p, kinds) => (kinds.every((k) => CAN[p]?.[k]) ? p : p !== 'claude-code' && !pin() && process.env.GEMINI_API_KEY ? 'gemini' : p);
+export const canRead = (kind) => aiReady() && Boolean(CAN[mediaProvider(provider(), [kind])]?.[kind]);
 const model = () => pin()?.name || process.env.AI_MODEL || MODELS[provider()];
 // The model behind the next call, as stored with a shared solution ('opus', 'gemini-3.8-flash').
 export const modelInUse = () => (provider() === 'claude-code' ? (pin()?.name || process.env.CRUX_CLAUDE_MODEL || 'sonnet') : model());
@@ -256,8 +258,8 @@ export async function claudeReadPdf(buf, run = spawn, render = renderPdfPages) {
 
 // media: [{ mime, data (base64) }], images or audio, for the providers that can read them (CAN).
 export async function structured(schema, system, content, maxTokens = 4000, media = []) {
-  const p = provider();
-  if (!aiReady()) throw new Error(`No ${KEYS[p]} for provider "${p}". Pick another provider in Settings, or add the key.`);
+  if (!aiReady()) throw new Error(`No ${KEYS[provider()]} for provider "${provider()}". Pick another provider in Settings, or add the key.`);
+  const p = mediaProvider(provider(), media.map((m) => (m.mime.startsWith('audio/') ? 'audio' : 'image')));
   for (const m of media) {
     const kind = m.mime.startsWith('audio/') ? 'audio' : 'image';
     if (!CAN[p]?.[kind]) throw Object.assign(new Error(`${p} can't read ${kind === 'audio' ? 'recordings' : 'photos'}. Switch to Gemini in Settings, or type it.`), { status: 400 });

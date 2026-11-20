@@ -35,13 +35,27 @@ test('only a relay key gets in: no key, a session cookie token, or a stale key a
   assert.equal((await relay(...req('basic', null, { path: '/api/ai/v1/models', token: stale }), deps)).status, 401);
 });
 
-test('each plan sees its models; the entry plans see DeepSeek only as the Gemini-busy choice', () => {
-  assert.deepEqual(modelsFor('basic').map((m) => m.id), ['gemini-3.8-flash', 'deepseek-flash']);
-  assert.match(modelsFor('basic')[1].name, /when Gemini is busy/);
-  assert.deepEqual(modelsFor('premium').map((m) => m.id), ['gemini-3.8-flash', 'deepseek-flash']); // GLM paused (2026-11-18)
+test('DeepSeek first: every plan lists DeepSeek Flash first, as its fallback, and Gemini second (Track H1)', () => {
+  for (const tier of Object.keys(PLANS)) {
+    const live = modelsFor(tier).map((m) => m.id);
+    assert.equal(live[0], 'deepseek-flash', tier);
+    assert.equal(PLANS[tier].fallback ?? PLANS[tier].models[0], 'deepseek-flash', tier);
+    assert.ok(live.includes('gemini-3.8-flash'), tier);
+  }
+  assert.deepEqual(modelsFor('basic').map((m) => m.id), ['deepseek-flash', 'gemini-3.8-flash']);
+  assert.doesNotMatch(modelsFor('basic')[0].name, /busy/);
+  assert.deepEqual(modelsFor('premium').map((m) => m.id), ['deepseek-flash', 'gemini-3.8-flash']); // GLM paused (2026-11-18)
   assert.ok(modelsFor('vvip').some((m) => m.id === 'deepseek-v4-pro'));
   assert.deepEqual(modelsFor('none'), []);
   assert.deepEqual([PLANS.basic.perDay, PLANS.premium.perDay, PLANS.vvip.perDay], [15, 40, 80]);
+});
+
+test('Gacrux can pick DeepSeek straight away: no Gemini-busy gate any more', async () => {
+  const { store } = setup();
+  const seen = [];
+  const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV });
+  assert.equal(r.status, 200);
+  assert.match(seen[0].url, /deepseek/);
 });
 
 test('effort: Gacrux low, Mimosa up to medium, Acrux as asked', () => {
@@ -75,24 +89,6 @@ test('a model outside the plan, or past the daily allowance, is refused before a
   assert.equal(r.status, 429);
   assert.match((await r.json()).error.message, /40 answers/);
   assert.equal(seen.length, 0);
-});
-
-test('Gemini busy twice on Gacrux: the student is told to switch, and DeepSeek opens for 30 minutes', async () => {
-  const { store, rows } = setup();
-  const seen = [];
-  const busy = await relay(...req('basic', { model: 'gemini-3.8-flash', messages: [] }), { store, fetchImpl: upstream(503, seen), now: () => NOW, env: ENV });
-  assert.equal(busy.status, 503);
-  assert.equal(seen.length, 2, 'two tries');
-  assert.ok((await busy.json()).error.message.includes(BUSY_MARK));
-  assert.ok(rows.u1.gemini_failed_at);
-  // DeepSeek now works for this student
-  const ds = await relay(...req('basic', { model: 'deepseek-flash', messages: [], reasoning_effort: 'low' }), { store, fetchImpl: upstream(200, seen), now: () => NOW + 60e3, env: ENV });
-  assert.equal(ds.status, 200);
-  assert.match(seen.at(-1).url, /deepseek/);
-  assert.equal(seen.at(-1).body.reasoning_effort, undefined, 'DeepSeek gets no effort parameter');
-  // and closes again after 30 minutes
-  const later = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store, fetchImpl: upstream(200, seen), now: () => NOW + 31 * 60e3, env: ENV });
-  assert.equal(later.status, 403);
 });
 
 test('a refusal from the model (400) is not retried and does not open the fallback', async () => {
@@ -133,6 +129,6 @@ test('a session that still names a paused GLM model is answered by the plan\'s f
   const a = setup();
   const r = await relay(...req('premium', { model: 'glm-5.3-flash', messages: [{ role: 'user', content: 'hi' }] }), { store: a.store, fetchImpl: upstream(200, seen), now: () => NOW, env: ENV });
   assert.equal(r.status, 200);
-  assert.match(seen[0].url, /generativelanguage/);
-  assert.equal(seen[0].body.model, 'gemini-3.8-flash');
+  assert.match(seen[0].url, /deepseek/);
+  assert.equal(seen[0].body.model, 'deepseek-flash');
 });

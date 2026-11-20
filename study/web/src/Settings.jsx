@@ -63,10 +63,10 @@ export default function Settings({ s, user, unit, refresh, notify, onClose, onPr
             </select>
           </label>
           {s.provider === 'claude-code' ? (
-            <p className="field">AI <span className="hint">Claude Code on this computer, on your Claude plan. Started from Crux (local).bat; the website still uses Gemini.</span></p>
+            <p className="field">AI <span className="hint">Claude Code on this computer, on your Claude plan. Started from Crux (local).bat; the website uses DeepSeek.</span></p>
           ) : <label className="field">AI
             <select value={s.settings.aiProvider} onChange={(e) => setting({ aiProvider: e.target.value })}>
-              <option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option>
+              <option value="deepseek">DeepSeek</option><option value="gemini">Gemini</option>
             </select>
             <span className="hint">{s.ai ? 'Ready.' : `Not available right now. Pick the other one.`}{usage?.ai && usage.ai.limit !== null && Number.isFinite(usage.ai.limit) ? ` AI today: ${usage.ai.used} of ${usage.ai.limit}.` : ''}</span>
           </label>}

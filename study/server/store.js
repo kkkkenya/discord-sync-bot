@@ -24,13 +24,13 @@ export const DATA_DIR = DIR; // uploads (photos of working, voice teach-backs) l
 // attempts: checkpoint attempts (practice.js).
 // materials: [{ id, unit, topicId|null, kind: 'ladder'|'recipes'|'sheet', stage, content, edited, at }]   (study kit)
 // cards, reviews: retired flashcards. Left exactly as they are in old files, never read or sent to the dashboard.
-// settings: { aiProvider: 'gemini'|'deepseek', tour: { step, done, skipped }, cardsNotice: true once
+// settings: { aiProvider: 'deepseek'|'gemini' (DeepSeek first, Track H1), aiPicked: true once the student chose one, tour: { step, done, skipped }, cardsNotice: true once
 //   the "flashcards retired" note was dismissed, cohort: { course, year, sem } | null,
 //   unitArchive: { code: { catDate, confidence, ... } } (units you un-ticked, restored if you tick them again) }
 // learner: { notes: [{ id, text, at }] (up to 5, 140 characters), hidden: [line ids the student hid] } (the learner file, learner.js)
 const EMPTY = {
   units: [], topics: [], sessions: [], papers: [], teach: [], questions: [], mocks: [], subtopics: [], attempts: [], hints: [], paperq: [], materials: [], stickies: [], marks: [],
-  settings: { aiProvider: 'gemini', tour: {}, cohort: null, unitArchive: {} },
+  settings: { aiProvider: 'deepseek', tour: {}, cohort: null, unitArchive: {} },
   learner: { notes: [], hidden: [] },
 };
 
@@ -41,7 +41,8 @@ export const VERSION = 3;
 export function normalize(saved) {
   const doc = { ...structuredClone(EMPTY), ...saved, settings: { ...structuredClone(EMPTY.settings), ...saved?.settings } };
   doc.learner = { notes: Array.isArray(saved?.learner?.notes) ? saved.learner.notes : [], hidden: Array.isArray(saved?.learner?.hidden) ? saved.learner.hidden : [] };
-  if (!['gemini', 'deepseek'].includes(doc.settings.aiProvider)) doc.settings.aiProvider = 'gemini'; // anthropic and hub are retired
+  // anthropic and hub are retired; the old Gemini default moves to DeepSeek unless the student picked it (Track H1)
+  if (!['gemini', 'deepseek'].includes(doc.settings.aiProvider) || !doc.settings.aiPicked) doc.settings.aiProvider = 'deepseek';
   doc.version = VERSION;
   return doc;
 }

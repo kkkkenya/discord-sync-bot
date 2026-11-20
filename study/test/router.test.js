@@ -112,20 +112,20 @@ test('an AI request that loses a save race is redone on the newer document witho
   const router = makeRouter(docs, { ...noNetwork, db: { ...noNetwork.db, select: async () => [], rpc: async () => ({ ok: true, used: 1 }) } });
   await call(router, 'PUT', 'units', { user: 'amina', body: [{ code: 'EMM 302', title: 'Strength of Materials' }] });
   const realFetch = globalThis.fetch;
-  process.env.GEMINI_API_KEY = 'test-key';
+  process.env.DEEPSEEK_API_KEY = 'test-key'; // DeepSeek is the default provider (Track H1)
   let calls = 0;
   globalThis.fetch = async (url, opts) => {
-    if (!String(url).includes('generativelanguage')) return realFetch(url, opts);
+    if (!String(url).includes('api.deepseek.com')) return realFetch(url, opts);
     calls += 1;
     docs.bump('amina'); // another tab saved while the AI was working
-    const out = { topics: [{ name: 'Bending stress', why: 'paper' }, { name: 'Shear force', why: 'paper' }, { name: 'Torsion', why: 'paper' }] };
-    return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(out) }] } }] }), { headers: { 'content-type': 'application/json' } });
+    const out = { topics: [{ name: 'Bending stress', from: 'papers' }, { name: 'Shear force', from: 'papers' }, { name: 'Torsion', from: 'papers' }] };
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(out) } }] }), { headers: { 'content-type': 'application/json' } });
   };
   try {
     const r = await call(router, 'POST', 'topics/suggest', { user: 'amina', body: { unit: 'EMM 302' } });
     assert.equal(r.status, 200, JSON.stringify(r.body));
     assert.equal(calls, 1);
-  } finally { globalThis.fetch = realFetch; delete process.env.GEMINI_API_KEY; }
+  } finally { globalThis.fetch = realFetch; delete process.env.DEEPSEEK_API_KEY; }
 });
 
 test('an Acrux sign-in still saves its row on a database that predates the Acrux tier', async () => {

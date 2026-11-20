@@ -8,8 +8,8 @@ process.env.GEMINI_API_KEY = 'test';
 process.env.DEEPSEEK_API_KEY = 'test';
 const { DEEPSEEK, LIMITS, deepseekCost } = await import('../server/defs.js');
 const { addDeepseekSpend, bump, deepseekOpen, resetUsageForTests } = await import('../server/usage.js');
-const { emptyDoc, withDoc, requestScope } = await import('../server/store.js');
-const { provider } = await import('../server/ai.js');
+const { emptyDoc, normalize, withDoc, requestScope } = await import('../server/store.js');
+const { canRead, provider } = await import('../server/ai.js');
 const { sign } = await import('../../lib/session.js');
 const { makeRouter } = await import('../api/router.js');
 
@@ -24,13 +24,19 @@ test('Basic and trial get 15 AI actions a day, Premium 40, the owner no limit', 
   assert.equal((await bump({ id: 'x', tier: 'none' }, 'ai')).ok, false);
 });
 
-test('DeepSeek is for Premium only; others are moved to Gemini', async () => {
+test('DeepSeek first on every plan (Track H1); Gemini reads photos and recordings', async () => {
   resetUsageForTests();
   const doc = emptyDoc();
-  doc.settings.aiProvider = 'deepseek';
-  const as = (tier) => withDoc(doc, () => { requestScope().user = { id: 'u', tier }; return provider(); }).then((r) => r.result);
-  assert.equal(await as('basic'), 'gemini');
-  assert.equal(await as('premium'), 'deepseek');
+  assert.equal(doc.settings.aiProvider, 'deepseek', 'a new student starts on DeepSeek');
+  const as = (tier, fn = provider) => withDoc(doc, () => { requestScope().user = { id: 'u', tier }; return fn(); }).then((r) => r.result);
+  for (const tier of ['trial', 'basic', 'premium', 'vvip', 'owner']) assert.equal(await as(tier), 'deepseek', tier);
+  assert.equal(await as('basic', () => canRead('image')), true, 'a photo goes to Gemini');
+  assert.equal(await as('basic', () => canRead('audio')), true);
+});
+
+test('a saved document still on the old Gemini default moves to DeepSeek; a student who picked Gemini keeps it', () => {
+  assert.equal(normalize({ settings: { aiProvider: 'gemini' } }).settings.aiProvider, 'deepseek');
+  assert.equal(normalize({ settings: { aiProvider: 'gemini', aiPicked: true } }).settings.aiProvider, 'gemini');
 });
 
 test('DeepSeek stops at the monthly cap and Gemini takes over', async () => {

@@ -9,7 +9,7 @@ const { data, save } = await import('../server/store.js');
 
 test('a legacy store loads with every list and setting defaulted', () => {
   for (const list of ['subtopics', 'attempts', 'hints', 'sessions', 'mocks']) assert.ok(Array.isArray(data[list]), list);
-  assert.equal(data.settings.aiProvider, 'gemini');
+  assert.equal(data.settings.aiProvider, 'deepseek'); // DeepSeek first (Track H1)
   assert.equal(data.settings.tour.done, true);
 });
 

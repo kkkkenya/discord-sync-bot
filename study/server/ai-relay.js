@@ -3,9 +3,9 @@
 // endpoint here: GET /api/ai/v1/models, POST /api/ai/v1/chat/completions, GET /api/ai/usage.
 // Each request is checked against the student's plan and daily allowance, then forwarded with the Hub's own key.
 //
-// Plans (lib/plan-names.js): Imai (trial) and Gacrux use Gemini on low effort; when Gemini fails twice in a row
-// (out of quota or busy), DeepSeek is offered instead for 30 minutes. Mimosa gets Gemini, DeepSeek and GLM up to
-// medium effort. Acrux (and the owner) get every model on any effort.
+// Plans (lib/plan-names.js): DeepSeek Flash is the first model on every plan (owner, 2026-11-20, Track H1), Gemini
+// the second. Imai (trial) and Gacrux use them on low effort, Mimosa up to medium (GLM too when it is back), Acrux
+// (and the owner) get every model on any effort. A paused model a saved session still names goes to the fallback.
 import { db } from '../../lib/db.js';
 import { sign, verify } from '../../lib/session.js';
 import { nairobiDay } from './plan.js';
@@ -17,24 +17,26 @@ const UPSTREAM = {
 };
 // What students see in the model picker. context/maxTokens are what the desktop budgets with.
 export const MODELS = {
-  'gemini-3.8-flash': { provider: 'gemini', name: 'Gemini 3.8 Flash', context: 1048576, maxTokens: 65536, image: true, reasoning: true },
   'deepseek-flash': { provider: 'deepseek', name: 'DeepSeek Flash', context: 131072, maxTokens: 32768, image: false, reasoning: true },
+  'gemini-3.8-flash': { provider: 'gemini', name: 'Gemini 3.8 Flash', context: 1048576, maxTokens: 65536, image: true, reasoning: true },
   'deepseek-v4-pro': { provider: 'deepseek', name: 'DeepSeek V4 Pro', context: 131072, maxTokens: 32768, image: false, reasoning: true },
   // GLM is paused (owner, 2026-11-18: the z.ai account has no credit; DeepSeek carries on). Remove `off` to bring it back.
   'glm-5.3-flash': { provider: 'glm', name: 'GLM 5.3 Flash', context: 200000, maxTokens: 32768, image: false, reasoning: true, off: true },
   'glm-5.3': { provider: 'glm', name: 'GLM 5.3', context: 200000, maxTokens: 32768, image: false, reasoning: true, off: true },
 };
-const ENTRY = ['gemini-3.8-flash', 'deepseek-flash'];
+const FIRST = 'deepseek-flash';
+const ENTRY = [FIRST, 'gemini-3.8-flash'];
 export const PLANS = {
-  trial: { models: ENTRY, fallback: 'deepseek-flash', effort: 'low', perDay: 15 },
-  basic: { models: ENTRY, fallback: 'deepseek-flash', effort: 'low', perDay: 15 },
-  premium: { models: ['gemini-3.8-flash', 'deepseek-flash', 'glm-5.3-flash'], effort: 'medium', perDay: 40 },
-  vvip: { models: Object.keys(MODELS), effort: null, perDay: 80 },
-  owner: { models: Object.keys(MODELS), effort: null, perDay: 100000 },
+  trial: { models: ENTRY, fallback: FIRST, effort: 'low', perDay: 15 },
+  basic: { models: ENTRY, fallback: FIRST, effort: 'low', perDay: 15 },
+  premium: { models: [...ENTRY, 'glm-5.3-flash'], fallback: FIRST, effort: 'medium', perDay: 40 },
+  vvip: { models: Object.keys(MODELS), fallback: FIRST, effort: null, perDay: 80 },
+  owner: { models: Object.keys(MODELS), fallback: FIRST, effort: null, perDay: 100000 },
 };
+/** Pure: the model a plan runs in place of a paused one: its fallback, else its first live model. */
+export const liveFirst = (plan) => (plan.fallback && !MODELS[plan.fallback]?.off ? plan.fallback : plan.models.find((id) => !MODELS[id].off));
 const GEMINI_LIGHT = 'gemini-3.5-flash-lite'; // tried when the main Gemini model is busy
 const TOKEN_HOURS = 12;
-const FALLBACK_MINUTES = 30;
 export const BUSY_MARK = '[crux:gemini-busy]';
 const EFFORT_ORDER = ['none', 'minimal', 'low', 'medium', 'high', 'max'];
 
@@ -62,7 +64,7 @@ export function effortFor(plan, asked) {
 export function modelsFor(tier) {
   const plan = PLANS[tier];
   if (!plan) return [];
-  return plan.models.filter((id) => !MODELS[id].off).map((id) => ({ id, object: 'model', owned_by: 'crux', name: plan.fallback === id ? `${MODELS[id].name} (when Gemini is busy)` : MODELS[id].name, context_length: MODELS[id].context, max_tokens: MODELS[id].maxTokens, image: MODELS[id].image, reasoning: MODELS[id].reasoning }));
+  return plan.models.filter((id) => !MODELS[id].off).map((id) => ({ id, object: 'model', owned_by: 'crux', name: MODELS[id].name, context_length: MODELS[id].context, max_tokens: MODELS[id].maxTokens, image: MODELS[id].image, reasoning: MODELS[id].reasoning }));
 }
 
 const usageRow = async (store, userId, day) => (await store.select('crux_ai_usage', `user_id=eq.${encodeURIComponent(userId)}&day=eq.${day}&select=answers,gemini_failed_at`))[0] || { answers: 0, gemini_failed_at: null };
@@ -91,12 +93,8 @@ export async function relay(request, path, { store = db, fetchImpl = fetch, now 
   try { body = await request.json(); } catch { return fail('That request was not valid JSON.', 400, 'bad_request'); }
   let model = String(body?.model || '');
   // a paused model (GLM) that a saved session still names goes to the plan's first live model, not to an error
-  if (MODELS[model]?.off) model = plan.models.find((id) => !MODELS[id].off) || model;
+  if (MODELS[model]?.off) model = liveFirst(plan) || model;
   if (!plan.models.includes(model)) return fail(`${model || 'That model'} isn't part of your plan. Pick another model in the list.`, 403, 'model_not_in_plan');
-  if (model === plan.fallback) {
-    const failedAt = usage.gemini_failed_at ? Date.parse(usage.gemini_failed_at) : 0;
-    if (now() - failedAt > FALLBACK_MINUTES * 60e3) return fail('DeepSeek is offered on your plan when Gemini is busy. Use Gemini 3.8 Flash.', 403, 'fallback_not_open');
-  }
   if (usage.answers >= plan.perDay) return fail(`Today's ${plan.perDay} answers on your plan are used. They reset at midnight, Nairobi time.`, 429, 'daily_limit');
 
   const spec = MODELS[model];

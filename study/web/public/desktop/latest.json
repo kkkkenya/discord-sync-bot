@@ -1,7 +1,7 @@
 {
   "version": "0.7.1",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "- **Updates without the browser.** Crux Harness checks for a new version when it opens and every six hours. When one is ready, a green bar says so; tap Restart and Crux Harness updates and opens again by itself. A version that needs a new installer is downloaded quietly in the background and installed with no clicks, so there is no GitHub page and no Windows warning.\r",
+  "notes": "Updates without the browser, clearer errors, DeepSeek first, and a fixed reader.",
   "released": "2026-11-20",
   "patch": {
     "version": "0.7.1",

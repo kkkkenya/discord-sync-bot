@@ -1,6 +1,14 @@
 {
-  "version": "0.7.0",
+  "version": "0.7.1",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "The Hub files desk for staff, and sharing several files at once.",
-  "released": "2026-11-18"
+  "notes": "- **Updates without the browser.** Crux Harness checks for a new version when it opens and every six hours. When one is ready, a green bar says so; tap Restart and Crux Harness updates and opens again by itself. A version that needs a new installer is downloaded quietly in the background and installed with no clicks, so there is no GitHub page and no Windows warning.\r",
+  "released": "2026-11-20",
+  "patch": {
+    "version": "0.7.1",
+    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.7.1/crux-harness-server-0.7.1.zip",
+    "sha256": "a9117a8b156f9a68107b9399053718af01247b566cb0483ff4830f4846e16bd0",
+    "size": 64272968,
+    "shell": "0.7.0",
+    "sig": "63f+VoumGtTVA2o2RRghhpXOl1K7c+0eqhJfeuIEecYJ5ZBQ3QlYbbSkDle5vjC725CKnEEap1fePFKDZDbYCw=="
+  }
 }

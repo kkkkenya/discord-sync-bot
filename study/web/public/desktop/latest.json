@@ -1,7 +1,7 @@
 {
-  "version": "0.7.1",
+  "version": "0.8.0",
   "url": "https://github.com/kkkkenya/crux-desktop/releases/latest/download/Crux-Setup.exe",
-  "notes": "Updates without the browser, clearer errors, DeepSeek first, and a fixed reader.",
+  "notes": "Updates download in the background.",
   "released": "2026-11-20",
   "patch": {
     "version": "0.7.1",
@@ -10,5 +10,12 @@
     "size": 64272968,
     "shell": "0.7.0",
     "sig": "63f+VoumGtTVA2o2RRghhpXOl1K7c+0eqhJfeuIEecYJ5ZBQ3QlYbbSkDle5vjC725CKnEEap1fePFKDZDbYCw=="
+  },
+  "installer": {
+    "version": "0.8.0",
+    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.8.0/Crux-Setup.exe",
+    "sha256": "d7070f110bc52f36cc0c830ae5f692faa64824972cd171978feb4a4783151806",
+    "size": 204341081,
+    "sig": "4W39FRG3fHgxY8W8C4jBUDRRI1Tr2Np3qZ+O4va8zWASz6Zb1LjBh+iLtL4uqoIG2eR7eyVuLULiyvX7cKSQDQ=="
   }
 }

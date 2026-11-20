@@ -27,3 +27,7 @@ Crux is the Study Hub's web app (crux.engineeringhub.site). The repo-level `CLAU
 - Each release gets a note in `docs/versions/<YYYY.MM.DD>.md` (Done, To do, Scrapped, Needs the owner).
 - Commits: `crux(<phase>): what`. Public repo: check `git diff --cached`; never commit `.env*`, `data/`, `fixplan*.md`.
 - After two failed tries at one problem, stop and give the owner two options.
+- AI errors go through `classify()` in `server/ai-errors.js`: one plain sentence for the student, the raw error redacted to the log. DeepSeek Flash is every plan's first model (owner, 2026-11-20).
+- Supabase Storage keys must be plain ASCII (`storageKey()` in `server/hub-uploads.js`): a curly quote, dash, accent or emoji gives `InvalidKey`. Keep the real name in the row.
+- Live upload checks (`shots/upload-e2e.mjs`) name files "Crux upload check <stamp> …", stamp first; the hub PC skips that prefix. Never leave a test row at `new`.
+- PDF pages take their own shape (height/width per page), never page 1's.

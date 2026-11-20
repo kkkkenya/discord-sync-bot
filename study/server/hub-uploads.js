@@ -12,7 +12,25 @@ export const MAX_BYTES = 50 * 1024 * 1024;
 export const PER_DAY = 30;
 const TYPES = /\.(pdf|jpe?g|png|pptx?|docx?)$/i;
 const bad = (message, status = 400) => Object.assign(new Error(message), { status });
-const safe = (name) => String(name).replace(/[\\/:*?"<>|#%{}^~[\]`]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120) || 'file';
+// The name the hub posts the file under: no path or reserved characters, up to 120 characters with its extension kept
+// (a cut extension was refused as "not a PDF", Track H4).
+export function safeName(name) {
+  const clean = String(name).replace(/[\\/:*?"<>|#%{}^~[\]`]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const ext = (clean.match(/\.[a-z0-9]{1,5}$/i) || [''])[0];
+  const base = clean.slice(0, clean.length - ext.length).trim().slice(0, 120 - ext.length).trim();
+  return base ? `${base}${ext}` : clean ? `file${ext}` : 'file';
+}
+const safe = safeName;
+// The Storage object's name: Supabase Storage takes only plain ASCII letters, digits and a few marks in a key
+// ("Lecturer’s notes.pdf" was refused as InvalidKey, Track H4). Accents lose their marks, curly quotes and dashes
+// become plain ones, anything else goes. The row keeps the real name, which is what the hub posts.
+export function storageKey(name) {
+  const ext = (String(name).match(/\.[a-z0-9]{1,5}$/i) || [''])[0];
+  const base = String(name).slice(0, String(name).length - ext.length).normalize('NFKD').replace(/\p{M}+/gu, '')
+    .replace(/[‘’ʼ]/g, "'").replace(/[‐-―−]/g, '-')
+    .replace(/[^\w !\-.'()&$@=;+,]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return `${base || 'file'}${ext}`;
+}
 
 async function storage(method, path, body) {
   const r = await fetch(`${process.env.SUPABASE_URL}/storage/v1${path}`, {
@@ -71,7 +89,7 @@ export async function startUpload(body, user, { store = storage } = {}) {
   const today = await db.select('crux_uploads', `user_id=eq.${enc(user.id)}&created_at=gt.${enc(since)}&select=id`);
   if (today.length >= PER_DAY) throw bad(`That's ${PER_DAY} files today. Add more tomorrow, or send them to a class rep.`, 429);
   const batch = String(body.batch || Date.now()).replace(/[^\w-]/g, '').slice(0, 40) || String(Date.now());
-  const path = `${unit.code.replace(' ', '-')}/${batch}/${Date.now().toString(36)}-${name}`;
+  const path = `${unit.code.replace(' ', '-')}/${batch}/${Date.now().toString(36)}-${storageKey(name)}`;
   const signed = await store('POST', `/object/upload/sign/${BUCKET}/${path.split('/').map(enc).join('/')}`);
   const [row] = await db.insert('crux_uploads', [{ user_id: user.id, user_name: user.name, unit_code: unit.code, batch, name, path, size, status: 'uploading' }]);
   return { id: row.id, uploadUrl: `${process.env.SUPABASE_URL}/storage/v1${signed.url}` };

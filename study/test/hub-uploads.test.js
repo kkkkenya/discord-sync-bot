@@ -30,3 +30,28 @@ test('ten posted files this semester make a trial or Basic member Premium until 
   assert.equal((await withReward({ id: 'b1', tier: 'basic' }, '2026-12-11', ten)).tier, 'basic', `after ${REWARD.end}`);
   assert.equal((await withReward({ id: 'x', tier: 'none' }, '2026-11-02', ten)).tier, 'none');
 });
+
+// Track H4 (2026-11-20): Supabase Storage refuses object keys with characters outside its set (InvalidKey, seen live
+// for "Lecturer’s notes.pdf", "Thermo – Chapter 2.pdf", "Résumé of topics.pdf", "Week 3 notes 📘.pdf"), and a long
+// name lost its extension and was refused as "not a PDF".
+test('the storage key is in the set Supabase Storage accepts; the name the student sees is kept', async () => {
+  const { storageKey, safeName } = await import('../server/hub-uploads.js');
+  const STORAGE_OK = /^(\w|\/|!|-|\.|\*|'|\(|\)| |&|\$|@|=|;|:|\+|,|\?)*$/; // supabase/storage's own key check
+  for (const name of ['Lecturer’s notes.pdf', 'Thermo – Chapter 2.pdf', 'Résumé of topics.pdf', 'Week 3 notes 📘.pdf', 'نوٹس.pdf', 'Plain notes.pdf']) {
+    const key = storageKey(safeName(name));
+    assert.match(key, STORAGE_OK, name);
+    assert.match(key, /\.pdf$/, name);
+  }
+  assert.equal(storageKey('Résumé of topics.pdf'), 'Resume of topics.pdf');
+  assert.equal(storageKey("Lecturer’s notes.pdf"), "Lecturer's notes.pdf");
+  assert.equal(safeName('Lecturer’s notes.pdf'), 'Lecturer’s notes.pdf', 'the hub posts it under its real name');
+});
+
+test('a long file name keeps its extension, so it is not refused as the wrong type', async () => {
+  const { safeName } = await import('../server/hub-uploads.js');
+  const long = `EMM 314 Work study and ergonomics complete lecture notes chapters one to five revised edition for semester one of the year.pdf`;
+  const out = safeName(long);
+  assert.ok(out.length <= 120, out.length);
+  assert.match(out, /\.pdf$/);
+  assert.match(out, /^EMM 314 Work study/);
+});

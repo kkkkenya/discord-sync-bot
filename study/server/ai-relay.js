@@ -9,6 +9,7 @@
 import { db } from '../../lib/db.js';
 import { sign, verify } from '../../lib/session.js';
 import { nairobiDay } from './plan.js';
+import { becauseOf, classify, logAiError } from './ai-errors.js';
 
 const UPSTREAM = {
   gemini: { url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions', key: 'GEMINI_API_KEY' },
@@ -37,10 +38,10 @@ export const PLANS = {
 export const liveFirst = (plan) => (plan.fallback && !MODELS[plan.fallback]?.off ? plan.fallback : plan.models.find((id) => !MODELS[id].off));
 const GEMINI_LIGHT = 'gemini-3.5-flash-lite'; // tried when the main Gemini model is busy
 const TOKEN_HOURS = 12;
-export const BUSY_MARK = '[crux:gemini-busy]';
+export const BUSY_MARK = '[crux:gemini-busy]'; // Harness 0.7.0 and older look for it; since H3 the relay switches models itself
 const EFFORT_ORDER = ['none', 'minimal', 'low', 'medium', 'high', 'max'];
 
-const fail = (message, status, code) => Response.json({ error: { message, type: code || 'crux_relay', code: code || null } }, { status, headers: { 'Cache-Control': 'no-store' } });
+const fail = (message, status, code, extra = {}, headers = {}) => Response.json({ error: { message, type: code || 'crux_relay', code: code || null, ...extra } }, { status, headers: { 'Cache-Control': 'no-store', ...headers } });
 
 /** A relay key for a signed-in student: their id and plan, for 12 hours. */
 export const aiToken = (user, now = Date.now()) => ({ token: sign({ kind: 'ai', id: user.id, tier: user.tier, exp: now + TOKEN_HOURS * 3600e3 }), exp: now + TOKEN_HOURS * 3600e3, tier: user.tier });
@@ -95,37 +96,72 @@ export async function relay(request, path, { store = db, fetchImpl = fetch, now 
   // a paused model (GLM) that a saved session still names goes to the plan's first live model, not to an error
   if (MODELS[model]?.off) model = liveFirst(plan) || model;
   if (!plan.models.includes(model)) return fail(`${model || 'That model'} isn't part of your plan. Pick another model in the list.`, 403, 'model_not_in_plan');
-  if (usage.answers >= plan.perDay) return fail(`Today's ${plan.perDay} answers on your plan are used. They reset at midnight, Nairobi time.`, 429, 'daily_limit');
+  if (usage.answers >= plan.perDay) { const c = classify({ kind: 'daily_limit', perDay: plan.perDay }); return fail(c.say, c.status, c.code, { action: c.action }); }
 
-  const spec = MODELS[model];
-  const up = UPSTREAM[spec.provider];
-  const key = env[up.key];
-  if (!key) return fail('This model is not set up on Crux yet.', 503, 'not_ready');
+  // Track H3: the asked model, then (when it fails for a reason that isn't the student's) the plan's next live
+  // models, in plan order, that have a key here. Gemini also tries its lighter model (its own quota) first.
+  const order = [model, ...plan.models.filter((id) => id !== model && !MODELS[id].off)].filter((id) => env[UPSTREAM[MODELS[id].provider].key]);
+  if (!order.length || order[0] !== model) return fail('This model is not set up on Crux yet. Pick another model in the list.', 503, 'not_ready', { action: 'switch' });
   const effort = effortFor(plan, body.reasoning_effort);
-  const out = { ...body, model, max_tokens: Math.min(Number(body.max_tokens) || spec.maxTokens, spec.maxTokens) };
-  delete out.max_completion_tokens;
-  const sent = providerEffort(spec.provider, effort);
-  if (sent) out.reasoning_effort = sent; else delete out.reasoning_effort;
-  if (!spec.image) out.messages = (out.messages || []).map((m) => (Array.isArray(m.content) ? { ...m, content: m.content.filter((p) => p.type !== 'image_url') } : m));
-
-  // Gemini: the asked model, then the lighter one (its own quota). On the entry plans DeepSeek is offered after that.
-  const tries = spec.provider === 'gemini' ? [model, GEMINI_LIGHT] : [model];
-  let r;
-  for (const id of tries) {
-    try {
-      r = await fetchImpl(up.url, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...out, model: id }) });
-    } catch { r = null; }
-    if (r && r.ok) break;
-    if (r && ![429, 500, 502, 503, 504].includes(r.status)) break; // a real refusal: no point retrying
-  }
-  if (!r || !r.ok) {
-    if (spec.provider === 'gemini' && plan.fallback && (!r || [429, 500, 502, 503, 504].includes(r.status))) {
-      await saveUsage(store, who.id, day, { answers: usage.answers, gemini_failed_at: new Date(now()).toISOString() }).catch(() => {});
-      return fail(`Gemini is busy right now. ${BUSY_MARK} Switch to DeepSeek Flash (when Gemini is busy) in the model list to keep going.`, 503, 'gemini_busy');
+  let first = null; // what went wrong with the asked model, for the note
+  let last = null;
+  for (const id of order) {
+    const spec = MODELS[id];
+    const up = UPSTREAM[spec.provider];
+    const out = { ...body, model: id, max_tokens: Math.min(Number(body.max_tokens) || spec.maxTokens, spec.maxTokens) };
+    delete out.max_completion_tokens;
+    const sent = providerEffort(spec.provider, effort);
+    if (sent) out.reasoning_effort = sent; else delete out.reasoning_effort;
+    if (!spec.image) out.messages = (out.messages || []).map((m) => (Array.isArray(m.content) ? { ...m, content: m.content.filter((p) => p.type !== 'image_url') } : m));
+    for (const upstreamId of spec.provider === 'gemini' ? [id, GEMINI_LIGHT] : [id]) {
+      const got = await call(fetchImpl, up.url, env[up.key], { ...out, model: upstreamId });
+      if (got.ok) {
+        await saveUsage(store, who.id, day, { answers: usage.answers + 1, gemini_failed_at: usage.gemini_failed_at }).catch((e) => console.error('crux_ai_usage:', e.message));
+        const headers = { 'Content-Type': got.r.headers.get('content-type') || 'application/json', 'Cache-Control': 'no-store', 'X-Crux-Answers-Left': String(Math.max(0, plan.perDay - usage.answers - 1)), 'X-Crux-Model': id };
+        if (first) headers['X-Crux-Note'] = `${MODELS[model].name} ${becauseOf(first.code)}, so ${spec.name} answered.`;
+        return new Response(guard(got.r, body.stream), { status: 200, headers });
+      }
+      last = classify(got.err, { model: spec.name });
+      logAiError(`ai relay ${upstreamId}`, `${got.err.status || got.err.kind} ${got.err.text || ''}`, env);
+      if (!first) first = last;
+      if (!['busy', 'timeout', 'down'].includes(last.code)) break; // the lighter Gemini only helps when Gemini is busy
     }
-    const said = r ? (await r.text().catch(() => '')).slice(0, 200) : '';
-    return fail(`The model didn't answer (${r ? r.status : 'no connection'}). Try again in a moment.${said && r.status < 500 ? ` ${said}` : ''}`, 502, 'upstream');
+    if (!last.switch) break; // the student's doing (too long, refused): another model won't help
   }
-  await saveUsage(store, who.id, day, { answers: usage.answers + 1, gemini_failed_at: usage.gemini_failed_at }).catch((e) => console.error('crux_ai_usage:', e.message));
-  return new Response(r.body, { status: 200, headers: { 'Content-Type': r.headers.get('content-type') || 'application/json', 'Cache-Control': 'no-store', 'X-Crux-Answers-Left': String(Math.max(0, plan.perDay - usage.answers - 1)) } });
+  return fail(last.say, last.status, last.code, { action: last.action, ...(last.waitSeconds != null && { wait_seconds: last.waitSeconds }) }, last.waitSeconds != null ? { 'Retry-After': String(last.waitSeconds) } : {});
+}
+
+/** One upstream call: { ok, r } or { ok: false, err } in the shape classify() reads. Waits up to a minute for the
+ * reply to start (the answer itself may stream for longer). */
+async function call(fetchImpl, url, key, payload, waitMs = 60e3) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), waitMs);
+  try {
+    const r = await fetchImpl(url, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal });
+    if (r.ok) return { ok: true, r };
+    return { ok: false, err: { status: r.status, text: (await r.text().catch(() => '')).slice(0, 2000), retryAfter: r.headers.get('retry-after') } };
+  } catch (e) {
+    return { ok: false, err: { kind: ctrl.signal.aborted ? 'timeout' : 'network', text: e?.message || '' } };
+  } finally { clearTimeout(timer); }
+}
+
+/** A streamed answer that breaks off mid-reply ends with an OpenAI-style error chunk (the desktop's client throws it
+ * as an error with the plain sentence), instead of stopping silently. */
+function guard(r, streamed) {
+  if (!streamed || !r.body || !/event-stream/.test(r.headers.get('content-type') || '')) return r.body;
+  const reader = r.body.getReader();
+  const cut = classify({ kind: 'cut' });
+  return new ReadableStream({
+    async pull(c) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) c.close(); else c.enqueue(value);
+      } catch (e) {
+        logAiError('ai relay stream', e);
+        c.enqueue(new TextEncoder().encode(`\n\ndata: ${JSON.stringify({ error: { message: cut.say, code: cut.code, type: 'crux_relay' } })}\n\n`));
+        c.close();
+      }
+    },
+    cancel(reason) { return reader.cancel(reason); },
+  });
 }

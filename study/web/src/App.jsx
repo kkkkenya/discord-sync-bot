@@ -85,6 +85,12 @@ export default function App({ user }) {
   const [focus, setFocus] = useState(null); // what a Today task asks for: { section, unit, topic }
   const [toast, setToast] = useState(null); // { text, undo }: deletes happen at once and can be undone for 8 s
   const notify = useCallback((text, undo) => setToast({ text, undo, id: Date.now() }), []);
+  useEffect(() => { // a model switch is said once per visit (api.js 'crux-ai-note')
+    const said = new Set();
+    const onNote = (e) => { if (!said.has(e.detail)) { said.add(e.detail); notify(e.detail); } };
+    window.addEventListener('crux-ai-note', onNote);
+    return () => window.removeEventListener('crux-ai-note', onNote);
+  }, [notify]);
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 8000);

@@ -91,13 +91,82 @@ test('a model outside the plan, or past the daily allowance, is refused before a
   assert.equal(seen.length, 0);
 });
 
-test('a refusal from the model (400) is not retried and does not open the fallback', async () => {
-  const { store, rows } = setup();
+// upstream by model: { 'deepseek-flash': [402, '{"error":{"message":"Insufficient Balance"}}'], ... }; unlisted answer 200
+const byModel = (plan, seen = []) => async (url, init) => {
+  const body = JSON.parse(init.body);
+  seen.push({ url, body });
+  const [status, text, headers = {}] = plan[body.model] || [200, '{"choices":[]}'];
+  return new Response(text, { status, headers: { 'content-type': 'application/json', ...headers } });
+};
+const errorOf = async (r) => (await r.json()).error;
+
+test('H3: DeepSeek out of credit: Gemini answers on its own, and the student is told once', async () => {
   const seen = [];
-  const r = await relay(...req('basic', { model: 'gemini-3.8-flash', messages: [] }), { store, fetchImpl: upstream(400, seen), now: () => NOW, env: ENV });
-  assert.equal(r.status, 502);
-  assert.equal(seen.length, 1);
-  assert.equal(rows.u1, undefined);
+  const { store, writes } = setup();
+  const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store, fetchImpl: byModel({ 'deepseek-flash': [402, '{"error":{"message":"Insufficient Balance"}}'] }, seen), now: () => NOW, env: ENV });
+  assert.equal(r.status, 200);
+  assert.deepEqual(seen.map((x) => x.body.model), ['deepseek-flash', 'gemini-3.8-flash']);
+  assert.equal(r.headers.get('x-crux-model'), 'gemini-3.8-flash');
+  assert.equal(r.headers.get('x-crux-note'), 'DeepSeek Flash is out of credit, so Gemini 3.8 Flash answered.');
+  assert.equal(writes.at(-1).answers, 1, 'one answer counted');
+});
+
+test('H3: every model fails: one plain sentence, the action, no key and no raw provider text', async () => {
+  const seen = [];
+  const { store } = setup();
+  const leak = '{"error":{"message":"Authentication Fails, Your api key: d is invalid"}}';
+  const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store, fetchImpl: byModel({ 'deepseek-flash': [401, leak], 'gemini-3.8-flash': [503, 'overloaded'], 'gemini-3.5-flash-lite': [503, 'overloaded'] }, seen), now: () => NOW, env: { GEMINI_API_KEY: 'g-secret-key-123', DEEPSEEK_API_KEY: 'd-secret-key-456' } });
+  assert.equal(r.status, 503);
+  const e = await errorOf(r);
+  assert.equal(e.code, 'busy');
+  assert.equal(e.action, 'switch');
+  assert.match(e.message, /^Gemini 3\.8 Flash is busy right now\./);
+  assert.doesNotMatch(JSON.stringify(e), /secret|Authentication|api key/);
+});
+
+test('H3: the student\'s own doing is not switched: context too long, refused content', async () => {
+  for (const [text, code, action] of [['{"error":{"message":"maximum context length is 131072 tokens"}}', 'too_long', 'shorten'], ['{"error":{"message":"Content Exists Risk"}}', 'refused', 'rephrase']]) {
+    const seen = [];
+    const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store: setup().store, fetchImpl: byModel({ 'deepseek-flash': [400, text] }, seen), now: () => NOW, env: ENV });
+    const e = await errorOf(r);
+    assert.equal(seen.length, 1, code);
+    assert.deepEqual([e.code, e.action], [code, action]);
+  }
+});
+
+test('H3: a rate limit passes on how long to wait', async () => {
+  const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store: setup().store, fetchImpl: byModel({ 'deepseek-flash': [429, 'slow down', { 'retry-after': '120' }], 'gemini-3.8-flash': [429, 'slow down', { 'retry-after': '300' }], 'gemini-3.5-flash-lite': [429, 'slow down', { 'retry-after': '300' }] }), now: () => NOW, env: ENV });
+  assert.equal(r.status, 429);
+  assert.equal(r.headers.get('retry-after'), '300');
+  assert.match((await errorOf(r)).message, /Wait 5 minutes/);
+});
+
+test('H3: a network failure and a timeout move on to the next model', async () => {
+  const seen = [];
+  const fetchImpl = async (url, init) => { const b = JSON.parse(init.body); seen.push(b.model); if (b.model === 'deepseek-flash') throw new TypeError('fetch failed'); return new Response('{"choices":[]}', { status: 200 }); };
+  const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store: setup().store, fetchImpl, now: () => NOW, env: ENV });
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('x-crux-note'), /couldn't be reached, so Gemini 3\.8 Flash answered/);
+});
+
+test('H3: a stream cut off mid-reply ends with a plain error chunk the client reads', async () => {
+  const enc = new TextEncoder();
+  const fetchImpl = async () => new Response(new ReadableStream({
+    start(c) { c.enqueue(enc.encode('data: {"choices":[{"delta":{"content":"Half"}}]}\n\n')); },
+    pull(c) { c.error(new Error('socket hang up')); },
+  }), { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [], stream: true }), { store: setup().store, fetchImpl, now: () => NOW, env: ENV });
+  const text = await r.text();
+  assert.match(text, /Half/);
+  assert.match(text, /data: \{"error":\{"message":"The answer stopped partway\. Send your message again\.","code":"cut"/);
+});
+
+test('H3: the daily allowance used up says when it resets', async () => {
+  const r = await relay(...req('basic', { model: 'deepseek-flash', messages: [] }), { store: setup({ u1: { answers: 15 } }).store, fetchImpl: byModel({}), now: () => NOW, env: ENV });
+  const e = await errorOf(r);
+  assert.equal(r.status, 429);
+  assert.deepEqual([e.code, e.action], ['daily_limit', 'wait']);
+  assert.match(e.message, /15 answers.*midnight/);
 });
 
 test('usage and models endpoints', async () => {

@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { renderPdfPages } from './pdf-pages.js';
 import { tmpdir } from 'node:os';
 import { deepseekCost } from './defs.js';
+import { becauseOf, classify, logAiError } from './ai-errors.js';
 import { data, requestScope } from './store.js';
 import { addDeepseekSpend, deepseekOpen } from './usage.js';
 
@@ -60,8 +61,8 @@ const fetchWithTimeout = (url, options, ms = 30000) => {
   const t = setTimeout(() => ctrl.abort(), ms);
   return fetch(url, { ...options, signal: ctrl.signal })
     .catch((e) => {
-      if (e.name === 'AbortError') throw Object.assign(new Error('AI request timed out'), { retryable: true });
-      throw e;
+      if (e.name === 'AbortError') throw Object.assign(new Error('AI request timed out'), { retryable: true, ai: { kind: 'timeout' } });
+      throw Object.assign(new Error(`AI request failed: ${e.message}`), { retryable: true, ai: { kind: 'network', text: e.message } });
     })
     .finally(() => clearTimeout(t));
 };
@@ -97,11 +98,14 @@ async function geminiCall(schema, system, content, maxTokens, media = [], chain 
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: body(m),
     }, waitFor(maxTokens, media));
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`), { retryable: [429, 500, 502, 503, 504].includes(r.status) });
+    const raw = await r.text().catch(() => '');
+    let d = {};
+    try { d = JSON.parse(raw); } catch { /* not JSON: kept as text for the log */ }
+    if (!r.ok) throw Object.assign(new Error(`Gemini ${r.status}: ${d.error?.message || 'request failed'}`), { retryable: [429, 500, 502, 503, 504].includes(r.status), ai: { status: r.status, text: raw.slice(0, 2000), retryAfter: r.headers.get('retry-after') } });
     const text = d.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
-    if (!text) throw new Error(`Gemini gave no answer (${d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || 'empty'})`);
-    return JSON.parse(text);
+    const why = d.candidates?.[0]?.finishReason || d.promptFeedback?.blockReason || 'empty';
+    if (!text) throw Object.assign(new Error(`Gemini gave no answer (${why})`), { ai: /SAFETY|BLOCK|PROHIBITED|RECITATION/i.test(why) ? { kind: 'blocked', text: why } : { kind: 'bad_json', text: why } });
+    try { return JSON.parse(text); } catch (e) { throw Object.assign(new Error(`Gemini gave bad JSON: ${e.message}`), { ai: { kind: 'bad_json', text: e.message } }); }
   };
   // Busy/hung servers are common and short-lived: one go on the primary, then straight to the lighter model, so a
   // failure shows in about a minute rather than two.
@@ -191,7 +195,7 @@ async function deepseekCall(schema, system, content, maxTokens) {
       await sleep(3000 * (attempt + 1));
       continue;
     }
-    if (!r.ok) throw new Error(`DeepSeek ${r.status}: ${text.slice(0, 200)}`);
+    if (!r.ok) throw Object.assign(new Error(`DeepSeek ${r.status}: ${text.slice(0, 200)}`), { ai: { status: r.status, text: text.slice(0, 2000), retryAfter: r.headers.get('retry-after') } });
     // the owner's own laptop runs (withModel) are not the students' monthly budget
     if (!pin()) try { addDeepseekSpend(deepseekCost(JSON.parse(text).usage)).catch((e) => console.error('DeepSeek spend:', e.message)); } catch { /* no usage block */ }
     let raw = '';
@@ -202,7 +206,7 @@ async function deepseekCall(schema, system, content, maxTokens) {
     if (err) { last = err; messages.push({ role: 'assistant', content: raw }, { role: 'user', content: `The JSON didn't match the schema (${err}). Return the corrected JSON only.` }); continue; }
     return obj;
   }
-  throw new Error(`DeepSeek returned invalid JSON after retries: ${last}`);
+  throw Object.assign(new Error(`DeepSeek returned invalid JSON after retries: ${last}`), { ai: { kind: 'bad_json', text: String(last) } });
 }
 
 // A scanned PDF read whichever provider the student picked: the shared library is read once for everyone.
@@ -268,8 +272,36 @@ export async function structured(schema, system, content, maxTokens = 4000, medi
   const memo = requestScope()?.memo;
   const key = memo && JSON.stringify([p, schema, system, content, media.map((m) => m.data.length)]);
   if (key && memo.has(key)) return structuredClone(memo.get(key));
-  const out = p === 'claude-code' ? await claudeCodeCall(schema, system, content, maxTokens)
-    : p === 'gemini' ? await geminiCall(schema, system, content, maxTokens, media) : await deepseekCall(schema, system, content, maxTokens);
+  const out = await answer(p, schema, system, content, maxTokens, media);
   if (key) memo.set(key, structuredClone(out));
   return out;
+}
+
+const NAMES = { deepseek: 'DeepSeek', gemini: 'Gemini', 'claude-code': 'Claude Code' };
+const callOne = (p, schema, system, content, maxTokens, media) => (p === 'claude-code' ? claudeCodeCall(schema, system, content, maxTokens)
+  : p === 'gemini' ? geminiCall(schema, system, content, maxTokens, media) : deepseekCall(schema, system, content, maxTokens));
+
+// Track H3: a provider error becomes one plain sentence (ai-errors.js) and the raw error goes to the log. When it
+// failed for a reason that isn't the student's (credit, busy, down), the other provider answers, if it has a key and
+// can read what was sent, and the request carries a note saying so (api/router.js sends it as X-Crux-Note).
+// The owner's own laptop runs (withModel, Claude Code) keep the raw error and never switch.
+async function answer(p, schema, system, content, maxTokens, media) {
+  try { return await callOne(p, schema, system, content, maxTokens, media); } catch (e) {
+    if (pin() || p === 'claude-code' || !e.ai) throw e;
+    let c = classify(e.ai, { model: NAMES[p] });
+    logAiError(`ai ${p}`, e);
+    const other = PROVIDERS.find((q) => q !== p && process.env[KEYS[q]] && (q !== 'deepseek' || deepseekFor()) && media.every((m) => CAN[q][m.mime.startsWith('audio/') ? 'audio' : 'image']));
+    if (c.switch && other) {
+      try {
+        const out = await callOne(other, schema, system, content, maxTokens, media);
+        requestScope()?.aiNotes?.push(`${NAMES[p]} ${becauseOf(c.code)}, so ${NAMES[other]} answered.`);
+        return out;
+      } catch (e2) {
+        if (!e2.ai) throw e2;
+        logAiError(`ai ${other}`, e2);
+        c = classify(e2.ai, { model: NAMES[other] });
+      }
+    }
+    throw Object.assign(new Error(c.say), { status: c.status, code: c.code, action: c.action, retryable: e.retryable, ...(c.waitSeconds != null && { waitSeconds: c.waitSeconds }) });
+  }
 }

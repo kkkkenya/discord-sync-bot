@@ -64,15 +64,18 @@ export function makeRouter(docs, deps = { db, member: memberOf }) {
       // study rooms read only their own tables: no document to load or save (a full room polls every 20 s)
       if (ROOM_PATHS.test(path)) return reply(await roomsRoute(request.method, path, query, body, user));
       if (HUB_PATHS.test(path)) return reply(await hubRoute(request.method, path, query, body, user)); // the Hub files desk: Discord and Supabase only
-      const result = await withSavedDoc(docs, user.id, (extra) => dispatch(request.method, path, query, body, { user, today: nairobiDay(), ...extra }));
+      const aiNotes = [];
+      const result = await withSavedDoc(docs, user.id, (extra) => dispatch(request.method, path, query, body, { user, today: nairobiDay(), aiNotes, ...extra }));
       if (result instanceof Response) { // a file download (Anki export)
         if (cookie) result.headers.append('Set-Cookie', cookie);
         return result;
       }
-      return reply(result);
+      const r = reply(result);
+      if (aiNotes.length) r.headers.set('X-Crux-Note', [...new Set(aiNotes)].join(' ')); // one note, however many calls switched
+      return r;
     } catch (e) {
       if (!e.status) console.error(e);
-      return json({ error: e.message, ...(e.resetsAt && { resetsAt: e.resetsAt }) }, e.status || 500);
+      return json({ error: e.message, ...(e.resetsAt && { resetsAt: e.resetsAt }), ...(e.code && e.action && { code: e.code, action: e.action }), ...(e.waitSeconds != null && { waitSeconds: e.waitSeconds }) }, e.status || 500);
     }
   };
 }

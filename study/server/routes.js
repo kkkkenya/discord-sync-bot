@@ -599,6 +599,7 @@ export async function dispatch(method, pathname, query, body, ctx) {
   const scope = requestScope();
   if (scope && ctx?.user) scope.user = ctx.user; // the provider choice depends on the tier (ai.js)
   if (scope && ctx?.memo) scope.memo = ctx.memo; // AI answers kept for a redo after a save conflict
+  if (scope && ctx?.aiNotes) scope.aiNotes = ctx.aiNotes; // "DeepSeek is busy, so Gemini answered." (ai.js, Track H3)
   if (method === 'POST' && USES_AI.test(pathname) && ctx?.user && aiReady() && !ctx.redo) {
     const used = await bump(ctx.user, 'ai');
     if (!used.ok) throw Object.assign(new Error(AI_LIMIT_MESSAGE), { status: 429, limit: 'ai' });

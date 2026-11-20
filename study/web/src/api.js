@@ -10,6 +10,9 @@ const send = async (method, path, body) => {
     body: body ? JSON.stringify(body) : undefined,
   });
   const out = await r.json();
+  // "DeepSeek is busy, so Gemini answered." (server/ai.js, Track H3): App.jsx shows it once
+  const note = r.headers.get('X-Crux-Note');
+  if (note && typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('crux-ai-note', { detail: note }));
   if (!r.ok) throw Object.assign(new Error(out.error || r.statusText), { status: r.status });
   return out;
 };

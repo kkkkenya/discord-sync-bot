@@ -4,12 +4,12 @@
   "notes": "Updates download in the background.",
   "released": "2026-11-20",
   "patch": {
-    "version": "0.7.2",
-    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.7.2/crux-harness-server-0.7.2.zip",
-    "sha256": "825a217e4d9608138a5a102e6aed449147514161c2239a6177f7b8aa526c61d8",
-    "size": 64308373,
+    "version": "0.7.3",
+    "url": "https://github.com/kkkkenya/crux-desktop/releases/download/v0.7.3/crux-harness-server-0.7.3.zip",
+    "sha256": "d4f9fcb765762bddbd689dbc931e4532827e4670234e5ef04b95578cc39fff53",
+    "size": 64311546,
     "shell": "0.7.0",
-    "sig": "HYcTNA7EP9oYD1Rjdx4VUuPiLwiBpxnA2U+sPxHOHZNQpunKay2WhShmUaFUjhK0rAY0dNNozqQQG5+aaZAQDw=="
+    "sig": "m2bJ+eCe1TmpkIxsyzlPs546wxinIpGTxngusxbU2DEQqEal3tkkSIDRwViK74ymr6GnBdRqqgOYOn5vNlXsCg=="
   },
   "installer": {
     "version": "0.8.0",
